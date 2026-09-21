@@ -1,0 +1,26 @@
+# OpenAI models of generate_traces and the Chat Completions kwargs each is called with.
+# SIM_AGENT_MODEL / SIM_CUSTOMER_MODEL override `roles`; a model missing from `models` gets no kwargs.
+
+roles:
+  agent: gpt-5.4-mini     # the agent's StructuredLLM (stands in for Bedrock)
+  customer: gpt-5.4-mini  # writes briefs and plays the customer
+
+models:
+  # Per call kind:
+  #   tools: the agent's extraction, a forced function call (the Bedrock method)
+  #   parse: structured output via response_format (briefs, customer turns)
+  gpt-5.4-mini:
+    tools: {reasoning_effort: none}  # chat completions rejects function tools with reasoning on
+    parse: {reasoning_effort: low}
+  gpt-5.4:
+    tools: {reasoning_effort: none}
+    parse: {reasoning_effort: low}
+  gpt-5.5:
+    tools: {reasoning_effort: none}
+    parse: {reasoning_effort: low}
+  gpt-4.1:
+    tools: {temperature: 0}
+    parse: {temperature: 0.7}
+  gpt-4.1-mini:
+    tools: {temperature: 0}
+    parse: {temperature: 0.7}

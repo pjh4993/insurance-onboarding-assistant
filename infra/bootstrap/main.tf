@@ -1,5 +1,5 @@
 # One-time stack that creates the Terraform state bucket and lock table used by
-# envs/develop and envs/prod. It keeps its own state locally (run once by an
+# envs/develop and envs/prod, and the Iceberg warehouse bucket of the data lakehouse (data/). It keeps its own state locally (run once by an
 # admin, then commit nothing: *.tfstate is git-ignored).
 #
 #   cd infra/bootstrap && terraform init && terraform apply
@@ -126,10 +126,89 @@ resource "aws_dynamodb_table" "locks" {
   }
 }
 
+# Iceberg warehouse for data/registry (personas, simulated conversation traces). Iceberg keeps its
+# own snapshots, so the bucket is not versioned.
+resource "aws_s3_bucket" "lakehouse" {
+  bucket = "onboarding-lakehouse-${data.aws_caller_identity.current.account_id}"
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "lakehouse" {
+  bucket = aws_s3_bucket.lakehouse.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "aws:kms"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "lakehouse" {
+  bucket                  = aws_s3_bucket.lakehouse.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_ownership_controls" "lakehouse" {
+  bucket = aws_s3_bucket.lakehouse.id
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "lakehouse" {
+  bucket = aws_s3_bucket.lakehouse.id
+  rule {
+    id     = "abort-incomplete-uploads"
+    status = "Enabled"
+    filter {}
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+data "aws_iam_policy_document" "lakehouse_tls_only" {
+  statement {
+    sid     = "DenyInsecureTransport"
+    effect  = "Deny"
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.lakehouse.arn,
+      "${aws_s3_bucket.lakehouse.arn}/*",
+    ]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "lakehouse" {
+  bucket = aws_s3_bucket.lakehouse.id
+  policy = data.aws_iam_policy_document.lakehouse_tls_only.json
+
+  depends_on = [aws_s3_bucket_public_access_block.lakehouse]
+}
+
 output "state_bucket_name" {
   value = aws_s3_bucket.state.bucket
 }
 
 output "lock_table_name" {
   value = aws_dynamodb_table.locks.name
+}
+
+output "lakehouse_bucket_name" {
+  value = aws_s3_bucket.lakehouse.bucket
 }

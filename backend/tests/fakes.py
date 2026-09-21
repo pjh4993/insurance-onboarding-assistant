@@ -36,9 +36,12 @@ def identity_input(key: str, *, consent: bool, with_dob: bool = False) -> dict[s
 
 
 class FakeExternal:
-    """Partner, identity and contract systems. `fail[target] = n` fails the next n calls with 500."""
+    """Partner, identity and contract systems. `fail[target] = n` fails the next n calls with 500.
 
-    def __init__(self) -> None:
+    `customers` replaces the seed customers (same record shape), e.g. for simulated personas."""
+
+    def __init__(self, customers: list[dict[str, Any]] | None = None) -> None:
+        self.customers = SEED if customers is None else customers
         self.calls: list[tuple[str, str, dict[str, str], Any]] = []
         self.fail: Counter[str] = Counter()
         self.otps: dict[str, str] = {}
@@ -48,7 +51,7 @@ class FakeExternal:
         return httpx.MockTransport(self.handle)
 
     def _customer_by(self, field: str, value: Any) -> dict[str, Any] | None:
-        return next((c for c in SEED if c.get(field) == value), None)
+        return next((c for c in self.customers if c.get(field) == value), None)
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -77,7 +80,7 @@ class FakeExternal:
         if m:
             if not request.headers.get("x-consent-at"):
                 return httpx.Response(403, json={"error": "consent required"})
-            c = next((c for c in SEED if c["partner"] and c["partner"]["partner_customer_ref"] == m[1]), None)
+            c = next((c for c in self.customers if c["partner"] and c["partner"]["partner_customer_ref"] == m[1]), None)
             return httpx.Response(200, json={"purchases": c["partner"]["purchases"] if c else []})
         if path == "/identity/v1/otp":
             otp_id = f"otp-{len(self.otps) + 1}"

@@ -1,0 +1,40 @@
+[project]
+name = "onboarding-data"
+version = "0.1.0"
+description = "Data lakehouse (Iceberg on S3) and pipelines: personas and simulated conversation traces"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "onboarding-core",
+    "onboarding-agent",
+    "pyiceberg[pyarrow,sql-sqlite]>=0.9",
+    "pandas>=2.2",
+    "boto3>=1.35",
+    "openai>=2.0",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "psycopg[binary,pool]>=3.2",
+    "pydantic-settings>=2.6",
+    "httpx>=0.27",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.8"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+onboarding-core = { path = "../backend/packages/core", editable = true }
+onboarding-agent = { path = "../backend/packages/agent", editable = true }
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+src = [".", "../backend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# imports the backend source tree after putting it on sys.path; the Korean prompts are long lines
+"pipeline/generate_traces.py" = ["E402", "E501"]
