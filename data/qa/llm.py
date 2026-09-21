@@ -64,9 +64,25 @@ class OpenAIStructuredLLM:
             **call_kwargs(self._model, "tools"),
         )
         tool_calls = resp.choices[0].message.tool_calls
-        if not tool_calls:
-            raise ValueError(f"{node}: model returned no {name} tool call")
-        result = schema.model_validate_json(tool_calls[0].function.arguments)
+        raw = tool_calls[0].function.arguments if tool_calls else None
+        try:
+            if raw is None:
+                raise ValueError(f"{node}: model returned no {name} tool call")
+            result = schema.model_validate_json(raw)
+        except Exception as exc:
+            # Failed attempts are kept too: a retry that hides a bad output is what QA should see.
+            calls_var.get([]).append(
+                {
+                    "node": node,
+                    "schema": name,
+                    "model": self._model,
+                    "input": openai_messages(messages),
+                    "output": {"error": f"{type(exc).__name__}: {exc}", "raw": raw},
+                    "latency_s": round(time.monotonic() - started, 2),
+                    "usage": resp.usage.model_dump() if resp.usage else None,
+                }
+            )
+            raise
         calls_var.get([]).append(
             {
                 "node": node,

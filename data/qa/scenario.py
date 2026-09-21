@@ -1,5 +1,5 @@
 """Scenarios: a persona, the situation it is in, the facts it knows (the brief), how it behaves, and what the
-conversation should end with. Scenarios are frozen in `onboarding_traces.qa_scenarios` so every run of a
+conversation should end with. Scenarios are frozen in `onboarding_qa.scenarios` so every run of a
 suite replays the same customers; dates are stored relative to the day ("today+21") so they stay valid.
 
 Two sources: `freeze_sample` has the customer model write briefs for a persona sample (the smoke suite),
@@ -46,6 +46,7 @@ class Expect:
     status: Status
     product: str | None = None
     max_turns: int = 14
+    agent_says: tuple[str, ...] = ()  # phrases the agent must say at some point (e.g. an explanation)
 
 
 class Device(BaseModel):

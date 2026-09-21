@@ -24,7 +24,7 @@ variable "region" {
 variable "lakehouse_namespaces" {
   description = "Iceberg namespaces of data/registry; each is a Glue database onboarding_<namespace>."
   type        = list(string)
-  default     = ["personas", "traces"]
+  default     = ["personas", "traces", "qa"]
 }
 
 variable "lock_table_name" {

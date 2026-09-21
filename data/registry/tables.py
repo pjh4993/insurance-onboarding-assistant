@@ -150,7 +150,7 @@ LLM_CALLS = TableDef(
 )
 
 QA_SCENARIOS = TableDef(
-    "onboarding_traces.qa_scenarios",
+    "onboarding_qa.scenarios",
     pa.schema(
         [
             pa.field("scenario_id", pa.string(), nullable=False),
@@ -170,7 +170,7 @@ QA_SCENARIOS = TableDef(
 )
 
 QA_RUNS = TableDef(
-    "onboarding_traces.qa_runs",
+    "onboarding_qa.runs",
     pa.schema(
         [
             pa.field("run_id", pa.string(), nullable=False),
@@ -190,7 +190,7 @@ QA_RUNS = TableDef(
 )
 
 QA_CHECKS = TableDef(
-    "onboarding_traces.qa_checks",
+    "onboarding_qa.checks",
     pa.schema(
         [
             pa.field("run_id", pa.string(), nullable=False),

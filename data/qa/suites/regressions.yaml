@@ -99,3 +99,24 @@ scenarios:
         - {relation: 남편, full_name: 김민수, date_of_birth: "2005-11-20", gender: M, role: PAYER}
       change_story: ""
       speaking_style: 경기권 20대 초반, 차분한 생활형 말투.
+
+  - id: reg-policyholder-is-applicant
+    # Asked for the spouse as policyholder, the agent re-summarized without explaining and handed off
+    # after three rejections (SUMMARY_REJECTED).
+    persona_uuid: be2a5eadd01b42c98c2a724fc48495d4
+    situation: {identity: PARTNER, need: PHONE, decision: ACCEPT, note: "남편을 계약자로 요청하지만 계약자는 신청자 본인만 가능"}
+    behavior: 챗봇이 피보험자와 납입자를 처음 물으면 반드시 "계약자와 납입자 모두 남편 김민수로 해 주세요"라고 요청합니다. 챗봇이 계약자는 신청자 본인만 될 수 있다고 설명하기 전에는 계약자가 본인이라고 먼저 말하지 않습니다. 설명을 들은 뒤에는 받아들이고, 본인이 계약자·피보험자, 남편이 납입자인 요약을 확인합니다.
+    expect: {status: SUBMITTED, product: KR-MOB-SWAP, agent_says: ["계약자는 본인 확인을 마친 신청자 본인"]}
+    brief:
+      full_name: 김다움
+      email: daum.kim@example.com
+      phone: "+821000000000"
+      date_of_birth: "2006-03-14"
+      gender: F
+      need_story: 제휴 매장에서 산 새 폰을 보장받고 싶고, 보험료는 남편이 내기로 했습니다.
+      device: {category: SMARTPHONE, manufacturer: Samsung, model: Galaxy S25, purchase_date: today-4, price_krw: 1298000, serial_or_imei: "353912340567892"}
+      trip: null
+      other_people:
+        - {relation: 남편, full_name: 김민수, date_of_birth: "2005-11-20", gender: M, role: PAYER}
+      change_story: ""
+      speaking_style: 경기권 20대 초반, 차분한 생활형 말투.

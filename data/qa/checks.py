@@ -139,6 +139,16 @@ def turn_budget(t: dict[str, Any]) -> Result:
     return (PASS if n <= limit else FAIL), f"{n} turns (budget {limit})"
 
 
+def agent_says(t: dict[str, Any]) -> Result:
+    """Phrases the scenario expects the agent to say, such as an explanation it owes the customer."""
+    wanted = t["expect"].get("agent_says") or []
+    if not wanted:
+        return SKIP, "nothing expected"
+    said = "\n".join(m["text"] for m in t.get("messages") or [] if m["role"] == "assistant")
+    missing = [w for w in wanted if w not in said]
+    return (FAIL, f"never said {missing}") if missing else (PASS, f"said {wanted}")
+
+
 def no_error(t: dict[str, Any]) -> Result:
     if t.get("error"):
         return FAIL, t["error"].strip().splitlines()[-1]
@@ -159,6 +169,7 @@ CHECKS: dict[str, Callable[[dict[str, Any]], Result]] = {
     "no_loop": no_loop,
     "finished": finished,
     "turn_budget": turn_budget,
+    "agent_says": agent_says,
     "no_error": no_error,
 }
 

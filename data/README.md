@@ -29,7 +29,7 @@ docker compose up -d postgres   # qa runs the agent on the compose Postgres (dat
 ```
 
 - **Warehouse:** `s3://onboarding-lakehouse-<account>/warehouse`.
-- **Catalog:** AWS Glue. There is one database per namespace, `onboarding_personas` and `onboarding_traces`, so the tables can also be queried from Athena. The QA tables live in `onboarding_traces` with a `qa_` prefix.
+- **Catalog:** AWS Glue. There is one database per namespace (`onboarding_personas`, `onboarding_traces`, `onboarding_qa`), so the tables can also be queried from Athena.
 - **Where they come from:** the bucket and the Glue databases are both created in `infra/bootstrap`. Adding a namespace means adding it to `lakehouse_namespaces` there.
 - **AWS access:** Glue and S3 are reached with the AWS profile `aws-jhpark`.
 - **Env overrides:** see `registry/catalog.py` for `LAKEHOUSE_*`, and `qa/llm.py` and `qa/harness.py` for `SIM_*`.
@@ -74,9 +74,9 @@ A scenario is made of these parts:
 - **Situation:** the identity path (partner match, OTP, document, both checks failing), the need (phone, laptop, appliance, trip, or a phone too old to insure), and the decision (accept, change, decline).
 - **Brief:** the facts the customer knows. It is the ground truth the checks compare the agent against.
 - **Behavior:** an optional hint for how to talk, such as "give the price in 만 원".
-- **Expectation:** the final status, the submitted product and a turn budget.
+- **Expectation:** the final status, the submitted product, a turn budget, and optionally phrases the agent must say.
 
-Scenarios are stored in `onboarding_traces.qa_scenarios`; the latest row per id wins. Dates are stored relative to the day (`today`, `today+29`) and resolved on the market's calendar, so a suite stays valid over time.
+Scenarios are stored in `onboarding_qa.scenarios`; the latest row per id wins. Dates are stored relative to the day (`today`, `today+29`) and resolved on the market's calendar, so a suite stays valid over time.
 
 The harness replaces each brief's phone and email with values unique to the scenario, because the identity fakes look customers up by them.
 
@@ -94,6 +94,7 @@ The harness replaces each brief's phone and email with values unique to the scen
 | `no_loop` | the same input was asked for more than 3 times in a row |
 | `finished` | the conversation was still active at the step limit |
 | `turn_budget` | the conversation took more turns than the scenario allows |
+| `agent_says` | the agent never said a phrase the scenario requires (an explanation it owes the customer) |
 | `no_error` | the harness crashed or the session went to an agent for an error |
 
 ### What is and is not real
@@ -110,9 +111,9 @@ The harness replaces each brief's phone and email with values unique to the scen
 |---|---|---|
 | `onboarding_personas.nemotron_ko` | one persona (Nemotron-Personas-Korea row, CC BY 4.0) | — |
 | `onboarding_personas.samples` | one persona in a named sample, with its `position` | `sample_id` |
-| `onboarding_traces.qa_scenarios` | one version of a scenario | `suite` |
-| `onboarding_traces.qa_runs` | one run: suites, repeats, git commit, models | — |
-| `onboarding_traces.qa_checks` | one check's verdict on one conversation | `run_id` |
+| `onboarding_qa.scenarios` | one version of a scenario | `suite` |
+| `onboarding_qa.runs` | one run: suites, repeats, git commit, models | — |
+| `onboarding_qa.checks` | one check's verdict on one conversation | `run_id` |
 | `onboarding_traces.conversations` | one conversation: scenario, final status, brief, messages, entities | `run_id` |
 | `onboarding_traces.turns` | one input the graph waited for, with the agent prompt and timings | `run_id` |
 | `onboarding_traces.llm_calls` | one structured-output call of the agent (node, input, output, tokens) | `run_id` |
