@@ -6,7 +6,8 @@ AI customer onboarding and policy recommendation, from identity check to submitt
 
 <p align="center">
 | <a href="https://dev.docs.onboardassist.click/"><b>Documentation</b></a>
-| <a href="https://dev.onboardassist.click/agent"><b>Live demo</b></a>
+| <a href="https://dev.app.onboardassist.click/"><b>Live demo</b></a>
+| <a href="https://dev.agent.onboardassist.click/"><b>Agent console</b></a>
 | <a href="https://dev.docs.onboardassist.click/design/01-solution-architecture/"><b>Architecture</b></a>
 | <a href="https://dev.docs.onboardassist.click/guides/demo/"><b>Demo walkthrough</b></a>
 | <a href="https://dev.docs.onboardassist.click/guides/development/"><b>Development</b></a> |

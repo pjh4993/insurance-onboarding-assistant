@@ -17,8 +17,9 @@ partner_api_url  = "https://partner.invalid"
 identity_api_url = "https://identity.invalid"
 contract_api_url = "https://contract.invalid"
 
-# Hosts in the zone develop's domain registration created (develop: dev., dev.docs.).
+# Hosts in the zone develop's domain registration created (develop: dev.app., dev.agent., dev.docs.).
 domain_name       = "app.onboardassist.click"
+agent_domain_name = "agent.onboardassist.click"
 docs_domain_name  = "docs.onboardassist.click"
 route53_zone_name = "onboardassist.click"
 

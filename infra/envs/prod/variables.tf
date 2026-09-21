@@ -127,6 +127,12 @@ variable "domain_name" {
   default     = ""
 }
 
+variable "agent_domain_name" {
+  description = "Hostname of the agent console, in route53_zone_name. Empty = the console stays on domain_name under /agent."
+  type        = string
+  default     = ""
+}
+
 variable "docs_domain_name" {
   description = "Hostname of the docs site, in route53_zone_name. Empty = no docs host."
   type        = string

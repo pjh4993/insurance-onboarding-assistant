@@ -14,7 +14,7 @@ infra/
     security/   security groups and their rules, KMS key
     data/       RDS PostgreSQL 16, parameter group (TLS forced), application secrets
     auth/       Cognito user pool, domain, app client for the ALB
-    edge/       ALB, target group, listeners, ACM certificate + Route 53 records, Cognito rule on agent paths
+    edge/       ALB, target group, listeners, ACM certificate + Route 53 records, Cognito rule on the agent host
     service/    one ECS service: task definition, Service Connect, task + execution roles, log group
     ci/         GitHub OIDC provider and ECR repositories (shared), one deploy role per environment
   envs/
@@ -48,7 +48,8 @@ plain HTTP on port 80, so the stack can be planned and applied without one.
 | Variable | develop | prod |
 |---|---|---|
 | `enable_mocks` | `true` | `false` |
-| `domain_name` | `dev.onboardassist.click` | `app.onboardassist.click` |
+| `domain_name` (customers) | `dev.app.onboardassist.click` | `app.onboardassist.click` |
+| `agent_domain_name` (agents, Cognito) | `dev.agent.onboardassist.click` | `agent.onboardassist.click` |
 | `docs_domain_name` | `dev.docs.onboardassist.click` | `docs.onboardassist.click` |
 | `interface_endpoint_azs` | `2a` | `2a`, `2c` |
 | `single_nat_gateway` | `true` (1 NAT) | `false` (1 per AZ) |

@@ -25,7 +25,7 @@ The numbers in `design/` and `infra/` are a reading order: each document assumes
 - One mock service for partner, identity, contract admin and Bedrock, with seed customers A–D and fault injection.
 - A frontend with the customer app and an agent console: session list, conversation, progress and application
   views, new session links, take over, answer as agent, handoff resolution.
-- Terraform for both environments (develop has a domain, HTTPS and Cognito for the agent paths), a bootstrap
+- Terraform for both environments (develop has customer, agent and docs hosts, HTTPS, and Cognito on the agent host), a bootstrap
   stack for remote state, CI checks, a develop deploy and a prod promotion.
 - Traces and structured logs to Grafana Cloud, and this documentation site on its own host (`dev.docs.` / `docs.`).
 

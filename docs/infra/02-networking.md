@@ -111,9 +111,13 @@ Task egress is open (to reach the endpoints and NAT); ingress is what limits eac
 
 ### Agents: Cognito through the ALB
 
-1. When a domain is set (develop: `dev.onboardassist.click`, prod: `app.onboardassist.click`; each with a docs host), the HTTPS listener has a rule for `/agent`, `/agent/*`
-   and `/api/agent/*` with an `authenticate-cognito` action. The console's own API calls are covered by the same
-   ALB session cookie (8 hours). Requests for the docs host (`dev.docs.` / `docs.`) go to the docs site through a plain forward
+1. Each environment has three hosts: customers use the app host (develop `dev.app.`, prod `app.onboardassist.click`),
+   agents the agent host (`dev.agent.` / `agent.`), and the docs have their own (`dev.docs.` / `docs.`). Every path
+   on the agent host goes through an `authenticate-cognito` rule, and the frontend serves the console at its root;
+   the console's own API calls are covered by the same ALB session cookie (8 hours). On the app host, `/agent`,
+   `/agent/*` and `/api/agent/*` redirect to the agent host, so no agent page is reachable without the login.
+   Without an agent host (`agent_domain_name` empty) the console stays on the app host behind the same rule on
+   those paths. Requests for the docs host (`dev.docs.` / `docs.`) go to the docs site through a plain forward
    rule on the host header, with no login: the design docs are public.
 2. The Cognito user pool accepts only accounts an admin creates (email as username, optional TOTP MFA).
 3. After login, the ALB adds `x-amzn-oidc-identity` (the user's `sub`) and a signed JWT, `x-amzn-oidc-data`, to

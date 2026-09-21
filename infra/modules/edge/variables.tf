@@ -37,6 +37,12 @@ variable "domain_name" {
   default     = ""
 }
 
+variable "agent_domain_name" {
+  description = "Hostname of the agent console, in the same zone as domain_name. Every path on it requires the Cognito login, and the app host's agent paths redirect to it. Empty = the console stays on domain_name under the agent paths."
+  type        = string
+  default     = ""
+}
+
 variable "docs_domain_name" {
   description = "Hostname of the docs site, in the same zone as domain_name. Empty, or no domain_name = no docs host."
   type        = string

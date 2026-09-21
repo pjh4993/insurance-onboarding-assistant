@@ -11,9 +11,11 @@ db_multi_az            = false
 db_deletion_protection = false
 
 # onboardassist.click is registered in Route 53, which created the public hosted
-# zone. Each environment gets an app host and a docs host in it (develop: dev.,
-# dev.docs.; prod: app., docs.); the apex itself serves nothing.
-domain_name       = "dev.onboardassist.click"
+# zone. Each environment gets a customer host, an agent host and a docs host in it
+# (develop: dev.app., dev.agent., dev.docs.; prod: app., agent., docs.); the apex
+# itself serves nothing.
+domain_name       = "dev.app.onboardassist.click"
+agent_domain_name = "dev.agent.onboardassist.click"
 docs_domain_name  = "dev.docs.onboardassist.click"
 route53_zone_name = "onboardassist.click"
 

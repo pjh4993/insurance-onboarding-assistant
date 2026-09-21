@@ -1,8 +1,13 @@
 locals {
   https_enabled = var.domain_name != ""
   docs_enabled  = local.https_enabled && var.docs_domain_name != ""
-  hostnames     = compact([var.domain_name, local.docs_enabled ? var.docs_domain_name : ""])
-  zone_name     = var.route53_zone_name != "" ? var.route53_zone_name : var.domain_name
+  agent_enabled = local.https_enabled && var.agent_domain_name != ""
+  hostnames = compact([
+    var.domain_name,
+    local.docs_enabled ? var.docs_domain_name : "",
+    local.agent_enabled ? var.agent_domain_name : "",
+  ])
+  zone_name = var.route53_zone_name != "" ? var.route53_zone_name : var.domain_name
 }
 
 resource "aws_lb" "this" {
@@ -109,7 +114,7 @@ resource "aws_acm_certificate" "this" {
   count = local.https_enabled ? 1 : 0
 
   domain_name               = var.domain_name
-  subject_alternative_names = local.docs_enabled ? [var.docs_domain_name] : []
+  subject_alternative_names = [for h in local.hostnames : h if h != var.domain_name]
   validation_method         = "DNS"
   tags                      = var.tags
 
@@ -169,8 +174,9 @@ resource "aws_lb_listener" "https" {
   tags = var.tags
 }
 
-# /agent/*: the ALB logs the agent in with Cognito, then forwards with the
-# signed x-amzn-oidc-data header that the frontend verifies.
+# Agents log in with Cognito at the ALB, which then forwards with the signed x-amzn-oidc-data header the
+# frontend verifies. With an agent host, every path on it needs the login (the frontend serves the console
+# at its root); without one, only the agent paths on the app host do.
 resource "aws_lb_listener_rule" "agent_cognito" {
   count = local.https_enabled ? 1 : 0
 
@@ -195,16 +201,19 @@ resource "aws_lb_listener_rule" "agent_cognito" {
     target_group_arn = aws_lb_target_group.frontend.arn
   }
 
-  condition {
-    path_pattern {
-      values = var.agent_path_patterns
+  dynamic "condition" {
+    for_each = local.agent_enabled ? [] : [1]
+    content {
+      path_pattern {
+        values = var.agent_path_patterns
+      }
     }
   }
 
-  # Only on the app host: the docs host shares the listener and has no Cognito callback.
+  # One host only: the Cognito app client's callback URL names it, and the docs host shares the listener.
   condition {
     host_header {
-      values = [var.domain_name]
+      values = [local.agent_enabled ? var.agent_domain_name : var.domain_name]
     }
   }
 
@@ -212,6 +221,39 @@ resource "aws_lb_listener_rule" "agent_cognito" {
     precondition {
       condition     = var.cognito != null
       error_message = "cognito must be set when domain_name is set."
+    }
+  }
+}
+
+# With an agent host, the app host is for customers: send its agent paths to the agent host, same path.
+resource "aws_lb_listener_rule" "agent_paths_to_agent_host" {
+  count = local.agent_enabled ? 1 : 0
+
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 15
+
+  action {
+    type = "redirect"
+
+    redirect {
+      host        = var.agent_domain_name
+      path        = "/#{path}"
+      query       = "#{query}"
+      protocol    = "HTTPS"
+      port        = "443"
+      status_code = "HTTP_302"
+    }
+  }
+
+  condition {
+    path_pattern {
+      values = var.agent_path_patterns
+    }
+  }
+
+  condition {
+    host_header {
+      values = [var.domain_name]
     }
   }
 }

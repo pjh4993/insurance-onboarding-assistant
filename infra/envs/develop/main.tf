@@ -4,6 +4,9 @@
 data "aws_caller_identity" "current" {}
 
 locals {
+  # Agents use their own host when one is set, otherwise the app host's agent paths.
+  agent_host = var.agent_domain_name != "" ? var.agent_domain_name : var.domain_name
+
   name       = "${var.project}-${var.environment}"
   account_id = data.aws_caller_identity.current.account_id
 
@@ -75,7 +78,7 @@ module "auth" {
   count  = var.domain_name == "" ? 0 : 1
 
   name                  = local.name
-  domain_name           = var.domain_name
+  domain_name           = local.agent_host # the ALB's Cognito callback runs on the host agents log in on
   cognito_domain_prefix = "${local.name}-${local.account_id}"
 }
 
@@ -88,6 +91,7 @@ module "edge" {
   alb_security_group_id = module.security.alb_security_group_id
   domain_name           = var.domain_name
   docs_domain_name      = var.docs_domain_name
+  agent_domain_name     = var.agent_domain_name
   route53_zone_name     = var.route53_zone_name
   deletion_protection   = var.environment == "prod"
 
@@ -239,7 +243,10 @@ module "frontend" {
   target_group_arn              = module.edge.frontend_target_group_arn
 
   environment = merge(local.otel_common_env, {
-    BACKEND_URL       = "http://backend:8000"
+    BACKEND_URL = "http://backend:8000"
+    # Unset without a domain: the frontend then serves customers and agents from one origin.
+    CUSTOMER_BASE_URL = var.domain_name == "" ? "" : "https://${var.domain_name}"
+    AGENT_BASE_URL    = var.domain_name == "" ? "" : "https://${local.agent_host}"
     AGENT_DEV_AUTH    = tostring(var.agent_dev_auth)
     AWS_REGION        = var.region
     OTEL_SERVICE_NAME = "onboarding-frontend"
