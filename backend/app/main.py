@@ -3,6 +3,8 @@ of work, HTTP clients, SSE broker) into the agent's ports. Tests pass fakes thro
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 
@@ -27,16 +29,22 @@ from onboarding_agent import (
     build_graph,
     open_checkpointer,
 )
+from onboarding_agent.config import Bundle, load_bundle
 from onboarding_core.util import Clock, utcnow
 
 
 @dataclass
 class Overrides:
-    """Test seams: HTTP transport for the partner/identity/contract systems, the LLM and the clock."""
+    """Test seams: HTTP transport for the partner/identity/contract systems, the LLM, the clock and the
+    agent config bundle."""
 
     transport: httpx.AsyncBaseTransport | None = None
     llm: StructuredLLM | None = None
     clock: Clock | None = None
+    bundle: Bundle | None = None
+
+
+log = logging.getLogger(__name__)
 
 
 def agent_config(settings: Settings) -> AgentConfig:
@@ -48,13 +56,23 @@ def agent_config(settings: Settings) -> AgentConfig:
     )
 
 
-def bedrock_llm(settings: Settings) -> BedrockStructuredLLM:
-    return BedrockStructuredLLM(
-        model_id=settings.bedrock_model_id,
-        region=settings.aws_region,
-        endpoint_url=settings.bedrock_endpoint_url,
-        model_overrides=settings.llm_model_overrides,
+def bedrock_llm(settings: Settings, bundle: Bundle) -> BedrockStructuredLLM:
+    return BedrockStructuredLLM(bundle=bundle, region=settings.aws_region, endpoint_url=settings.bedrock_endpoint_url)
+
+
+async def agent_bundle(settings: Settings) -> Bundle:
+    """Read and validate the config bundle once, at startup: a bad one stops the service here."""
+    bundle = await asyncio.to_thread(
+        load_bundle,
+        settings.agent_config_uri,
+        settings.agent_config_version,
+        allowed_model_ids=settings.allowed_model_ids,
     )
+    log.info(
+        "agent config loaded",
+        extra={"agent_config.version": bundle.version, "agent_config.source": bundle.source},
+    )
+    return bundle
 
 
 def create_app(settings: Settings | None = None, overrides: Overrides | None = None) -> FastAPI:
@@ -85,13 +103,15 @@ def create_app(settings: Settings | None = None, overrides: Overrides | None = N
             if settings.sse_broker == "postgres":
                 broker = await stack.enter_async_context(PostgresBroker(settings.psycopg_conninfo))
             clock = overrides.clock or utcnow
+            bundle = overrides.bundle or await agent_bundle(settings)
             deps = AgentDeps(
                 config=agent_config(settings),
                 uow=uow_factory(sessionmaker),
                 partner=PartnerClient(partner),
                 identity=IdentityClient(identity),
                 contract=ContractClient(contract),
-                llm=overrides.llm or bedrock_llm(settings),
+                llm=overrides.llm or bedrock_llm(settings, bundle),
+                bundle=bundle,
                 clock=clock,
                 on_entity=entity_listener(broker),
             )

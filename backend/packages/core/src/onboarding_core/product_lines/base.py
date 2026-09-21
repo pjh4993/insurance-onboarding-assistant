@@ -2,6 +2,7 @@
 loop over the registered lines instead of branching on device or trip, so a new line is a new module
 here plus its catalog products.
 
+Labels for the fields a line asks about are copy, kept in the agent's config bundle (`labels`).
 A line also needs its own key on `NeedsAssessment` (a JSONB column today: `device`, `trip`) and on the
 LLM's `NeedsExtraction`; both are fixed fields for now."""
 
@@ -22,7 +23,7 @@ class ProductLine:
     needs_key: str  # the NeedsAssessment / NeedsExtraction field holding what the customer described
     objectives: frozenset[str]  # objectives that call for this line
     answer_aliases: Mapping[str, tuple[str, ...]] = {}  # required answer -> keys the LLM may use instead
-    field_labels: Mapping[str, tuple[str, str]] = {}  # field -> (Korean, English) label for questions
+    needs_fields: tuple[str, ...] = ()  # every key of `needs_key` required_needs may ask for (each needs a label)
 
     def required_needs(self, market: str, values: Mapping[str, Any]) -> tuple[str, ...]:
         """Keys of `needs_key` profiling must know before eligibility can run, given what is known of it

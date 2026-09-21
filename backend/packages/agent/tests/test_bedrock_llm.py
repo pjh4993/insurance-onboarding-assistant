@@ -4,16 +4,20 @@ against a local HTTP stand-in for the Converse API (no AWS)."""
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 
 import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from onboarding_agent.config import BUNDLED, load_bundle
 from onboarding_agent.llm.provider import BedrockStructuredLLM
 from onboarding_agent.llm.schemas import NeedsExtraction
 
 REQUESTS: list[tuple[str, dict]] = []
+BUNDLED_1_0_0 = Path(str(BUNDLED)) / "1.0.0"
 
 
 class ConverseHandler(BaseHTTPRequestHandler):
@@ -68,21 +72,43 @@ def converse_url(monkeypatch):
     server.shutdown()
 
 
-async def test_structured_output_through_converse(converse_url):
+def bundle_with_profiles(tmp_path: Path):
+    """The baseline bundle, with assess_needs moved to a second model profile."""
+    bundle_dir = tmp_path / "bundle"
+    shutil.copytree(BUNDLED_1_0_0, bundle_dir)
+    config = json.loads((bundle_dir / "config.json").read_text())
+    config["models"]["fast"] = {
+        "provider": "bedrock",
+        "model_id": "global.anthropic.claude-haiku-4-5",
+        "args": {"temperature": 0.2, "max_tokens": 512},
+    }
+    (bundle_dir / "config.json").write_text(json.dumps(config))
+    profiling = json.loads((bundle_dir / "flows" / "profiling.json").read_text())
+    profiling["llm"]["assess_needs"]["model"] = "fast"
+    (bundle_dir / "flows" / "profiling.json").write_text(json.dumps(profiling))
+    return load_bundle(str(bundle_dir))
+
+
+async def test_structured_output_through_converse(converse_url, tmp_path):
     REQUESTS.clear()
     llm = BedrockStructuredLLM(
-        model_id="global.anthropic.claude-sonnet-4-6",
-        region="ap-northeast-2",
-        endpoint_url=converse_url,
-        model_overrides={"assess_needs": "global.anthropic.claude-haiku-4-5"},
+        bundle=bundle_with_profiles(tmp_path), region="ap-northeast-2", endpoint_url=converse_url
     )
     out = await llm.extract(
         "assess_needs", NeedsExtraction, [SystemMessage("Customer: 김하늘"), HumanMessage("폰 보험")]
     )
     assert isinstance(out, NeedsExtraction) and out.age_range == "AGE_30_39"
     path, body = REQUESTS[0]
-    # per-node model override lands in the URL; the tool is named after the Pydantic class
+    # the node's model profile picks the model (in the URL) and its arguments; the tool is named after the class
     assert path.startswith("/model/global.anthropic.claude-haiku-4-5/converse")
     assert body["toolConfig"]["tools"][0]["toolSpec"]["name"] == "NeedsExtraction"
-    assert body["inferenceConfig"]["temperature"] == 0
+    assert body["inferenceConfig"]["temperature"] == 0.2 and body["inferenceConfig"]["maxTokens"] == 512
     assert "김하늘" in json.dumps(body, ensure_ascii=False)
+
+    # a node on the default profile uses the default model and arguments
+    await llm.extract(
+        "collect_parties", NeedsExtraction, [SystemMessage("Customer: 김하늘"), HumanMessage("저 혼자요")]
+    )
+    path, body = REQUESTS[1]
+    assert path.startswith("/model/global.anthropic.claude-sonnet-4-6/converse")
+    assert body["inferenceConfig"]["temperature"] == 0 and "maxTokens" not in body["inferenceConfig"]

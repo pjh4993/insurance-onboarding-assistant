@@ -1,24 +1,17 @@
 """LLM access. Nodes call `StructuredLLM.extract(node, schema, messages)`; production uses Bedrock
-Converse through langchain-aws, tests inject a fake with the same method."""
+Converse through langchain-aws with the model the config bundle names for the node, tests inject a fake
+with the same method."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Protocol, TypeVar
 
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
 
-T = TypeVar("T", bound=BaseModel)
+from onboarding_agent.config import Bundle, ModelProfile
 
-# Nodes that call the LLM; each may be pointed at another model id (`model_overrides`).
-LLM_NODES = (
-    "assess_needs",
-    "explain_recommendation",
-    "collect_parties",
-    "collect_answers",
-    "summarize_application",
-)
+T = TypeVar("T", bound=BaseModel)
 
 
 class StructuredLLM(Protocol):
@@ -28,37 +21,30 @@ class StructuredLLM(Protocol):
 class BedrockStructuredLLM:
     """`ChatBedrockConverse(...).with_structured_output(Schema, method="function_calling")`.
 
-    The model id can be overridden per node (`model_overrides`). Clients are cached per
-    (model, schema) because building one creates a boto3 client."""
+    Which model a node uses, and with which arguments, comes from the config bundle (`models` profiles,
+    chosen per LLM node). Clients are cached per (profile, schema) because building one creates a boto3
+    client."""
 
-    def __init__(
-        self,
-        *,
-        model_id: str,
-        region: str,
-        endpoint_url: str | None = None,
-        model_overrides: Mapping[str, str] | None = None,
-    ) -> None:
-        self._model_id = model_id
+    def __init__(self, *, bundle: Bundle, region: str, endpoint_url: str | None = None) -> None:
+        self._bundle = bundle
         self._region = region
         self._endpoint_url = endpoint_url
-        self._overrides = dict(model_overrides or {})
         self._cache: dict[tuple[str, str], object] = {}
 
-    def model_for(self, node: str) -> str:
-        return self._overrides.get(node, self._model_id)
+    def model_for(self, node: str) -> ModelProfile:
+        return self._bundle.model(node)
 
     def _runnable(self, node: str, schema: type[BaseModel]):
         from langchain_aws import ChatBedrockConverse
 
-        model_id = self.model_for(node)
-        key = (model_id, schema.__name__)
+        profile = self.model_for(node)
+        key = (profile.name, schema.__name__)
         if key not in self._cache:
             llm = ChatBedrockConverse(
-                model=model_id,
+                model=profile.model_id,
                 region_name=self._region,
                 endpoint_url=self._endpoint_url or None,
-                temperature=0,
+                **profile.args,
             )
             self._cache[key] = llm.with_structured_output(schema, method="function_calling")
         return self._cache[key]

@@ -8,9 +8,10 @@ from typing import Any
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 
+from onboarding_agent.config import TextSpec
 from onboarding_agent.flows.base import DomainModule, Flow, HandoffKind, InputKind
 from onboarding_agent.routing import HANDOFF, has_error
-from onboarding_agent.texts import locale_of, mask_phone, say, t
+from onboarding_agent.texts import locale_of, mask_phone, say
 from onboarding_core.crypto import decrypt_field, encrypt_field, hmac_hex
 from onboarding_core.util import iso, parse_date
 
@@ -35,16 +36,12 @@ async def record_identity_info(
         party.third_party_consent_at = now if value.get("third_party_consent") else None
         party.verification_status = "PENDING"
     await flow._touch(state, "party", state["party_id"])
-    consent = t(
-        lang,
-        "동의" if value.get("third_party_consent") else "동의 안 함",
-        "yes" if value.get("third_party_consent") else "no",
+    consent = (
+        flow.text(lang, "identity.consent_yes")
+        if value.get("third_party_consent")
+        else flow.text(lang, "identity.consent_no")
     )
-    text = t(
-        lang,
-        f"본인 정보를 입력했습니다 — {party.full_name} (파트너 조회 {consent})",
-        f"Identity details submitted — {party.full_name} (partner lookup consent: {consent})",
-    )
+    text = flow.text(lang, "identity.identity_received", consent=consent, name=party.full_name)
     return text, {"identity_result": None}
 
 
@@ -54,7 +51,7 @@ async def record_otp_code(
     """The OTP the customer typed, kept only until check_otp uses it."""
     # Wrapped in a dict so it lands in an encrypted blob: the saver stores primitive
     # channel values inline in the plaintext `checkpoints.checkpoint` JSONB.
-    text = t(locale_of(state), "인증번호를 입력했습니다.", "Entered the verification code.")
+    text = flow.text(locale_of(state), "identity.otp_received")
     return text, {"otp_code": {"code": str(value.get("code", "")).strip()}}
 
 
@@ -74,7 +71,7 @@ async def resolve_identity_failure(
             party.verification_attempts = 0
     await flow._touch(state, "party", state["party_id"])
     if resolution == "VERIFIED":
-        msgs.append(say(t(lang, "상담원이 본인 확인을 마쳤습니다.", "An agent has verified your identity."), now))
+        msgs.append(say(flow.text(lang, "identity.agent_verified"), now))
     return msgs, {}
 
 
@@ -101,21 +98,13 @@ class IdentityFlow(Flow):
                     party.verification_status = "VERIFIED"
                     party.verification_method = "PARTNER_MATCH"
                     party.verified_at = self.now()
-                    text = t(
-                        lang,
-                        "파트너사 고객 정보로 본인 확인이 끝났습니다.",
-                        "You're verified through your partner account.",
-                    )
+                    text = self.text(lang, "identity.partner_verified")
                     await self._touch(state, "party", party.party_id)
                     return {"identity_result": "MATCHED", "messages": [say(text, self.now())]}
             otp = await self.d.identity.send_otp(party.phone or "")
             party.verification_status = "PENDING"
         await self._touch(state, "party", state["party_id"])
-        text = t(
-            lang,
-            f"{mask_phone(party.phone)} 번호로 인증번호를 보냈습니다. 받은 6자리 번호를 입력해 주세요.",
-            f"We sent a verification code to {mask_phone(party.phone)}. Please enter the 6-digit code.",
-        )
+        text = self.text(lang, "identity.otp_sent", phone=mask_phone(party.phone))
         return {
             "identity_result": "NOT_MATCHED",
             "otp_request_id": otp.get("otp_request_id"),
@@ -141,13 +130,9 @@ class IdentityFlow(Flow):
                 party.verification_attempts = max(party.verification_attempts or 0, 1)
         await self._touch(state, "party", state["party_id"])
         if verified:
-            text = t(lang, "인증번호가 확인됐습니다.", "Code verified — thank you.")
+            text = self.text(lang, "identity.otp_verified")
             return {"identity_result": "OTP_OK", "otp_code": None, "messages": [say(text, self.now())]}
-        text = t(
-            lang,
-            "인증번호가 맞지 않아 입력하신 신분증으로 확인해 볼게요.",
-            "That code didn't work, so I'll verify the ID document you gave instead.",
-        )
+        text = self.text(lang, "identity.otp_failed")
         return {"identity_result": "OTP_FAILED", "otp_code": None, "messages": [say(text, self.now())]}
 
     async def check_document(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
@@ -175,13 +160,9 @@ class IdentityFlow(Flow):
                 party.verification_status = "FAILED"
         await self._touch(state, "party", state["party_id"])
         if verified:
-            text = t(lang, "신분증으로 본인 확인이 끝났습니다.", "Your ID document is verified.")
+            text = self.text(lang, "identity.document_verified")
             return {"identity_result": "DOC_OK", "messages": [say(text, self.now())]}
-        text = t(
-            lang,
-            "본인 확인을 마치지 못했습니다. 상담원을 연결해 드릴게요.",
-            "I couldn't verify your identity, so I'm connecting you with an agent.",
-        )
+        text = self.text(lang, "identity.identity_failed")
         return {
             "identity_result": "DOC_FAILED",
             "handoff_reason": "IDENTITY_FAILED",
@@ -207,8 +188,26 @@ def after_check_document(state: dict[str, Any]) -> str:
     return "fetch_purchases" if state.get("identity_result") == "DOC_OK" else HANDOFF
 
 
+TEXTS = TextSpec(
+    copy={
+        "consent_yes": frozenset(),
+        "consent_no": frozenset(),
+        "identity_received": frozenset({"consent", "name"}),
+        "otp_received": frozenset(),
+        "agent_verified": frozenset(),
+        "partner_verified": frozenset(),
+        "otp_sent": frozenset({"phone"}),
+        "otp_verified": frozenset(),
+        "otp_failed": frozenset(),
+        "document_verified": frozenset(),
+        "identity_failed": frozenset(),
+    },
+)
+
+
 MODULE = DomainModule(
     name="identity",
+    texts=TEXTS,
     flow=IdentityFlow,
     edges={
         "verify_identity": after_verify_identity,

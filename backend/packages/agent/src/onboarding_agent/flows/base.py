@@ -24,6 +24,7 @@ from typing import Any
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 
+from onboarding_agent.config import TextSpec
 from onboarding_agent.deps import AgentDeps
 from onboarding_agent.texts import locale_of
 from onboarding_core.party.models import Party
@@ -73,17 +74,22 @@ class Flow:
             raise LookupError("session party not found")
         return party
 
+    def text(self, locale: str, key: str, **values: Any) -> str:
+        """Customer-facing copy `<flow>.<key>` from the config bundle."""
+        return self.d.bundle.text(key, locale, **values)
+
+    def prompt(self, node: str, part: str, **values: Any) -> str:
+        """A part of an LLM node's prompt from the config bundle."""
+        return self.d.bundle.prompt(node, part, **values)
+
     def _system(self, state: dict[str, Any], party: Party, instructions: str) -> SystemMessage:
-        market = state["market"]
-        language = "Korean" if locale_of(state) == "ko" else "English"
         return SystemMessage(
-            content=(
-                "You are the onboarding assistant of an insurance company.\n"
-                f"Customer: {party.full_name or 'unknown'}\n"
-                f"Market: {market}. Reply in {language}. Today is {self.now().date().isoformat()}.\n"
-                "Money is in integer minor units. KRW has no subunit, so the minor unit is one won: "
-                "299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\n"
-                f"{instructions}"
+            content=self.d.bundle.system_prompt(
+                customer=party.full_name or "unknown",
+                market=state["market"],
+                language=self.d.bundle.language_name(locale_of(state)),
+                today=self.now().date().isoformat(),
+                instructions=instructions,
             )
         )
 
@@ -123,6 +129,7 @@ class DomainModule:
     retrying: frozenset[str] = field(default_factory=frozenset)  # nodes that call the LLM or an external system
     inputs: Mapping[str, InputKind] = field(default_factory=dict)  # waiting_for -> how to take the answer
     handoffs: Mapping[str, HandoffKind] = field(default_factory=dict)  # handoff_reason -> its resolution
+    texts: TextSpec = field(default_factory=TextSpec)  # the copy and prompts it reads from the config bundle
 
     def nodes(self, deps: AgentDeps) -> dict[str, NodeFn]:
         flow = self.flow(deps)

@@ -12,12 +12,13 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END
 from langgraph.types import interrupt
 
+from onboarding_agent.config import TextSpec
 from onboarding_agent.flows.base import DomainModule, Flow, HandoffKind, as_uuid, jsonable, step_of, thread_of
 from onboarding_agent.flows.profiling import restart_profiling, resume_profiling
 from onboarding_agent.ids import node_uuid
 from onboarding_agent.llm.schemas import RecommendationRationale
 from onboarding_agent.routing import HANDOFF, has_error
-from onboarding_agent.texts import human, locale_of, price_label, say, t
+from onboarding_agent.texts import human, locale_of, price_label, say
 from onboarding_core.catalog.eligibility import RuleSpec, evaluate_product, rank_order, target_market_score
 from onboarding_core.catalog.models import Product
 from onboarding_core.needs.models import InsurableObject
@@ -146,11 +147,8 @@ class RecommendationFlow(Flow):
             "decision": None,
         }
         if eligible == 0:
-            text = t(
-                lang,
-                "지금 알려 주신 내용으로는 가입할 수 있는 상품이 없습니다. 상담원이 이어서 도와드릴게요.\n",
-                "Based on what you told me, none of our products fit right now. An agent will follow up with you.\n",
-            ) + "\n".join(f"- {r}" for r in reasons)
+            reason_lines = "\n".join(f"- {r}" for r in reasons)
+            text = self.text(lang, "recommendation.no_eligible_product", reasons=reason_lines)
             out["handoff_reason"] = "NO_ELIGIBLE_PRODUCT"
             out["messages"] = [say(text, self.now())]
         return out
@@ -232,23 +230,29 @@ class RecommendationFlow(Flow):
             _, grounds = target_market_score(tms.get(r.product_code, []), needs)
             fallback[str(r.recommendation_id)] = " ".join(grounds) or p.marketing_name
             lines.append(
-                f"- recommendation_id: {r.recommendation_id}\n"
-                f"  product: {p.marketing_name} ({p.product_type}), rank {r.rank}\n"
-                f"  price: {price_label(lang, q.premium_minor, q.currency, q.billing_period)}, "
-                f"cover {q.term_start_date} to {q.term_end_date}\n"
-                f"  grounds: {json.dumps(grounds, ensure_ascii=False)}"
+                self.prompt(
+                    "explain_recommendation",
+                    "item",
+                    recommendation_id=r.recommendation_id,
+                    product=p.marketing_name,
+                    product_type=p.product_type,
+                    rank=r.rank,
+                    price=price_label(self.d.bundle, lang, q.premium_minor, q.currency, q.billing_period),
+                    cover_start=q.term_start_date,
+                    cover_end=q.term_end_date,
+                    grounds=json.dumps(grounds, ensure_ascii=False),
+                )
             )
-        instructions = (
-            "Write one short, customer-facing reason (1-2 sentences) for each recommended product, "
-            "using only the listed grounds and the customer's needs. Do not invent coverage or prices. "
-            "Return every recommendation_id exactly as given.\n"
-            f"Customer needs: {json.dumps(needs, ensure_ascii=False, default=str)}\n"
-            "Recommendations:\n" + "\n".join(lines)
+        instructions = self.prompt(
+            "explain_recommendation",
+            "instructions",
+            needs=json.dumps(needs, ensure_ascii=False, default=str),
+            recommendations="\n".join(lines),
         )
         ext = await self.d.llm.extract(
             "explain_recommendation",
             RecommendationRationale,
-            [self._system(state, party, instructions), HumanMessage("Explain these recommendations.")],
+            [self._system(state, party, instructions), HumanMessage(self.prompt("explain_recommendation", "user"))],
         )
         by_id = {str(i.get("recommendation_id")): str(i.get("rationale") or "") for i in ext.items}
         async with self.d.uow() as uow:
@@ -258,20 +262,19 @@ class RecommendationFlow(Flow):
                 rec.rationale = by_id.get(str(r.recommendation_id)) or fallback[str(r.recommendation_id)]
                 q = quotes[str(r.recommendation_id)]
                 out_lines.append(
-                    f"{rec.rank}. {products[r.product_code].marketing_name} — "
-                    f"{price_label(lang, q.premium_minor, q.currency, q.billing_period)}\n   {rec.rationale}"
+                    self.text(
+                        lang,
+                        "recommendation.offer_item",
+                        price=price_label(self.d.bundle, lang, q.premium_minor, q.currency, q.billing_period),
+                        product=products[r.product_code].marketing_name,
+                        rank=rec.rank,
+                        rationale=rec.rationale,
+                    )
                 )
         for r in recs:
             await self._touch(state, "recommendation", r.recommendation_id)
-        text = (
-            t(lang, "추천 상품입니다:\n", "Here's what I recommend:\n")
-            + "\n".join(out_lines)
-            + t(
-                lang,
-                "\n\n가입할 상품을 고르시거나, 답을 바꾸거나, 가입하지 않을 수 있어요.",
-                "\n\nChoose one to apply, change your answers, or decline.",
-            )
-        )
+        offers = "\n".join(out_lines)
+        text = self.text(lang, "recommendation.offers", offers=offers)
         return {"waiting_for": "DECISION", "messages": [say(text, self.now())]}
 
     async def await_decision(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
@@ -294,12 +297,12 @@ class RecommendationFlow(Flow):
                 if quote is not None:
                     quote.status = "ACCEPTED"
                 product = await uow.catalog.product(rec.product_code)
-                text = t(lang, f"{product.marketing_name}에 가입할게요.", f"I'd like {product.marketing_name}.")
+                text = self.text(lang, "recommendation.accept", product=product.marketing_name)
                 touched = [("recommendation", rec.recommendation_id)]
             elif decision == "DECLINE":
                 for r in eligible:
                     r.status, r.decided_by, r.decided_at = "DECLINED", actor, now
-                text = t(lang, "가입하지 않을게요.", "No thanks, I'll pass.")
+                text = self.text(lang, "recommendation.decline")
                 touched = [("recommendation", r.recommendation_id) for r in eligible]
             else:  # CHANGE
                 for r in recs:
@@ -308,7 +311,7 @@ class RecommendationFlow(Flow):
                 for q in quotes.values():
                     if q is not None:
                         q.status = "EXPIRED"
-                text = extra_text or t(lang, "답을 바꾸고 싶어요.", "I'd like to change my answers.")
+                text = extra_text or self.text(lang, "recommendation.change")
                 touched = [("recommendation", r.recommendation_id) for r in recs]
         for entity_type, entity_id in touched:
             await self._touch(state, entity_type, entity_id)
@@ -328,9 +331,7 @@ class RecommendationFlow(Flow):
         }
         if decision == "DECLINE":
             out["stage"] = "DECLINED"
-            out["messages"].append(
-                say(t(lang, "알겠습니다. 언제든 다시 찾아 주세요.", "Understood. You're welcome back any time."), now)
-            )
+            out["messages"].append(say(self.text(lang, "recommendation.declined"), now))
         elif decision == "CHANGE":
             out.update(
                 stage="PROFILING",
@@ -375,8 +376,31 @@ def after_await_decision(state: dict[str, Any]) -> str:
     return END
 
 
+TEXTS = TextSpec(
+    copy={
+        "no_eligible_product": frozenset({"reasons"}),
+        "offer_item": frozenset({"price", "product", "rank", "rationale"}),
+        "offers": frozenset({"offers"}),
+        "accept": frozenset({"product"}),
+        "decline": frozenset(),
+        "change": frozenset(),
+        "declined": frozenset(),
+    },
+    llm={
+        "explain_recommendation": {
+            "instructions": frozenset({"needs", "recommendations"}),
+            "item": frozenset(
+                {"recommendation_id", "product", "product_type", "rank", "price", "cover_start", "cover_end", "grounds"}
+            ),
+            "user": frozenset(),
+        },
+    },
+)
+
+
 MODULE = DomainModule(
     name="recommendation",
+    texts=TEXTS,
     flow=RecommendationFlow,
     edges={
         "check_eligibility": after_check_eligibility,

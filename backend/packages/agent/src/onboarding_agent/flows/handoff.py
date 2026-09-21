@@ -13,9 +13,10 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END
 from langgraph.types import interrupt
 
+from onboarding_agent.config import TextSpec
 from onboarding_agent.deps import AgentDeps
 from onboarding_agent.flows.base import DomainModule, Flow, HandoffKind, collect
-from onboarding_agent.texts import human, locale_of, note, say, t
+from onboarding_agent.texts import human, locale_of, note, say
 
 
 async def resolve_error(
@@ -50,12 +51,7 @@ class HandoffFlow(Flow):
             out["messages"] = [
                 note(f"Handoff: {err['node']} failed after {err['attempts']} attempts ({err['kind']}).", self.now()),
                 say(
-                    t(
-                        lang,
-                        "처리 중 문제가 생겨 상담원을 연결해 드릴게요. 입력하신 내용은 저장돼 있습니다.",
-                        "Something went wrong on our side, so I'm connecting you with an agent. "
-                        "Everything you've entered is saved.",
-                    ),
+                    self.text(lang, "handoff.error_handoff"),
                     self.now(),
                 ),
             ]
@@ -80,7 +76,7 @@ class HandoffFlow(Flow):
             out["last_input"] = None
         if resolution == "END":
             out["stage"] = "WITHDRAWN"
-            msgs.append(say(t(lang, "상담원이 상담을 종료했습니다.", "The agent has closed this session."), now))
+            msgs.append(say(self.text(lang, "handoff.closed_by_agent"), now))
         elif (kind := self.handoffs.get(reason or "")) is not None and kind.resolve is not None:
             extra, updates = await kind.resolve(self, state, resolution, now)
             msgs += extra
@@ -91,6 +87,14 @@ class HandoffFlow(Flow):
 
 def after_human_handoff(state: dict[str, Any]) -> str:
     return "await_agent"
+
+
+TEXTS = TextSpec(
+    copy={
+        "error_handoff": frozenset(),
+        "closed_by_agent": frozenset(),
+    },
+)
 
 
 def module(domains: Sequence[DomainModule]) -> DomainModule:
@@ -109,6 +113,7 @@ def module(domains: Sequence[DomainModule]) -> DomainModule:
 
     return DomainModule(
         name="handoff",
+        texts=TEXTS,
         flow=lambda deps: HandoffFlow(deps, handoffs),
         edges={"human_handoff": after_human_handoff, "await_agent": after_await_agent},
     )

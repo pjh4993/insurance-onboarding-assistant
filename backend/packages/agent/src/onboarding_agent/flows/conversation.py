@@ -10,10 +10,11 @@ from typing import Any
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
+from onboarding_agent.config import TextSpec
 from onboarding_agent.deps import AgentDeps
 from onboarding_agent.flows.base import DomainModule, Flow, InputKind, collect
 from onboarding_agent.routing import HANDOFF, has_error
-from onboarding_agent.texts import human, locale_of, say, t
+from onboarding_agent.texts import human, locale_of, say
 
 
 class ConversationFlow(Flow):
@@ -23,15 +24,7 @@ class ConversationFlow(Flow):
 
     async def greet(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         lang = locale_of(state)
-        text = t(
-            lang,
-            "안녕하세요! 보험 가입을 도와드릴게요. 먼저 본인 확인을 위해 이름, 이메일, 휴대폰 번호, "
-            "신분증 종류와 번호를 알려 주세요. 파트너사 구매 기록 조회(제3자 제공)에 동의하시면 "
-            "확인이 더 빨라집니다.",
-            "Hi! I'll help you find the right cover. First, to verify your identity, please share your "
-            "full name, email, phone number and an ID document. If you consent to us checking your "
-            "purchase history with our partner, verification is faster.",
-        )
+        text = self.text(lang, "conversation.greeting")
         return {
             "stage": "IDENTITY",
             "waiting_for": "IDENTITY_INFO",
@@ -61,6 +54,13 @@ def after_greet(state: dict[str, Any]) -> str:
     return HANDOFF if has_error(state) else "ask_customer"
 
 
+TEXTS = TextSpec(
+    copy={
+        "greeting": frozenset(),
+    },
+)
+
+
 def module(domains: Sequence[DomainModule]) -> DomainModule:
     """The conversation nodes, taking the kinds of answer `domains` ask for."""
     inputs: dict[str, InputKind] = collect(domains, "inputs")
@@ -73,6 +73,7 @@ def module(domains: Sequence[DomainModule]) -> DomainModule:
 
     return DomainModule(
         name="conversation",
+        texts=TEXTS,
         flow=lambda deps: ConversationFlow(deps, inputs),
         edges={"greet": after_greet, "ask_customer": after_ask_customer},
     )

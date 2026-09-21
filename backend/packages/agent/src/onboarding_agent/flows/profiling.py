@@ -10,6 +10,7 @@ from typing import Any
 from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
+from onboarding_agent.config import TextSpec
 from onboarding_agent.flows.base import (
     DomainModule,
     Flow,
@@ -24,7 +25,7 @@ from onboarding_agent.flows.base import (
 from onboarding_agent.ids import node_uuid
 from onboarding_agent.llm.schemas import NeedsExtraction
 from onboarding_agent.routing import HANDOFF, has_error
-from onboarding_agent.texts import field_list, locale_of, say, t
+from onboarding_agent.texts import locale_of, say
 from onboarding_core.needs.models import InsurableObject, NeedsAssessment
 from onboarding_core.needs.rules import compute_needs_missing, described_objects, merge_needs, needs_view
 
@@ -97,11 +98,7 @@ class ProfilingFlow(Flow):
             "handoff_reason": None,
         }
         if found:
-            text = t(
-                lang,
-                f"파트너사 구매 기록에서 {', '.join(found)} 구매를 찾았습니다.",
-                f"I found your recent purchase: {', '.join(found)}.",
-            )
+            text = self.text(lang, "profiling.purchases_found", purchases=", ".join(found))
             out["messages"] = [say(text, self.now())]
         return out
 
@@ -119,26 +116,13 @@ class ProfilingFlow(Flow):
         if state.get("last_input") != "NEEDS":
             # Nothing new to assess yet: ask (first visit, after a CHANGE without text, after handoff).
             if current is not None and current.completed_at is None and current.missing_fields:
-                text = t(
-                    lang,
-                    f"추천을 위해 {field_list(lang, current.missing_fields)}을(를) 알려 주세요.",
-                    f"To recommend cover, please tell me {field_list(lang, current.missing_fields)}.",
+                text = self.text(
+                    lang, "profiling.ask_missing", fields=self.d.bundle.field_list(lang, current.missing_fields)
                 )
             elif current is not None and current.completed_at is not None:
-                text = t(
-                    lang,
-                    "어떤 점을 바꾸고 싶으신가요? 달라진 내용을 알려 주세요.",
-                    "What would you like to change? Tell me what's different.",
-                )
+                text = self.text(lang, "profiling.ask_change")
             else:
-                text = t(
-                    lang,
-                    "이제 맞는 보험을 찾아볼게요. 나이, 직업, 거주 국가와 무엇을 보장받고 싶은지(기기, 여행 등) "
-                    "알려 주세요. 기존에 가입한 보험이 있다면 함께 알려 주세요.",
-                    "Now let's find the right cover. Tell me your age, occupation, where you live, and "
-                    "what you'd like to protect (a device, a trip, ...). Mention any insurance you "
-                    "already have.",
-                )
+                text = self.text(lang, "profiling.ask_needs")
             return {
                 "needs_complete": False,
                 "handoff_reason": None,
@@ -152,11 +136,11 @@ class ProfilingFlow(Flow):
             for o in partner_objects
         ]
         base = needs_view(current)
-        instructions = (
-            "Extract the customer's profile and insurance needs from their messages into the "
-            "NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\n"
-            f"Devices already known from partner purchase records: {json.dumps(known_devices, ensure_ascii=False)}\n"
-            f"Values captured so far: {json.dumps(base, ensure_ascii=False, default=str)}"
+        instructions = self.prompt(
+            "assess_needs",
+            "instructions",
+            known_devices=json.dumps(known_devices, ensure_ascii=False),
+            values=json.dumps(base, ensure_ascii=False, default=str),
         )
         texts = latest_texts(state.get("messages") or [], ("NEEDS",))
         ext = await self.d.llm.extract(
@@ -217,11 +201,7 @@ class ProfilingFlow(Flow):
         if not missing:
             for obj_id in ids:
                 await self._touch(state, "insurable_object", obj_id)
-            text = t(
-                lang,
-                "감사합니다. 가입할 수 있는 상품을 확인해 볼게요.",
-                "Thanks — let me check which products fit you.",
-            )
+            text = self.text(lang, "profiling.needs_complete")
             return {
                 "needs_assessment_id": na_id,
                 "needs_complete": True,
@@ -232,11 +212,7 @@ class ProfilingFlow(Flow):
                 "messages": [say(text, now)],
             }
         if rounds >= MAX_NEEDS_ROUNDS:
-            text = t(
-                lang,
-                "필요한 정보를 다 받지 못해 상담원을 연결해 드릴게요.",
-                "I still don't have everything I need, so I'm bringing in an agent to help.",
-            )
+            text = self.text(lang, "profiling.needs_handoff")
             return {
                 "needs_assessment_id": na_id,
                 "needs_complete": False,
@@ -245,11 +221,7 @@ class ProfilingFlow(Flow):
                 "handoff_reason": "NEEDS_INCOMPLETE",
                 "messages": [say(text, now)],
             }
-        text = t(
-            lang,
-            f"추천을 위해 {field_list(lang, missing)}을(를) 더 알려 주세요.",
-            f"Thanks! To recommend cover I also need {field_list(lang, missing)}.",
-        )
+        text = self.text(lang, "profiling.ask_more", fields=self.d.bundle.field_list(lang, missing))
         return {
             "needs_assessment_id": na_id,
             "needs_complete": False,
@@ -271,8 +243,27 @@ def after_assess_needs(state: dict[str, Any]) -> str:
     return "check_eligibility" if state.get("needs_complete") else "ask_customer"
 
 
+TEXTS = TextSpec(
+    copy={
+        "purchases_found": frozenset({"purchases"}),
+        "ask_missing": frozenset({"fields"}),
+        "ask_change": frozenset(),
+        "ask_needs": frozenset(),
+        "needs_complete": frozenset(),
+        "needs_handoff": frozenset(),
+        "ask_more": frozenset({"fields"}),
+    },
+    llm={
+        "assess_needs": {
+            "instructions": frozenset({"known_devices", "values"}),
+        },
+    },
+)
+
+
 MODULE = DomainModule(
     name="profiling",
+    texts=TEXTS,
     flow=ProfilingFlow,
     edges={
         "fetch_purchases": after_fetch_purchases,

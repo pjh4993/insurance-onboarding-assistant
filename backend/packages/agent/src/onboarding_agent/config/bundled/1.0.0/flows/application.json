@@ -1,0 +1,74 @@
+{
+  "llm": {
+    "collect_parties": {
+      "model": "default",
+      "instructions": "Decide whether the applicant is also the insured person and the payer. If not, list the other people with their role (INSURED or PAYER), full_name and date_of_birth (ISO 8601)."
+    },
+    "collect_answers": {
+      "model": "default",
+      "instructions": [
+        "Extract application answers from the customer's latest message into AnswersExtraction. Use exactly these field names: {fields}. Dates ISO 8601, money in minor units.",
+        "Answers so far: {answers}",
+        "Still missing: {missing}"
+      ]
+    },
+    "summarize_application": {
+      "model": "default",
+      "instructions": [
+        "Write a short plain-language summary of this insurance application for the customer to confirm before submission. Use only these facts:",
+        "{facts}"
+      ],
+      "user": "Summarize my application."
+    }
+  },
+  "copy": {
+    "opened": {
+      "ko": "{product} 청약서를 작성할게요.",
+      "en": "Great choice. Let's complete your {product} application."
+    },
+    "ask_parties": {
+      "ko": "피보험자(보장받는 분)와 보험료를 내는 분이 모두 본인인가요? 다른 분이 있다면 그분의 역할(피보험자/납입자), 이름, 생년월일을 알려 주세요.",
+      "en": "Are you both the insured person and the payer? If someone else is, tell me their role (insured or payer), full name and date of birth."
+    },
+    "ask_party_details": {
+      "ko": "다른 분의 이름과 생년월일을 알려 주세요.",
+      "en": "Please tell me the other person's full name and date of birth."
+    },
+    "parties_named": {
+      "ko": "당사자 정보를 확인했습니다 ({names}).",
+      "en": "Got it ({names})."
+    },
+    "parties_self": {
+      "ko": "당사자 정보를 확인했습니다 — 모두 본인입니다.",
+      "en": "Got it — you're the insured and the payer."
+    },
+    "answers_handoff": {
+      "ko": "청약에 필요한 정보를 다 받지 못해 상담원을 연결해 드릴게요.",
+      "en": "I still can't complete the application, so I'm bringing in an agent to help."
+    },
+    "ask_answers": {
+      "ko": "청약을 위해 {fields}을(를) 알려 주세요.",
+      "en": "To complete the application, please provide {fields}."
+    },
+    "ask_correction": {
+      "ko": "어떤 내용을 고칠까요?",
+      "en": "What would you like to change?"
+    },
+    "confirm_summary": {
+      "ko": "{summary}\n\n이대로 제출할까요?",
+      "en": "{summary}\n\nShall I submit this application?"
+    },
+    "confirm_yes": {
+      "ko": "네, 제출해 주세요.",
+      "en": "Yes, please submit."
+    },
+    "confirm_no": {
+      "ko": "고칠 내용이 있어요.",
+      "en": "I need to change something."
+    },
+    "submitted": {
+      "ko": "청약을 제출했습니다. 접수번호는 {ref}입니다. 심사 결과는 따로 안내해 드릴게요.",
+      "en": "Your application is submitted. Your reference number is {ref}. We'll be in touch with the underwriting decision."
+    }
+  }
+}

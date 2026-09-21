@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from onboarding_agent.config import Bundle, default_bundle
 from onboarding_agent.llm.provider import StructuredLLM
 from onboarding_core.ports import (
     ContractGateway,
@@ -38,3 +39,4 @@ class AgentDeps:
     llm: StructuredLLM
     clock: Clock = utcnow
     on_entity: EntityListener = field(default=_ignore)
+    bundle: Bundle = field(default_factory=default_bundle)  # models, prompts and copy

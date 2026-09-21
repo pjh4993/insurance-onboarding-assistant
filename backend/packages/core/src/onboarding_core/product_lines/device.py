@@ -63,6 +63,7 @@ class DeviceLine(ProductLine):
     code = "DEVICE"
     object_type = "DEVICE"
     needs_key = "device"
+    needs_fields = ("device_category", "purchase_price_minor", "manufacturer")
     objectives = frozenset({"PROTECT_DEVICE", "EXTEND_WARRANTY"})
     answer_aliases = {
         "purchase_price": ("purchase_price_minor", "price_minor", "price"),
@@ -70,21 +71,6 @@ class DeviceLine(ProductLine):
         "msrp": ("msrp_minor",),
         "order_number": ("order_id", "order_no"),
         "imei": ("serial_number",),
-    }
-    field_labels = {
-        "device.device_category": ("기기 종류", "the device type"),
-        "device.purchase_date": ("기기 구매일", "the device purchase date"),
-        "device.purchase_price_minor": ("기기 구매 가격", "the device purchase price"),
-        "device.manufacturer": ("기기 제조사", "the device manufacturer"),
-        "imei": ("IMEI 번호", "the IMEI number"),
-        "device_model": ("기기 모델명", "the device model"),
-        "msrp": ("기기 출고가", "the device list price (MSRP)"),
-        "activation_date": ("개통일", "the activation date"),
-        "serial_number": ("시리얼 번호", "the serial number"),
-        "purchase_date": ("구매일", "the purchase date"),
-        "purchase_price": ("구매 가격", "the purchase price"),
-        "proof_of_purchase": ("구매 증빙", "proof of purchase"),
-        "order_number": ("주문 번호", "the order number"),
     }
 
     def required_needs(self, market: str, values: Mapping[str, Any]) -> tuple[str, ...]:

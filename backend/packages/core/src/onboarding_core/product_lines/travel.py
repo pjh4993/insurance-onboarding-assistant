@@ -16,6 +16,7 @@ class TravelLine(ProductLine):
     code = "TRAVEL"
     object_type = "TRIP"
     needs_key = "trip"
+    needs_fields = ("departure_date", "return_date", "destination_countries", "trip_cost_minor")
     objectives = frozenset({"TRAVEL_COVER"})
     answer_aliases = {
         "destination": ("destination_countries", "destinations", "destination_country"),
@@ -25,20 +26,6 @@ class TravelLine(ProductLine):
         "traveler_name": ("full_name", "name"),
         "departure_date": ("departure_datetime",),
         "return_date": ("return_datetime",),
-    }
-    field_labels = {
-        "trip.departure_date": ("출발일", "your departure date"),
-        "trip.return_date": ("귀국일", "your return date"),
-        "trip.destination_countries": ("여행지", "your destination"),
-        "trip.trip_cost_minor": ("여행 경비 총액", "the total trip cost"),
-        "departure_date": ("출발일", "the departure date"),
-        "return_date": ("귀국일", "the return date"),
-        "destination": ("여행지", "the destination"),
-        "traveler_name": ("여행자 이름", "the traveller's name"),
-        "traveler_date_of_birth": ("여행자 생년월일", "the traveller's date of birth"),
-        "traveler_gender": ("여행자 성별", "the traveller's gender"),
-        "traveler_age": ("여행자 나이", "the traveller's age"),
-        "trip_cost": ("여행 경비 총액", "the total trip cost"),
     }
 
     def required_needs(self, market: str, values: Mapping[str, Any]) -> tuple[str, ...]:

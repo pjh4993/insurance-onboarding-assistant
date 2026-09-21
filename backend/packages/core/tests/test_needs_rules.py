@@ -149,3 +149,11 @@ def test_described_objects_skip_what_the_partner_supplied():
 def test_every_line_is_reachable_by_its_object_type():
     assert [line_for_object_type(line.object_type) for line in LINES] == list(LINES)
     assert len({line.needs_key for line in LINES}) == len(LINES)
+
+
+def test_every_need_a_line_may_ask_for_is_declared():
+    """Labels are checked against `needs_fields`, so `required_needs` must stay inside it."""
+    for line in LINES:
+        for market in ("KR", "US"):
+            for values in ({}, {"device_category": "SMARTPHONE"}, {"device_category": "NOTEBOOK"}):
+                assert set(line.required_needs(market, values)) <= set(line.needs_fields), (line.code, market, values)

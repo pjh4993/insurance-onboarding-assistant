@@ -1,0 +1,48 @@
+{
+  "copy": {
+    "consent_yes": {
+      "ko": "동의",
+      "en": "yes"
+    },
+    "consent_no": {
+      "ko": "동의 안 함",
+      "en": "no"
+    },
+    "identity_received": {
+      "ko": "본인 정보를 입력했습니다 — {name} (파트너 조회 {consent})",
+      "en": "Identity details submitted — {name} (partner lookup consent: {consent})"
+    },
+    "otp_received": {
+      "ko": "인증번호를 입력했습니다.",
+      "en": "Entered the verification code."
+    },
+    "agent_verified": {
+      "ko": "상담원이 본인 확인을 마쳤습니다.",
+      "en": "An agent has verified your identity."
+    },
+    "partner_verified": {
+      "ko": "파트너사 고객 정보로 본인 확인이 끝났습니다.",
+      "en": "You're verified through your partner account."
+    },
+    "otp_sent": {
+      "ko": "{phone} 번호로 인증번호를 보냈습니다. 받은 6자리 번호를 입력해 주세요.",
+      "en": "We sent a verification code to {phone}. Please enter the 6-digit code."
+    },
+    "otp_verified": {
+      "ko": "인증번호가 확인됐습니다.",
+      "en": "Code verified — thank you."
+    },
+    "otp_failed": {
+      "ko": "인증번호가 맞지 않아 입력하신 신분증으로 확인해 볼게요.",
+      "en": "That code didn't work, so I'll verify the ID document you gave instead."
+    },
+    "document_verified": {
+      "ko": "신분증으로 본인 확인이 끝났습니다.",
+      "en": "Your ID document is verified."
+    },
+    "identity_failed": {
+      "ko": "본인 확인을 마치지 못했습니다. 상담원을 연결해 드릴게요.",
+      "en": "I couldn't verify your identity, so I'm connecting you with an agent."
+    }
+  }
+}

@@ -13,6 +13,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END
 from langgraph.types import interrupt
 
+from onboarding_agent.config import TextSpec
 from onboarding_agent.flows.base import (
     DomainModule,
     Flow,
@@ -32,7 +33,7 @@ from onboarding_agent.llm.schemas import (
     PartiesExtraction,
 )
 from onboarding_agent.routing import HANDOFF, has_error
-from onboarding_agent.texts import field_list, human, locale_of, price_label, say, t
+from onboarding_agent.texts import human, locale_of, price_label, say
 from onboarding_core.application.models import Application
 from onboarding_core.application.rules import apply_answer_aliases, missing_answers, prefill_answers
 from onboarding_core.needs.rules import object_view
@@ -93,7 +94,7 @@ class ApplicationFlow(Flow):
             quote_ids = {**state["quote_ids"], str(rec.recommendation_id): str(quote.quote_id)}
             name = product.marketing_name
         await self._touch(state, "application", app_id)
-        text = t(lang, f"{name} 청약서를 작성할게요.", f"Great choice. Let's complete your {name} application.")
+        text = self.text(lang, "application.opened", product=name)
         return {
             "stage": "APPLICATION",
             "application_id": str(app_id),
@@ -108,21 +109,12 @@ class ApplicationFlow(Flow):
     async def collect_parties(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         lang, now, step = locale_of(state), self.now(), step_of(config)
         if state.get("last_input") != "PARTIES":
-            text = t(
-                lang,
-                "피보험자(보장받는 분)와 보험료를 내는 분이 모두 본인인가요? 다른 분이 있다면 그분의 역할"
-                "(피보험자/납입자), 이름, 생년월일을 알려 주세요.",
-                "Are you both the insured person and the payer? If someone else is, tell me their role "
-                "(insured or payer), full name and date of birth.",
-            )
+            text = self.text(lang, "application.ask_parties")
             return {"parties_complete": False, "waiting_for": "PARTIES", "messages": [say(text, now)]}
 
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
-        instructions = (
-            "Decide whether the applicant is also the insured person and the payer. If not, list the "
-            "other people with their role (INSURED or PAYER), full_name and date_of_birth (ISO 8601)."
-        )
+        instructions = self.prompt("collect_parties", "instructions")
         texts = latest_texts(state.get("messages") or [], ("PARTIES",))
         ext = await self.d.llm.extract(
             "collect_parties",
@@ -131,11 +123,7 @@ class ApplicationFlow(Flow):
         )
         others = [] if ext.all_self else [p for p in ext.parties if p.get("role") in ("INSURED", "PAYER")]
         if any(not str(p.get("full_name") or "").strip() for p in others):
-            text = t(
-                lang,
-                "다른 분의 이름과 생년월일을 알려 주세요.",
-                "Please tell me the other person's full name and date of birth.",
-            )
+            text = self.text(lang, "application.ask_party_details")
             return {
                 "parties_complete": False,
                 "last_input": None,
@@ -179,10 +167,11 @@ class ApplicationFlow(Flow):
             application.answers = jsonable(answers)
             application.missing_fields = missing_answers(product.required_application_fields, answers)
         await self._touch(state, "application", app_id)
-        text = t(
-            lang,
-            "당사자 정보를 확인했습니다" + (f" ({', '.join(names)})." if names else " — 모두 본인입니다."),
-            "Got it" + (f" ({', '.join(names)})." if names else " — you're the insured and the payer."),
+        others = ", ".join(names)
+        text = (
+            self.text(lang, "application.parties_named", names=others)
+            if names
+            else self.text(lang, "application.parties_self")
         )
         return {"parties_complete": True, "last_input": None, "messages": [say(text, now)]}
 
@@ -199,11 +188,12 @@ class ApplicationFlow(Flow):
 
         if got_input:
             missing_now = missing_answers(required, answers)
-            instructions = (
-                "Extract application answers from the customer's latest message into AnswersExtraction. "
-                f"Use exactly these field names: {json.dumps(required)}. Dates ISO 8601, money in minor units.\n"
-                f"Answers so far: {json.dumps(answers, ensure_ascii=False, default=str)}\n"
-                f"Still missing: {json.dumps(missing_now)}"
+            instructions = self.prompt(
+                "collect_answers",
+                "instructions",
+                fields=json.dumps(required),
+                answers=json.dumps(answers, ensure_ascii=False, default=str),
+                missing=json.dumps(missing_now),
             )
             texts = latest_texts(state.get("messages") or [], ("ANSWERS",))
             ext = await self.d.llm.extract(
@@ -231,11 +221,7 @@ class ApplicationFlow(Flow):
             "confirmed": None if got_input else state.get("confirmed"),
         }
         if missing and rounds >= MAX_ANSWERS_ROUNDS:
-            text = t(
-                lang,
-                "청약에 필요한 정보를 다 받지 못해 상담원을 연결해 드릴게요.",
-                "I still can't complete the application, so I'm bringing in an agent to help.",
-            )
+            text = self.text(lang, "application.answers_handoff")
             return {
                 **base,
                 "answers_complete": False,
@@ -243,14 +229,10 @@ class ApplicationFlow(Flow):
                 "messages": [say(text, now)],
             }
         if missing:
-            text = t(
-                lang,
-                f"청약을 위해 {field_list(lang, missing)}을(를) 알려 주세요.",
-                f"To complete the application, please provide {field_list(lang, missing)}.",
-            )
+            text = self.text(lang, "application.ask_answers", fields=self.d.bundle.field_list(lang, missing))
             return {**base, "answers_complete": False, "waiting_for": "ANSWERS", "messages": [say(text, now)]}
         if state.get("confirmed") is False and not got_input:
-            text = t(lang, "어떤 내용을 고칠까요?", "What would you like to change?")
+            text = self.text(lang, "application.ask_correction")
             return {**base, "answers_complete": False, "waiting_for": "ANSWERS", "messages": [say(text, now)]}
         return {**base, "answers_complete": True, "answers_rounds": 0}
 
@@ -265,26 +247,25 @@ class ApplicationFlow(Flow):
             parties = await self._application_parties(uow, app_id)
         facts = {
             "product": product.marketing_name,
-            "price": price_label(lang, quote.premium_minor, quote.currency, quote.billing_period),
+            "price": price_label(self.d.bundle, lang, quote.premium_minor, quote.currency, quote.billing_period),
             "cover": f"{quote.term_start_date} to {quote.term_end_date}",
             "parties": parties,
             "answers": application.answers,
         }
-        instructions = (
-            "Write a short plain-language summary of this insurance application for the customer to "
-            "confirm before submission. Use only these facts:\n" + json.dumps(facts, ensure_ascii=False, default=str)
+        instructions = self.prompt(
+            "summarize_application", "instructions", facts=json.dumps(facts, ensure_ascii=False, default=str)
         )
         ext = await self.d.llm.extract(
             "summarize_application",
             ApplicationSummary,
-            [self._system(state, party, instructions), HumanMessage("Summarize my application.")],
+            [self._system(state, party, instructions), HumanMessage(self.prompt("summarize_application", "user"))],
         )
         async with self.d.uow() as uow:
             application = await uow.applications.get(app_id)
             application.summary = ext.summary
             application.status = "COMPLETE"
         await self._touch(state, "application", app_id)
-        text = ext.summary + t(lang, "\n\n이대로 제출할까요?", "\n\nShall I submit this application?")
+        text = self.text(lang, "application.confirm_summary", summary=ext.summary)
         return {"waiting_for": "CONFIRM", "confirmed": None, "messages": [say(text, now)]}
 
     async def confirm_summary(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
@@ -293,12 +274,10 @@ class ApplicationFlow(Flow):
         confirmed = bool(value.get("confirmed"))
         extra = str(value.get("text") or "").strip()
         if confirmed:
-            msg = human(
-                extra or t(lang, "네, 제출해 주세요.", "Yes, please submit."), now, actor=actor, input_type="CONFIRM"
-            )
+            msg = human(extra or self.text(lang, "application.confirm_yes"), now, actor=actor, input_type="CONFIRM")
             return {"confirmed": True, "waiting_for": None, "messages": [msg]}
         msg = human(
-            extra or t(lang, "고칠 내용이 있어요.", "I need to change something."),
+            extra or self.text(lang, "application.confirm_no"),
             now,
             actor=actor,
             input_type="ANSWERS" if extra else "CONFIRM",
@@ -348,12 +327,7 @@ class ApplicationFlow(Flow):
                 application.status = "SUBMITTED"
                 application.submitted_at = now
         await self._touch(state, "application", app_id)
-        text = t(
-            lang,
-            f"청약을 제출했습니다. 접수번호는 {ref}입니다. 심사 결과는 따로 안내해 드릴게요.",
-            f"Your application is submitted. Your reference number is {ref}. We'll be in touch "
-            "with the underwriting decision.",
-        )
+        text = self.text(lang, "application.submitted", ref=ref)
         return {"stage": "SUBMITTED", "waiting_for": None, "messages": [say(text, now)]}
 
     async def _application_parties(self, uow: UnitOfWork, app_id: uuid.UUID) -> list[dict[str, Any]]:
@@ -393,8 +367,39 @@ def after_submit_application(state: dict[str, Any]) -> str:
     return HANDOFF if has_error(state) else END
 
 
+TEXTS = TextSpec(
+    copy={
+        "opened": frozenset({"product"}),
+        "ask_parties": frozenset(),
+        "ask_party_details": frozenset(),
+        "parties_named": frozenset({"names"}),
+        "parties_self": frozenset(),
+        "answers_handoff": frozenset(),
+        "ask_answers": frozenset({"fields"}),
+        "ask_correction": frozenset(),
+        "confirm_summary": frozenset({"summary"}),
+        "confirm_yes": frozenset(),
+        "confirm_no": frozenset(),
+        "submitted": frozenset({"ref"}),
+    },
+    llm={
+        "collect_parties": {
+            "instructions": frozenset(),
+        },
+        "collect_answers": {
+            "instructions": frozenset({"fields", "answers", "missing"}),
+        },
+        "summarize_application": {
+            "instructions": frozenset({"facts"}),
+            "user": frozenset(),
+        },
+    },
+)
+
+
 MODULE = DomainModule(
     name="application",
+    texts=TEXTS,
     flow=ApplicationFlow,
     edges={
         "open_application": after_open_application,
