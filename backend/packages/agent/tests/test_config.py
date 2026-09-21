@@ -285,3 +285,22 @@ def test_cli_push(tmp_path, capsys):
     assert "pushed 1.1.0 (from 1.0.0)" in capsys.readouterr().out
     assert main(["versions", repo]) == 0
     assert capsys.readouterr().out.split() == ["1.0.0", "1.1.0"]
+
+
+def test_s3_stores_use_the_environment_region(monkeypatch):
+    monkeypatch.setenv("AWS_REGION", "ap-northeast-2")
+    store = open_store("s3://agent-config-bucket/agent-config")
+    assert store.location == "s3://agent-config-bucket/agent-config"
+    assert store.fs.client_kwargs["region_name"] == "ap-northeast-2"
+    assert store.fs.dircache.use_listings_cache is False
+
+
+def test_writing_to_an_object_store_does_not_touch_the_bucket(monkeypatch):
+    """No makedirs on S3: it would check or create the bucket, which the publishing roles may not."""
+    monkeypatch.setenv("AWS_REGION", "ap-northeast-2")
+    store = open_store("s3://agent-config-bucket/agent-config")
+    calls = []
+    monkeypatch.setattr(store.fs, "makedirs", lambda *a, **k: calls.append(("makedirs", a)))
+    monkeypatch.setattr(store.fs, "pipe_file", lambda path, data, mode="overwrite", **k: calls.append((mode, path)))
+    store.sub("1.0.0").write("flows/identity.json", b"{}")
+    assert calls == [("create", "agent-config-bucket/agent-config/1.0.0/flows/identity.json")]

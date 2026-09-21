@@ -13,6 +13,7 @@ at one bundle (a directory with `config.json`), which is handy locally."""
 
 from __future__ import annotations
 
+import os
 import posixpath
 import uuid
 from collections.abc import Iterator, Mapping
@@ -71,7 +72,10 @@ class Store:
     def write(self, path: str, data: bytes) -> None:
         """Create `path`. Raises FileExistsError if it exists: published files are never overwritten."""
         target = self._path(path)
-        self.fs.makedirs(posixpath.dirname(target), exist_ok=True)
+        if isinstance(self.fs, LocalFileSystem):
+            # Only a local disk has directories to make. On S3, s3fs's makedirs would check (and try to create)
+            # the bucket, which the roles that publish may not do.
+            self.fs.makedirs(posixpath.dirname(target), exist_ok=True)
         self.fs.pipe_file(target, data, mode="create")
 
 
@@ -79,6 +83,11 @@ def open_store(uri: str, storage_options: Mapping[str, Any] | None = None) -> St
     """A Store for a URI or local path, e.g. "s3://bucket/agent-config" or "/srv/agent-config"."""
     protocol = fsspec.core.split_protocol(uri)[0] or "file"
     options = {**DEFAULT_STORAGE_OPTIONS.get(protocol, {}), **(storage_options or {})}
+    region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
+    if protocol == "s3" and region:
+        # botocore reads AWS_DEFAULT_REGION only; name the region so requests go straight to it (through the VPC
+        # endpoint), not to a default region and back through a redirect.
+        options["client_kwargs"] = {"region_name": region, **options.get("client_kwargs", {})}
     fs, root = fsspec.core.url_to_fs(uri, **options)
     return Store(fs, root)
 
