@@ -86,7 +86,10 @@ jobs:
 
       # The circuit breaker rolls a failed deployment back; this step then fails.
       - name: Wait for the new tasks to serve
-        run: .github/scripts/wait-for-rollout.sh "${{ steps.tf.outputs.cluster }}" ${{ steps.tf.outputs.services }}
+        # The job runs in $TF_ROOT, so the script is addressed from the workspace root.
+        run: |
+          "$GITHUB_WORKSPACE/.github/scripts/wait-for-rollout.sh" \
+            "${{ steps.tf.outputs.cluster }}" ${{ steps.tf.outputs.services }}
 
       - name: Smoke test (frontend /healthz -> backend /healthz)
         run: |
