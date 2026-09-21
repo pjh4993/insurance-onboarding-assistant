@@ -3,7 +3,7 @@
 
 FROM python:3.13-slim AS build
 # Same pins as the Makefile's `make docs`.
-RUN pip install --no-cache-dir mkdocs-material==9.7.7 mkdocs-same-dir==0.1.5 mkdocs-awesome-nav==3.3.0
+RUN pip install --no-cache-dir mkdocs-material==9.7.7 mkdocs-same-dir==0.1.5 mkdocs-awesome-nav==3.3.0 mkdocs-glightbox==0.5.1
 WORKDIR /src
 COPY mkdocs.yml .nav.yml README.md CONTRACTS.md ./
 COPY .mkdocs .mkdocs

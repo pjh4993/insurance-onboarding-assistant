@@ -1,0 +1,357 @@
+/*
+ * Hugging Face docs styling for MkDocs Material.
+ *
+ * Approximates the huggingface.co/docs look: a white shell with hairline
+ * borders instead of a colored header bar, HF yellow/orange as the only accent,
+ * Source Sans for prose, IBM Plex Mono for code, and a near-black dark mode.
+ */
+
+:root {
+  /* Hugging Face brand */
+  --hf-yellow: #ffd21e;
+  --hf-orange: #ff9d00;
+  --hf-blue: #2563eb;
+
+  /* Light shell */
+  --hf-bg: #ffffff;
+  --hf-bg-subtle: #f9fafb;
+  --hf-border: #ebedf0;
+  --hf-text: #1f2937;
+  --hf-text-muted: #6b7280;
+  --hf-code-bg: #f6f7f9;
+
+  --md-text-font: "Source Sans 3", "Source Sans Pro", system-ui, sans-serif;
+  --md-code-font: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+/* ---------------------------------------------------------------- palette */
+
+[data-md-color-scheme="default"] {
+  --md-default-bg-color: var(--hf-bg);
+  --md-default-fg-color: var(--hf-text);
+  --md-default-fg-color--light: var(--hf-text-muted);
+  --md-default-fg-color--lighter: #9ca3af;
+  --md-default-fg-color--lightest: var(--hf-border);
+
+  --md-primary-fg-color: var(--hf-bg);
+  --md-primary-bg-color: var(--hf-text);
+  --md-primary-bg-color--light: var(--hf-text-muted);
+
+  --md-accent-fg-color: var(--hf-orange);
+  --md-typeset-a-color: var(--hf-blue);
+
+  --md-code-bg-color: var(--hf-code-bg);
+  --md-code-fg-color: #24292f;
+
+  --md-footer-bg-color: var(--hf-bg);
+  --md-footer-bg-color--dark: var(--hf-bg-subtle);
+  --md-footer-fg-color: var(--hf-text);
+
+  color-scheme: light;
+}
+
+[data-md-color-scheme="slate"] {
+  --hf-bg: #0f0f0f;
+  --hf-bg-subtle: #161616;
+  --hf-border: #262626;
+  --hf-text: #e5e7eb;
+  --hf-text-muted: #9ca3af;
+  --hf-code-bg: #161b22;
+
+  --md-default-bg-color: var(--hf-bg);
+  --md-default-fg-color: var(--hf-text);
+  --md-default-fg-color--light: var(--hf-text-muted);
+  --md-default-fg-color--lighter: #6b7280;
+  --md-default-fg-color--lightest: var(--hf-border);
+
+  --md-primary-fg-color: var(--hf-bg);
+  --md-primary-bg-color: var(--hf-text);
+  --md-primary-bg-color--light: var(--hf-text-muted);
+
+  --md-accent-fg-color: var(--hf-yellow);
+  --md-typeset-a-color: #7aa2f7;
+
+  --md-code-bg-color: var(--hf-code-bg);
+  --md-code-fg-color: #c9d1d9;
+
+  --md-footer-bg-color: var(--hf-bg);
+  --md-footer-bg-color--dark: var(--hf-bg-subtle);
+  --md-footer-fg-color: var(--hf-text);
+
+  --md-typeset-kbd-color: #21262d;
+  --md-typeset-table-color: var(--hf-border);
+
+  color-scheme: dark;
+}
+
+/* ----------------------------------------------------------------- header */
+
+/* HF has no colored header band — a white bar separated by a hairline. */
+.md-header {
+  background-color: var(--hf-bg);
+  color: var(--hf-text);
+  border-bottom: 1px solid var(--hf-border);
+  box-shadow: none;
+}
+
+.md-header--shadow {
+  box-shadow: none;
+}
+
+.md-header__title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.md-tabs {
+  background-color: var(--hf-bg);
+  color: var(--hf-text);
+  border-bottom: 1px solid var(--hf-border);
+}
+
+/* Search box: pill-shaped, subtle fill — the HF search affordance. */
+.md-search__form {
+  background-color: var(--hf-bg-subtle);
+  border: 1px solid var(--hf-border);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.md-search__form:hover {
+  background-color: var(--hf-bg-subtle);
+  border-color: var(--hf-text-muted);
+}
+
+[data-md-toggle="search"]:checked ~ .md-header .md-search__form {
+  border-radius: 8px 8px 0 0;
+}
+
+/* ---------------------------------------------------------------- sidebar */
+
+.md-sidebar {
+  padding-top: 1.2rem;
+}
+
+.md-nav {
+  font-size: 0.72rem;
+}
+
+.md-nav__title {
+  color: var(--hf-text-muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.md-nav__link {
+  border-radius: 6px;
+  color: var(--hf-text-muted);
+  margin: 1px 0;
+  padding: 0.22rem 0.42rem;
+  transition: background-color 80ms, color 80ms;
+}
+
+.md-nav__link:hover {
+  background-color: var(--hf-bg-subtle);
+  color: var(--hf-text);
+}
+
+/* Active page: HF marks it with a soft fill and weight, not a color shift. */
+.md-nav__item .md-nav__link--active,
+.md-nav__item .md-nav__link--active:hover {
+  background-color: var(--hf-bg-subtle);
+  color: var(--hf-text);
+  font-weight: 600;
+}
+
+.md-nav--secondary .md-nav__link--active {
+  background-color: transparent;
+  box-shadow: inset 2px 0 0 var(--hf-yellow);
+}
+
+.md-nav--primary .md-nav__title[for="__drawer"] {
+  background-color: var(--hf-bg);
+  color: var(--hf-text);
+  border-bottom: 1px solid var(--hf-border);
+  box-shadow: none;
+}
+
+/* Section headers in the sidebar, e.g. an assignment's name. */
+.md-nav__item--section > .md-nav__link {
+  color: var(--hf-text);
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ prose */
+
+.md-typeset {
+  font-size: 0.79rem;
+  line-height: 1.68;
+}
+
+.md-typeset h1 {
+  color: var(--hf-text);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+}
+
+.md-typeset h2 {
+  border-bottom: 1px solid var(--hf-border);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-top: 2.2em;
+  padding-bottom: 0.3em;
+}
+
+.md-typeset h3,
+.md-typeset h4 {
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.md-typeset a {
+  text-decoration: none;
+}
+
+.md-typeset a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--hf-yellow);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------- code */
+
+.md-typeset code {
+  background-color: var(--md-code-bg-color);
+  border-radius: 4px;
+  font-size: 0.86em;
+  padding: 0.12em 0.34em;
+}
+
+.md-typeset pre > code {
+  border: 1px solid var(--hf-border);
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem;
+}
+
+.md-typeset .highlight span.filename {
+  background-color: var(--hf-bg-subtle);
+  border: 1px solid var(--hf-border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  color: var(--hf-text-muted);
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------------------- tables */
+
+/* The ADR indexes are tables — they carry a lot of this site. */
+.md-typeset table:not([class]) {
+  border: 1px solid var(--hf-border);
+  border-radius: 10px;
+  box-shadow: none;
+  font-size: 0.72rem;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: var(--hf-bg-subtle);
+  color: var(--hf-text);
+  font-weight: 600;
+}
+
+.md-typeset table:not([class]) td {
+  border-top: 1px solid var(--hf-border);
+}
+
+/* ------------------------------------------------------- admonitions etc. */
+
+.md-typeset .admonition,
+.md-typeset details {
+  border: 1px solid var(--hf-border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  box-shadow: none;
+  font-size: 0.74rem;
+}
+
+.md-typeset blockquote {
+  border-left: 3px solid var(--hf-yellow);
+  color: var(--hf-text-muted);
+}
+
+.md-typeset hr {
+  border-bottom: 1px solid var(--hf-border);
+}
+
+/* ----------------------------------------------------------------- footer */
+
+.md-footer {
+  border-top: 1px solid var(--hf-border);
+}
+
+.md-footer-meta {
+  background-color: var(--hf-bg);
+}
+
+.md-footer__link:hover {
+  color: var(--hf-orange);
+  opacity: 1;
+}
+
+.md-copyright {
+  color: var(--hf-text-muted);
+}
+
+/* Selection and focus pick up the brand yellow. */
+::selection {
+  background-color: rgba(255, 210, 30, 0.4);
+}
+
+.md-typeset :target {
+  --md-scroll-margin: 4rem;
+}
+
+/* Screenshots. A full-page capture runs to several thousand pixels, so every
+   image is capped to a readable thumbnail here and opened at full size by
+   glightbox — see the plugin block in mkdocs.yml. */
+.md-typeset img {
+  max-width: 100%;
+  max-height: 30rem;
+  width: auto;
+  border: 1px solid var(--hf-border);
+  border-radius: 6px;
+}
+
+/* glightbox wraps each image in an inline anchor; block-level so the capped
+   image centres in the text column instead of sitting flush left. */
+.md-typeset a.glightbox {
+  display: block;
+  text-align: center;
+}
+
+.md-typeset a.glightbox img {
+  cursor: zoom-in;
+  transition: border-color 120ms ease;
+}
+
+.md-typeset a.glightbox:hover img {
+  border-color: var(--hf-orange);
+}
+
+/* The default backdrop is light enough that the page reads through it. */
+.glightbox-container .goverlay {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.glightbox-clean .gslide-description {
+  background: var(--hf-bg);
+}
+
+.glightbox-clean .gslide-title,
+.glightbox-clean .gslide-desc {
+  color: var(--hf-text);
+  font-family: var(--md-text-font-family), sans-serif;
+}

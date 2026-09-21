@@ -1,6 +1,8 @@
 """MkDocs build hooks. In a dot-directory so the site build does not collect it."""
 
 import os
+import posixpath
+import re
 
 from mkdocs.structure.files import File
 
@@ -42,3 +44,30 @@ def on_serve(server, config, builder):
     for name in WATCHED:
         server.watch(os.path.join(root, name))
     return server
+
+
+# A diagram is written as a plain image (`![…](assets/x.svg)`) so GitHub shows it. On the site it is inlined,
+# so it draws in the page's currentColor (light/dark) and svg-zoom.js can open it; glightbox may have wrapped it.
+_SVG_IMAGE = re.compile(
+    r'(?:<p>\s*)?(?:<a [^>]*class="glightbox"[^>]*>\s*)?<img [^>]*?src="([^"]+\.svg)"[^>]*>(?:\s*</a>)?(?:\s*</p>)?'
+)
+_STANDALONE_STYLE = re.compile(r"<style>.*?</style>", re.S)
+
+
+def on_page_content(html, page, config, files):
+    by_url = {f.url: f for f in files}
+
+    def inline(match):
+        src = match.group(1)
+        if re.match(r"^[a-z]+:|^/", src):
+            return match.group(0)
+        base = page.url if page.url.endswith("/") or not page.url else posixpath.dirname(page.url)
+        url = posixpath.normpath(posixpath.join(base, src))
+        file = by_url.get(url)
+        if file is None:
+            return match.group(0)
+        with open(file.abs_src_path, encoding="utf-8") as fh:
+            svg = _STANDALONE_STYLE.sub("", fh.read().strip())
+        return f'<figure class="diagram">{svg}</figure>'
+
+    return _SVG_IMAGE.sub(inline, html)

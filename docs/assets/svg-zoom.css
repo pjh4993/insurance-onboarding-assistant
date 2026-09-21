@@ -1,0 +1,44 @@
+/* See svg-zoom.js. The overlay takes the page's own fg/bg colors so the
+   cloned diagram's currentColor still resolves correctly in both themes. */
+.svg-zoomable { cursor: zoom-in; }
+
+.svg-zoom-open { overflow: hidden; }
+
+.svg-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  cursor: zoom-out;
+}
+
+.svg-zoom-frame {
+  width: 96vw;
+  height: 92vh;
+  overflow: auto;
+  cursor: zoom-in;
+}
+.svg-zoom-frame > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.svg-zoom-frame.is-2x { cursor: zoom-out; }
+.svg-zoom-frame.is-2x > svg {
+  width: 200%;
+  height: auto;
+}
+
+.svg-zoom-hint {
+  position: fixed;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  opacity: 0.55;
+  pointer-events: none;
+}

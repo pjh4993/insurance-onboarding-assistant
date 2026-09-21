@@ -21,15 +21,30 @@ plugins:
   - same-dir
   - awesome-nav
   - search
+  # Screenshots open full size. SVG diagrams are inlined by the hook instead (glightbox only opens <img>).
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      draggable: true
+      auto_caption: true
+      caption_position: bottom
 
 hooks:
   - .mkdocs/hooks.py
 
+# Same look as the ai-interview-assignments site: Material with the Hugging Face docs palette and type.
 theme:
   name: material
   language: en
+  font:
+    text: Source Sans 3
+    code: IBM Plex Mono
+  icon:
+    repo: fontawesome/brands/github
   features:
     - navigation.instant
+    - navigation.instant.progress
     - navigation.tracking
     - navigation.sections
     - navigation.indexes
@@ -49,6 +64,15 @@ theme:
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
+
+# Paths are site URLs: the hook publishes docs/ at the site root, so docs/assets/ is served at assets/.
+extra_css:
+  - assets/huggingface.css
+  - assets/svg-zoom.css
+
+# Inline SVG diagrams zoom on click. glightbox cannot: it only opens <img>.
+extra_javascript:
+  - assets/svg-zoom.js
 
 markdown_extensions:
   - admonition
