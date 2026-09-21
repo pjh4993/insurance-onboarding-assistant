@@ -4,7 +4,10 @@ The backend runs one LangGraph graph per onboarding session. One session is one 
 the four stages the brief lists and pauses whenever it needs a person.
 
 What the graph stores and how routing reads it is in [state-management.md](03-state-management.md). The code is in
-`backend/app/graph/`: `build.py` wires the graph, `nodes.py` holds the nodes, `routing.py` the edge functions.
+the `onboarding-agent` package (`backend/packages/agent/src/onboarding_agent/`): `build.py` wires the graph, `nodes.py` holds
+the nodes, `routing.py` the edge functions, and `runner.py` is the entry point the API service drives. Nodes
+reach the domain DB and external systems only through the ports in `onboarding_core.ports` (see
+[solution-architecture.md](01-solution-architecture.md#backend-packages)).
 
 ## 1. The four stages
 

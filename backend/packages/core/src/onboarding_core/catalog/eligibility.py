@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from app.domain.pricing import trip_length_days
-from app.util import parse_date
+from onboarding_core.quoting.pricing import trip_length_days
+from onboarding_core.util import parse_date
 
 AGE_RANGE_LOWER_BOUND = {
     "AGE_UNDER_19": 0,

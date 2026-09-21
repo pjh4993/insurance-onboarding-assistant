@@ -10,9 +10,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.config import Settings
-from app.llm.provider import BedrockStructuredLLM
-from app.llm.schemas import NeedsExtraction
+from onboarding_agent.llm.provider import BedrockStructuredLLM
+from onboarding_agent.llm.schemas import NeedsExtraction
 
 REQUESTS: list[tuple[str, dict]] = []
 
@@ -71,11 +70,12 @@ def converse_url(monkeypatch):
 
 async def test_structured_output_through_converse(converse_url):
     REQUESTS.clear()
-    settings = Settings(
-        bedrock_endpoint_url=converse_url,
-        llm_model_overrides={"assess_needs": "global.anthropic.claude-haiku-4-5"},
+    llm = BedrockStructuredLLM(
+        model_id="global.anthropic.claude-sonnet-4-6",
+        region="ap-northeast-2",
+        endpoint_url=converse_url,
+        model_overrides={"assess_needs": "global.anthropic.claude-haiku-4-5"},
     )
-    llm = BedrockStructuredLLM(settings)
     out = await llm.extract(
         "assess_needs", NeedsExtraction, [SystemMessage("Customer: 김하늘"), HumanMessage("폰 보험")]
     )

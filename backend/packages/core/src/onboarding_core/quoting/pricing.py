@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from app.util import parse_date
+from onboarding_core.util import parse_date
 
 
 class RatingError(ValueError):

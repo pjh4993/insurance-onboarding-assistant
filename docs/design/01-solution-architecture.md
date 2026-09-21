@@ -107,6 +107,30 @@ flowchart LR
 | PostgreSQL | PostgreSQL 16 (RDS in AWS) | Three schemas: `checkpoint` (graph state), `domain` (customer and transaction entities), `catalog` (products, rules) |
 | Mock | FastAPI | One app for partner, identity, contract admin and Bedrock Converse, plus fault injection (`/_mock/faults`). Local and develop only |
 
+### Backend packages
+
+The backend is one deployable service built from three Python packages in a uv workspace (`backend/`). The
+agent and the domain are libraries; the API service depends on them, never the other way round.
+
+```mermaid
+flowchart LR
+    api["app/ (API service)<br/>FastAPI, sessions, SSE,<br/>SQLAlchemy + HTTP adapters"]
+    agent["onboarding-agent<br/>graph, nodes, routing,<br/>LLM, checkpointer, runner"]
+    core["onboarding-core<br/>entities, eligibility, pricing,<br/>catalog seed, ports"]
+    api --> agent --> core
+    api --> core
+```
+
+| Package | Path | Owns | Must not import |
+|---|---|---|---|
+| `onboarding-core` | `backend/packages/core` | Domain entities as plain dataclasses, eligibility and pricing rules, the catalog seed, and the **ports** (`onboarding_core.ports`): the `UnitOfWork` with one repository per domain, the partner/identity/contract gateways | SQLAlchemy, LangGraph, FastAPI, `app` |
+| `onboarding-agent` | `backend/packages/agent` | The LangGraph graph, nodes, routing, copy, LLM access, the encrypted checkpointer, and `AgentRunner` (start, resume, snapshot, route a failed run to handoff) | SQLAlchemy, FastAPI, `app` |
+| API service | `backend/app` | HTTP API and SSE, session tokens and the `OnboardingSession` mirror, and the **adapters**: the SQLAlchemy mapping of the core entities (`app/db/models.py`) and unit of work (`app/db/uow.py`), the HTTP clients. `app/main.py` is the composition root that plugs the adapters into the agent | — |
+
+The agent reads and writes the domain DB only through `UnitOfWork`. Core entities are mapped onto the tables
+imperatively, so a node changes an entity's fields and the unit of work persists them when its block exits.
+`tests/test_boundaries.py` fails the build if a package imports across its boundary.
+
 Why the three schemas share one instance: they differ in lifetime and access, but not enough to justify
 three databases for this scope. Checkpoints are only useful while a session is alive (30-day inactivity limit),
 domain entities live as long as the customer relationship, and the catalog is read-only for the graph.

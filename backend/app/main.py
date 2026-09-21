@@ -1,10 +1,10 @@
-"""FastAPI application factory. `create_app()` wires real clients; tests pass fakes."""
+"""FastAPI application factory and composition root: `create_app()` plugs the backend's adapters (DB unit
+of work, HTTP clients, SSE broker) into the agent's ports. Tests pass fakes through `Overrides`."""
 
 from __future__ import annotations
 
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from typing import Any
 
 import httpx
 from fastapi import FastAPI
@@ -13,15 +13,21 @@ from app.api.routes import router
 from app.clients.external import ContractClient, IdentityClient, PartnerClient, make_http
 from app.config import Settings, get_settings
 from app.db.engine import init_db, make_engine, make_sessionmaker
-from app.graph.build import build_graph
-from app.graph.checkpointer import open_checkpointer
-from app.graph.deps import Deps
-from app.llm.provider import BedrockStructuredLLM, StructuredLLM
+from app.db.uow import uow_factory
 from app.services.pg_broker import PostgresBroker
 from app.services.pubsub import Broker, InMemoryBroker
-from app.services.runtime import Runtime
+from app.services.runtime import Runtime, entity_listener
 from app.telemetry import setup_logging, setup_otel
-from app.util import Clock, utcnow
+from onboarding_agent import (
+    AgentConfig,
+    AgentDeps,
+    AgentRunner,
+    BedrockStructuredLLM,
+    StructuredLLM,
+    build_graph,
+    open_checkpointer,
+)
+from onboarding_core.util import Clock, utcnow
 
 
 @dataclass
@@ -31,6 +37,24 @@ class Overrides:
     transport: httpx.AsyncBaseTransport | None = None
     llm: StructuredLLM | None = None
     clock: Clock | None = None
+
+
+def agent_config(settings: Settings) -> AgentConfig:
+    return AgentConfig(
+        aes_key=settings.aes_key_bytes,
+        hmac_key=settings.session_hmac_key,
+        retry_max_attempts=settings.retry_max_attempts,
+        retry_initial_interval=settings.retry_initial_interval,
+    )
+
+
+def bedrock_llm(settings: Settings) -> BedrockStructuredLLM:
+    return BedrockStructuredLLM(
+        model_id=settings.bedrock_model_id,
+        region=settings.aws_region,
+        endpoint_url=settings.bedrock_endpoint_url,
+        model_overrides=settings.llm_model_overrides,
+    )
 
 
 def create_app(settings: Settings | None = None, overrides: Overrides | None = None) -> FastAPI:
@@ -61,24 +85,18 @@ def create_app(settings: Settings | None = None, overrides: Overrides | None = N
             if settings.sse_broker == "postgres":
                 broker = await stack.enter_async_context(PostgresBroker(settings.psycopg_conninfo))
             clock = overrides.clock or utcnow
-            holder: dict[str, Any] = {}
-
-            async def on_entity(session_id: str, entity_type: str, entity_id: str) -> None:
-                await holder["runtime"].publish_entity(session_id, entity_type, entity_id)
-
-            deps = Deps(
-                settings=settings,
-                sessionmaker=sessionmaker,
+            deps = AgentDeps(
+                config=agent_config(settings),
+                uow=uow_factory(sessionmaker),
                 partner=PartnerClient(partner),
                 identity=IdentityClient(identity),
                 contract=ContractClient(contract),
-                llm=overrides.llm or BedrockStructuredLLM(settings),
+                llm=overrides.llm or bedrock_llm(settings),
                 clock=clock,
-                on_entity=on_entity,
+                on_entity=entity_listener(broker),
             )
-            graph = build_graph(deps, checkpointer)
-            rt = Runtime(graph=graph, sessionmaker=sessionmaker, broker=broker, settings=settings, clock=clock)
-            holder["runtime"] = rt
+            agent = AgentRunner(build_graph(deps, checkpointer), retry_max_attempts=settings.retry_max_attempts)
+            rt = Runtime(agent=agent, sessionmaker=sessionmaker, broker=broker, settings=settings, clock=clock)
             app.state.settings = settings
             app.state.broker = broker
             app.state.runtime = rt

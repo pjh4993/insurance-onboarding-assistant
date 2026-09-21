@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 from langgraph.graph import END
 
-from app.graph import routing as r
-from app.graph.build import ALL_NODES, should_retry
+from onboarding_agent import routing as r
+from onboarding_agent.build import ALL_NODES, should_retry
 
 ERR = {"last_error": {"node": "x", "kind": "ValueError", "attempts": 3}}
 

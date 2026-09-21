@@ -4,7 +4,8 @@ Domain entities in the `domain` and `catalog` schemas. Names follow ACORD where 
 `InsurableObject`, `Quote`, `Policy`) and IDD for suitability (`NeedsAssessment`, `TargetMarket`). Graph state is
 separate and described in [state-management.md](03-state-management.md).
 
-This page matches `backend/app/db/models.py`. The backend creates the schemas and tables at startup with
+This page matches `backend/app/db/models.py`, which maps the entity dataclasses of `onboarding-core`
+(`backend/packages/core`) onto these tables. The backend creates the schemas and tables at startup with
 SQLAlchemy `create_all` and then upserts the catalog seed. Both steps are idempotent and run under a Postgres
 advisory lock, so several starting replicas do not race. There are no Alembic migrations: `create_all` adds
 missing tables but does not change existing ones.
@@ -211,7 +212,7 @@ Enum columns are stored as short strings; the allowed values are enforced by the
 
 ## 5. Product catalog seed
 
-Eight products: two markets × the four product types from the brief (`backend/app/domain/catalog_seed.py`).
+Eight products: two markets × the four product types from the brief (`onboarding_core/catalog/seed.py` in `backend/packages/core`).
 Values are modelled on public products and are not bolttech's real rates.
 
 | Code | Type | Pricing | Billing | Term |

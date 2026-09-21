@@ -1,15 +1,21 @@
-"""SQLAlchemy models. Schemas: `catalog` (read-only reference data), `domain` (customer + transaction
+"""Tables and ORM mapping. Schemas: `catalog` (read-only reference data), `domain` (customer + transaction
 records). The `checkpoint` schema belongs to langgraph-checkpoint-postgres.
 
-Field names follow wiki/entity-dictionary.md. Only the entities the flow needs are modelled."""
+The domain entities are plain dataclasses in `onboarding_core`; this module maps them onto the tables
+imperatively, so the core and the agent never import SQLAlchemy. `OnboardingSession` is the backend's
+own record and stays declarative. Importing this module installs the mappings.
+
+Field names follow wiki/entity-dictionary.md. Only the entities the flow needs are modelled.
+Columns the entities do not declare (`created_at`/`updated_at` with a server default) are still
+mapped, so queries can sort on them."""
 
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
-from typing import Any
+from datetime import datetime
 
 from sqlalchemy import (
+    Column,
     Date,
     DateTime,
     Float,
@@ -17,98 +23,118 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
+    Table,
     Text,
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, registry
+
+from onboarding_core.application.models import Application, ApplicationParty
+from onboarding_core.catalog.models import EligibilityRule, Product, TargetMarket
+from onboarding_core.needs.models import InsurableObject, NeedsAssessment
+from onboarding_core.party.models import Party
+from onboarding_core.quoting.models import Quote
+from onboarding_core.recommendation.models import Recommendation
 
 SCHEMAS = ("catalog", "domain", "checkpoint")
 
+mapper_registry = registry()
+metadata = mapper_registry.metadata
+
 
 class Base(DeclarativeBase):
-    pass
+    registry = mapper_registry
 
 
-def _ts(nullable: bool = True, **kw: Any) -> Mapped[Any]:
-    return mapped_column(DateTime(timezone=True), nullable=nullable, **kw)
+def _id(name: str, **kw) -> Column:
+    return Column(name, UUID(as_uuid=True), **kw)
+
+
+def _ts(name: str, nullable: bool = True, **kw) -> Column:
+    return Column(name, DateTime(timezone=True), nullable=nullable, **kw)
+
+
+def _audit() -> tuple[Column, Column]:
+    return (
+        _ts("created_at", False, server_default=func.now()),
+        _ts("updated_at", False, server_default=func.now(), onupdate=func.now()),
+    )
 
 
 # --------------------------------------------------------------------------------------------- catalog
 
+product = Table(
+    "product",
+    metadata,
+    Column("product_code", String(64), primary_key=True),
+    Column("product_type", String(32), nullable=False),
+    Column("marketing_name", String(200), nullable=False),
+    Column("insurable_object_type", String(16), nullable=False),
+    Column("coverages", JSONB, nullable=False),
+    Column("rating", JSONB, nullable=False),
+    Column("billing_period", String(16), nullable=False),
+    Column("currency", String(3), nullable=False),
+    Column("jurisdictions", ARRAY(String(2)), nullable=False),
+    Column("sale_effective_date", Date, nullable=False),
+    Column("sale_expiration_date", Date),
+    Column("term_rule", JSONB, nullable=False),
+    Column("required_application_fields", ARRAY(String(64)), nullable=False),
+    Column("status", String(16), nullable=False),
+    schema="catalog",
+)
 
-class Product(Base):
-    __tablename__ = "product"
-    __table_args__ = {"schema": "catalog"}
+eligibility_rule = Table(
+    "eligibility_rule",
+    metadata,
+    _id("rule_id", primary_key=True),
+    Column("product_code", ForeignKey("catalog.product.product_code"), index=True, nullable=False),
+    Column("subject", String(32), nullable=False),
+    Column("attribute", String(100), nullable=False),
+    Column("operator", String(16), nullable=False),
+    Column("value", JSONB, nullable=False),
+    Column("failure_reason_code", String(64), nullable=False),
+    Column("description", Text, nullable=False),
+    schema="catalog",
+)
 
-    product_code: Mapped[str] = mapped_column(String(64), primary_key=True)
-    product_type: Mapped[str] = mapped_column(String(32))
-    marketing_name: Mapped[str] = mapped_column(String(200))
-    insurable_object_type: Mapped[str] = mapped_column(String(16))
-    coverages: Mapped[list[dict]] = mapped_column(JSONB)
-    rating: Mapped[dict] = mapped_column(JSONB)
-    billing_period: Mapped[str] = mapped_column(String(16))
-    currency: Mapped[str] = mapped_column(String(3))
-    jurisdictions: Mapped[list[str]] = mapped_column(ARRAY(String(2)))
-    sale_effective_date: Mapped[date] = mapped_column(Date)
-    sale_expiration_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    term_rule: Mapped[dict] = mapped_column(JSONB)
-    required_application_fields: Mapped[list[str]] = mapped_column(ARRAY(String(64)))
-    status: Mapped[str] = mapped_column(String(16), default="ACTIVE")
-
-
-class EligibilityRule(Base):
-    __tablename__ = "eligibility_rule"
-    __table_args__ = {"schema": "catalog"}
-
-    rule_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    product_code: Mapped[str] = mapped_column(ForeignKey("catalog.product.product_code"), index=True)
-    subject: Mapped[str] = mapped_column(String(32))
-    attribute: Mapped[str] = mapped_column(String(100))
-    operator: Mapped[str] = mapped_column(String(16))
-    value: Mapped[Any] = mapped_column(JSONB)
-    failure_reason_code: Mapped[str] = mapped_column(String(64))
-    description: Mapped[str] = mapped_column(Text)
-
-
-class TargetMarket(Base):
-    __tablename__ = "target_market"
-    __table_args__ = {"schema": "catalog"}
-
-    target_market_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    product_code: Mapped[str] = mapped_column(ForeignKey("catalog.product.product_code"), index=True)
-    attribute: Mapped[str] = mapped_column(String(64))
-    values: Mapped[list] = mapped_column(JSONB)
-    weight: Mapped[float] = mapped_column(Float)
-    rationale: Mapped[str] = mapped_column(Text)
-
+target_market = Table(
+    "target_market",
+    metadata,
+    _id("target_market_id", primary_key=True),
+    Column("product_code", ForeignKey("catalog.product.product_code"), index=True, nullable=False),
+    Column("attribute", String(64), nullable=False),
+    Column("values", JSONB, nullable=False),
+    Column("weight", Float, nullable=False),
+    Column("rationale", Text, nullable=False),
+    schema="catalog",
+)
 
 # --------------------------------------------------------------------------------------------- domain
 
-
-class Party(Base):
-    __tablename__ = "party"
-    __table_args__ = {"schema": "domain"}
-
-    party_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    party_type: Mapped[str] = mapped_column(String(16), default="PERSON")
-    full_name: Mapped[str | None] = mapped_column(String(200))
-    email: Mapped[str | None] = mapped_column(String(320))
-    phone: Mapped[str | None] = mapped_column(String(32))
-    date_of_birth: Mapped[date | None] = mapped_column(Date)
-    id_document_type: Mapped[str | None] = mapped_column(String(32))
+party = Table(
+    "party",
+    metadata,
+    _id("party_id", primary_key=True),
+    Column("party_type", String(16), nullable=False),
+    Column("full_name", String(200)),
+    Column("email", String(320)),
+    Column("phone", String(32)),
+    Column("date_of_birth", Date),
+    Column("id_document_type", String(32)),
     # The document number is never stored in plaintext: AES-EAX ciphertext + HMAC for lookups.
-    id_document_number_enc: Mapped[bytes | None] = mapped_column(LargeBinary)
-    id_document_hmac: Mapped[str | None] = mapped_column(String(64), index=True)
-    third_party_consent_at: Mapped[datetime | None] = _ts()
-    partner_customer_ref: Mapped[str | None] = mapped_column(String(64))
-    verification_status: Mapped[str] = mapped_column(String(16), default="UNVERIFIED")
-    verification_method: Mapped[str | None] = mapped_column(String(16))
-    verification_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    verified_at: Mapped[datetime | None] = _ts()
-    merged_into_party_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    created_at: Mapped[datetime] = _ts(False, server_default=func.now())
-    updated_at: Mapped[datetime] = _ts(False, server_default=func.now(), onupdate=func.now())
+    Column("id_document_number_enc", LargeBinary),
+    Column("id_document_hmac", String(64), index=True),
+    _ts("third_party_consent_at"),
+    Column("partner_customer_ref", String(64)),
+    Column("verification_status", String(16), nullable=False),
+    Column("verification_method", String(16)),
+    Column("verification_attempts", Integer, nullable=False),
+    _ts("verified_at"),
+    _id("merged_into_party_id"),
+    *_audit(),
+    schema="domain",
+)
 
 
 class OnboardingSession(Base):
@@ -120,126 +146,137 @@ class OnboardingSession(Base):
     party_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.party.party_id"))
     market: Mapped[str] = mapped_column(String(2))
     token_hmac: Mapped[str] = mapped_column(String(64), unique=True)
-    token_expires_at: Mapped[datetime] = _ts(False)
+    token_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16), default="ACTIVE")
     last_stage: Mapped[str] = mapped_column(String(16), default="IDENTITY")
     waiting_for: Mapped[str | None] = mapped_column(String(16))
     current_node: Mapped[str | None] = mapped_column(String(64))
     mode: Mapped[str] = mapped_column(String(8), default="AUTO")
     assigned_agent_id: Mapped[str | None] = mapped_column(String(128))
-    started_at: Mapped[datetime] = _ts(False)
-    last_activity_at: Mapped[datetime] = _ts(False, index=True)
-    ended_at: Mapped[datetime | None] = _ts()
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class NeedsAssessment(Base):
-    __tablename__ = "needs_assessment"
-    __table_args__ = {"schema": "domain"}
-
-    needs_assessment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    party_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.party.party_id"), index=True)
-    session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
-    version: Mapped[int] = mapped_column(Integer)
-    age_range: Mapped[str | None] = mapped_column(String(16))
-    occupation: Mapped[str | None] = mapped_column(String(200))
-    residence_country: Mapped[str | None] = mapped_column(String(2))
-    existing_coverage: Mapped[list[dict]] = mapped_column(JSONB, default=list)
-    objectives: Mapped[list[str]] = mapped_column(JSONB, default=list)
-    objectives_note: Mapped[str | None] = mapped_column(Text)
+needs_assessment = Table(
+    "needs_assessment",
+    metadata,
+    _id("needs_assessment_id", primary_key=True),
+    Column("party_id", ForeignKey("domain.party.party_id"), index=True, nullable=False),
+    _id("session_id", index=True, nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("age_range", String(16)),
+    Column("occupation", String(200)),
+    Column("residence_country", String(2)),
+    Column("existing_coverage", JSONB, nullable=False),
+    Column("objectives", JSONB, nullable=False),
+    Column("objectives_note", Text),
     # Device/trip the customer described, kept with the version so a CHANGE re-derives objects.
-    device: Mapped[dict | None] = mapped_column(JSONB)
-    trip: Mapped[dict | None] = mapped_column(JSONB)
-    captured_by: Mapped[str] = mapped_column(String(16), default="CUSTOMER")
-    missing_fields: Mapped[list[str]] = mapped_column(JSONB, default=list)
-    completed_at: Mapped[datetime | None] = _ts()
-    created_at: Mapped[datetime] = _ts(False, server_default=func.now())
+    Column("device", JSONB),
+    Column("trip", JSONB),
+    Column("captured_by", String(16), nullable=False),
+    Column("missing_fields", JSONB, nullable=False),
+    _ts("completed_at"),
+    _ts("created_at", False, server_default=func.now()),
+    schema="domain",
+)
 
+insurable_object = Table(
+    "insurable_object",
+    metadata,
+    _id("insurable_object_id", primary_key=True),
+    Column("owner_party_id", ForeignKey("domain.party.party_id"), index=True, nullable=False),
+    Column("object_type", String(16), nullable=False),
+    Column("source", String(16), nullable=False),
+    Column("attributes", JSONB, nullable=False),
+    *_audit(),
+    schema="domain",
+)
 
-class InsurableObject(Base):
-    __tablename__ = "insurable_object"
-    __table_args__ = {"schema": "domain"}
+recommendation = Table(
+    "recommendation",
+    metadata,
+    _id("recommendation_id", primary_key=True),
+    Column("session_id", ForeignKey("domain.onboarding_session.session_id"), index=True, nullable=False),
+    Column("party_id", ForeignKey("domain.party.party_id"), nullable=False),
+    Column("needs_assessment_id", ForeignKey("domain.needs_assessment.needs_assessment_id"), nullable=False),
+    Column("product_code", ForeignKey("catalog.product.product_code"), nullable=False),
+    _id("insurable_object_id"),
+    Column("rank", Integer, nullable=False),
+    Column("score", Float, nullable=False),
+    Column("eligibility_result", String(16), nullable=False),
+    Column("failed_rule_ids", JSONB, nullable=False),
+    Column("failed_reasons", JSONB, nullable=False),
+    Column("rationale", Text),
+    Column("status", String(16), nullable=False),
+    Column("decided_by", String(16)),
+    _ts("decided_at"),
+    _ts("created_at", False, server_default=func.now()),
+    schema="domain",
+)
 
-    insurable_object_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    owner_party_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.party.party_id"), index=True)
-    object_type: Mapped[str] = mapped_column(String(16))
-    source: Mapped[str] = mapped_column(String(16))
-    attributes: Mapped[dict] = mapped_column(JSONB)
-    created_at: Mapped[datetime] = _ts(False, server_default=func.now())
-    updated_at: Mapped[datetime] = _ts(False, server_default=func.now(), onupdate=func.now())
+quote = Table(
+    "quote",
+    metadata,
+    _id("quote_id", primary_key=True),
+    Column("recommendation_id", ForeignKey("domain.recommendation.recommendation_id"), index=True, nullable=False),
+    Column("product_code", String(64), nullable=False),
+    _id("insurable_object_id", nullable=False),
+    Column("coverages", JSONB, nullable=False),
+    Column("term_start_date", Date, nullable=False),
+    Column("term_end_date", Date, nullable=False),
+    Column("premium_minor", Integer, nullable=False),
+    Column("billing_period", String(16), nullable=False),
+    Column("currency", String(3), nullable=False),
+    Column("rating_inputs", JSONB, nullable=False),
+    Column("status", String(16), nullable=False),
+    _ts("valid_until", False),
+    _ts("created_at", False),
+    schema="domain",
+)
 
+application = Table(
+    "application",
+    metadata,
+    _id("application_id", primary_key=True),
+    Column("session_id", ForeignKey("domain.onboarding_session.session_id"), index=True, nullable=False),
+    Column("recommendation_id", ForeignKey("domain.recommendation.recommendation_id"), nullable=False),
+    Column("quote_id", ForeignKey("domain.quote.quote_id"), nullable=False),
+    Column("product_code", String(64), nullable=False),
+    _id("insurable_object_id"),
+    Column("status", String(16), nullable=False),
+    Column("answers", JSONB, nullable=False),
+    Column("missing_fields", JSONB, nullable=False),
+    Column("summary", Text),
+    Column("captured_by", String(16), nullable=False),
+    _ts("submitted_at"),
+    Column("submission_ref", String(64)),
+    *_audit(),
+    schema="domain",
+)
 
-class Recommendation(Base):
-    __tablename__ = "recommendation"
-    __table_args__ = {"schema": "domain"}
+application_party = Table(
+    "application_party",
+    metadata,
+    Column("application_id", ForeignKey("domain.application.application_id"), primary_key=True),
+    Column("party_id", ForeignKey("domain.party.party_id"), primary_key=True),
+    Column("role", String(16), primary_key=True),
+    schema="domain",
+)
 
-    recommendation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.onboarding_session.session_id"), index=True)
-    party_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.party.party_id"))
-    needs_assessment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.needs_assessment.needs_assessment_id"))
-    product_code: Mapped[str] = mapped_column(ForeignKey("catalog.product.product_code"))
-    insurable_object_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    rank: Mapped[int] = mapped_column(Integer, default=0)
-    score: Mapped[float] = mapped_column(Float, default=0.0)
-    eligibility_result: Mapped[str] = mapped_column(String(16))
-    failed_rule_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
-    failed_reasons: Mapped[list[str]] = mapped_column(JSONB, default=list)
-    rationale: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(16), default="PROPOSED")
-    decided_by: Mapped[str | None] = mapped_column(String(16))
-    decided_at: Mapped[datetime | None] = _ts()
-    created_at: Mapped[datetime] = _ts(False, server_default=func.now())
-
-
-class Quote(Base):
-    __tablename__ = "quote"
-    __table_args__ = {"schema": "domain"}
-
-    quote_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    recommendation_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("domain.recommendation.recommendation_id"), index=True
-    )
-    product_code: Mapped[str] = mapped_column(String(64))
-    insurable_object_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
-    coverages: Mapped[list[dict]] = mapped_column(JSONB)
-    term_start_date: Mapped[date] = mapped_column(Date)
-    term_end_date: Mapped[date] = mapped_column(Date)
-    premium_minor: Mapped[int] = mapped_column(Integer)
-    billing_period: Mapped[str] = mapped_column(String(16))
-    currency: Mapped[str] = mapped_column(String(3))
-    rating_inputs: Mapped[dict] = mapped_column(JSONB)
-    status: Mapped[str] = mapped_column(String(16), default="ISSUED")
-    valid_until: Mapped[datetime] = _ts(False)
-    created_at: Mapped[datetime] = _ts(False)
-
-
-class Application(Base):
-    __tablename__ = "application"
-    __table_args__ = {"schema": "domain"}
-
-    application_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.onboarding_session.session_id"), index=True)
-    recommendation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.recommendation.recommendation_id"))
-    quote_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.quote.quote_id"))
-    product_code: Mapped[str] = mapped_column(String(64))
-    insurable_object_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    status: Mapped[str] = mapped_column(String(16), default="DRAFT")
-    answers: Mapped[dict] = mapped_column(JSONB, default=dict)
-    missing_fields: Mapped[list[str]] = mapped_column(JSONB, default=list)
-    summary: Mapped[str | None] = mapped_column(Text)
-    captured_by: Mapped[str] = mapped_column(String(16), default="CUSTOMER")
-    submitted_at: Mapped[datetime | None] = _ts()
-    submission_ref: Mapped[str | None] = mapped_column(String(64))
-    created_at: Mapped[datetime] = _ts(False, server_default=func.now())
-    updated_at: Mapped[datetime] = _ts(False, server_default=func.now(), onupdate=func.now())
-
-
-class ApplicationParty(Base):
-    __tablename__ = "application_party"
-    __table_args__ = {"schema": "domain"}
-
-    application_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.application.application_id"), primary_key=True)
-    party_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.party.party_id"), primary_key=True)
-    role: Mapped[str] = mapped_column(String(16), primary_key=True)
+for _entity, _table in (
+    (Product, product),
+    (EligibilityRule, eligibility_rule),
+    (TargetMarket, target_market),
+    (Party, party),
+    (NeedsAssessment, needs_assessment),
+    (InsurableObject, insurable_object),
+    (Recommendation, recommendation),
+    (Quote, quote),
+    (Application, application),
+    (ApplicationParty, application_party),
+):
+    mapper_registry.map_imperatively(_entity, _table)
 
 
 __all__ = [
@@ -256,4 +293,5 @@ __all__ = [
     "Quote",
     "Recommendation",
     "TargetMarket",
+    "metadata",
 ]

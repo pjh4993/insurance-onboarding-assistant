@@ -9,10 +9,10 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import RetryPolicy
 
-from app.graph import routing as r
-from app.graph.deps import Deps
-from app.graph.nodes import Nodes
-from app.graph.state import OnboardingState
+from onboarding_agent import routing as r
+from onboarding_agent.deps import AgentDeps
+from onboarding_agent.nodes import Nodes
+from onboarding_agent.state import OnboardingState
 
 # Nodes that call the LLM or an external system get a RetryPolicy (exponential backoff).
 RETRYING_NODES = {
@@ -65,11 +65,11 @@ EDGES = {
 ALL_NODES = list(EDGES)
 
 
-def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver | None) -> CompiledStateGraph:
+def build_graph(deps: AgentDeps, checkpointer: BaseCheckpointSaver | None) -> CompiledStateGraph:
     nodes = Nodes(deps)
     retry = RetryPolicy(
-        max_attempts=deps.settings.retry_max_attempts,
-        initial_interval=deps.settings.retry_initial_interval,
+        max_attempts=deps.config.retry_max_attempts,
+        initial_interval=deps.config.retry_initial_interval,
         retry_on=should_retry,
     )
     g = StateGraph(OnboardingState)

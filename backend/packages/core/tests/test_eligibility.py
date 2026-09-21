@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.domain.catalog_seed import PRODUCTS
-from app.domain.eligibility import (
+from onboarding_core.catalog.eligibility import (
     RuleSpec,
     derived_values,
     evaluate_product,
@@ -13,6 +12,7 @@ from app.domain.eligibility import (
     rank_order,
     target_market_score,
 )
+from onboarding_core.catalog.seed import PRODUCTS
 
 TODAY = date(2026, 9, 21)
 CATALOG = {p["product_code"]: p for p in PRODUCTS}

@@ -6,8 +6,8 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from app.domain.catalog_seed import PRODUCTS
-from app.domain.pricing import (
+from onboarding_core.catalog.seed import PRODUCTS
+from onboarding_core.quoting.pricing import (
     RatingError,
     add_months,
     compute_premium,

@@ -1,4 +1,5 @@
-"""HTTP clients for the partner, identity and contract systems (CONTRACTS.md §4).
+"""HTTP clients for the partner, identity and contract systems (CONTRACTS.md §4). They implement the
+`PartnerGateway`, `IdentityGateway` and `ContractGateway` ports of `onboarding_core.ports`.
 
 Each takes an `httpx.AsyncClient` whose `base_url` is the system prefix, so tests can pass a client
 built on `httpx.MockTransport`. Non-2xx responses raise `httpx.HTTPStatusError`."""
@@ -11,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from app.util import iso
+from onboarding_core.util import iso
 
 
 @dataclass

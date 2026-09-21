@@ -1,4 +1,4 @@
-# Backend API: FastAPI + LangGraph. Creates tables and seeds the catalog on start (idempotent).
+# Backend API: FastAPI service + the onboarding-agent/onboarding-core workspace libraries. Creates tables and seeds the catalog on start (idempotent).
 FROM python:3.13-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /uvx /bin/
@@ -11,9 +11,15 @@ ENV UV_COMPILE_BYTECODE=1 \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
+# Third-party dependencies first (cached layer): the lock needs the workspace members' pyproject files.
 COPY pyproject.toml uv.lock .python-version ./
-RUN uv sync --frozen --no-dev --no-install-project
+COPY packages/core/pyproject.toml packages/core/
+COPY packages/agent/pyproject.toml packages/agent/
+RUN uv sync --frozen --no-dev --no-install-project --no-install-workspace
 
+# Then the workspace libraries (onboarding-core, onboarding-agent) and the API service itself.
+COPY packages ./packages
+RUN uv sync --frozen --no-dev --no-install-project --no-editable
 COPY app ./app
 
 RUN useradd --system --uid 10001 --no-create-home appuser

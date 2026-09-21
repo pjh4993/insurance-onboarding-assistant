@@ -7,8 +7,9 @@
 - wait nodes stop on `interrupt()`: ask_customer, await_decision, confirm_summary, await_agent
 
 A node that needs customer input sets `waiting_for` and appends the question, then routes to
-`ask_customer`, which interrupts and records the answer. Every DB write is idempotent: new rows get
-`uuid5(thread_id, node, step)` ids and are upserted with `merge`."""
+`ask_customer`, which interrupts and records the answer. Nodes reach the domain DB only through the
+`UnitOfWork` port. Every write is idempotent: new rows get `uuid5(thread_id, node, step)` ids and are
+upserted with `save`."""
 
 from __future__ import annotations
 
@@ -20,39 +21,34 @@ from typing import Any
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
-from sqlalchemy import delete, func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import (
-    Application,
-    ApplicationParty,
-    EligibilityRule,
-    InsurableObject,
-    NeedsAssessment,
-    Party,
-    Product,
-    Quote,
-    Recommendation,
-    TargetMarket,
-)
-from app.domain.eligibility import (
-    RuleSpec,
-    age_on,
-    evaluate_product,
-    rank_order,
-    target_market_score,
-)
-from app.domain.pricing import RatingError, compute_premium, compute_term, quote_valid_until
-from app.graph.deps import Deps
-from app.graph.texts import field_list, human, note, price_label, say, t
-from app.llm.schemas import (
+from onboarding_agent.deps import AgentDeps
+from onboarding_agent.ids import node_uuid
+from onboarding_agent.llm.schemas import (
     AnswersExtraction,
     ApplicationSummary,
     NeedsExtraction,
     PartiesExtraction,
     RecommendationRationale,
 )
-from app.util import decrypt_field, encrypt_field, hmac_hex, iso, mask_phone, node_uuid, parse_date
+from onboarding_agent.texts import field_list, human, mask_phone, note, price_label, say, t
+from onboarding_core.application.models import Application
+from onboarding_core.catalog.eligibility import (
+    RuleSpec,
+    age_on,
+    evaluate_product,
+    rank_order,
+    target_market_score,
+)
+from onboarding_core.catalog.models import Product
+from onboarding_core.crypto import decrypt_field, encrypt_field, hmac_hex
+from onboarding_core.needs.models import InsurableObject, NeedsAssessment
+from onboarding_core.party.models import Party
+from onboarding_core.ports import UnitOfWork
+from onboarding_core.quoting.models import Quote
+from onboarding_core.quoting.pricing import RatingError, compute_premium, compute_term, quote_valid_until
+from onboarding_core.recommendation.models import Recommendation
+from onboarding_core.util import iso, parse_date
 
 MAX_NEEDS_ROUNDS = 3
 MAX_ANSWERS_ROUNDS = 3
@@ -269,7 +265,7 @@ def latest_texts(messages: list[BaseMessage], input_types: tuple[str, ...]) -> l
 
 
 class Nodes:
-    def __init__(self, deps: Deps) -> None:
+    def __init__(self, deps: AgentDeps) -> None:
         self.d = deps
 
     # ----------------------------------------------------------------------------------- helpers
@@ -280,8 +276,8 @@ class Nodes:
     async def _touch(self, state: dict[str, Any], entity_type: str, entity_id: Any) -> None:
         await self.d.on_entity(state["session_id"], entity_type, str(entity_id))
 
-    async def _party(self, s: AsyncSession, state: dict[str, Any]) -> Party:
-        party = await s.get(Party, _uuid(state["party_id"]))
+    async def _party(self, uow: UnitOfWork, state: dict[str, Any]) -> Party:
+        party = await uow.parties.get(_uuid(state["party_id"]))
         if party is None:
             raise LookupError("session party not found")
         return party
@@ -328,16 +324,16 @@ class Nodes:
         out: dict[str, Any] = {"waiting_for": None, "last_input": kind}
 
         if kind == "IDENTITY_INFO":
-            async with self.d.sessionmaker() as s, s.begin():
-                party = await self._party(s, state)
+            async with self.d.uow() as uow:
+                party = await self._party(uow, state)
                 party.full_name = str(value.get("full_name") or "").strip() or None
                 party.email = str(value.get("email") or "").strip() or None
                 party.phone = str(value.get("phone") or "").strip() or None
                 party.id_document_type = value.get("id_document_type")
                 number = str(value.get("id_document_number") or "").strip()
                 if number:
-                    party.id_document_number_enc = encrypt_field(self.d.settings.aes_key_bytes, number)
-                    party.id_document_hmac = hmac_hex(self.d.settings.session_hmac_key, number)
+                    party.id_document_number_enc = encrypt_field(self.d.config.aes_key, number)
+                    party.id_document_hmac = hmac_hex(self.d.config.hmac_key, number)
                 if value.get("date_of_birth"):
                     party.date_of_birth = parse_date(value["date_of_birth"])
                 party.third_party_consent_at = now if value.get("third_party_consent") else None
@@ -366,8 +362,8 @@ class Nodes:
 
     async def verify_identity(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m = state["market"]
-        async with self.d.sessionmaker() as s, s.begin():
-            party = await self._party(s, state)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
             if party.third_party_consent_at is not None:
                 res = await self.d.partner.match_customer(
                     full_name=party.full_name or "",
@@ -411,8 +407,8 @@ class Nodes:
         if state.get("otp_request_id") and code:
             res = await self.d.identity.verify_otp(state["otp_request_id"], code)
             verified = bool(res.get("verified"))
-        async with self.d.sessionmaker() as s, s.begin():
-            party = await self._party(s, state)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
             if verified:
                 party.verification_status = "VERIFIED"
                 party.verification_method = "OTP"
@@ -433,11 +429,11 @@ class Nodes:
 
     async def check_document(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m = state["market"]
-        async with self.d.sessionmaker() as s:
-            party = await self._party(s, state)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
         verified = False
         if party.id_document_number_enc and party.id_document_type:
-            number = decrypt_field(self.d.settings.aes_key_bytes, party.id_document_number_enc)
+            number = decrypt_field(self.d.config.aes_key, party.id_document_number_enc)
             res = await self.d.identity.verify_document(
                 document_type=party.id_document_type,
                 document_number=number,
@@ -445,8 +441,8 @@ class Nodes:
                 date_of_birth=iso(party.date_of_birth),
             )
             verified = bool(res.get("verified"))
-        async with self.d.sessionmaker() as s, s.begin():
-            party = await self._party(s, state)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
             if verified:
                 party.verification_status = "VERIFIED"
                 party.verification_method = "DOCUMENT"
@@ -474,13 +470,13 @@ class Nodes:
         precondition of the node, not a branch (state-model.md §3)."""
         m, ids = state["market"], list(state.get("insurable_object_ids") or [])
         found: list[str] = []
-        async with self.d.sessionmaker() as s:
-            party = await self._party(s, state)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
         if party.third_party_consent_at and party.partner_customer_ref:
             purchases = await self.d.partner.purchases(
                 party.partner_customer_ref, consent_at=party.third_party_consent_at
             )
-            async with self.d.sessionmaker() as s, s.begin():
+            async with self.d.uow() as uow:
                 for p in purchases:
                     item = p.get("item") or {}
                     obj_id = node_uuid(_thread(config), "fetch_purchases", 0, str(p.get("order_id")))
@@ -499,7 +495,7 @@ class Nodes:
                         "condition": "NEW",
                         "has_existing_damage": False,
                     }
-                    await s.merge(
+                    await uow.objects.save(
                         InsurableObject(
                             insurable_object_id=obj_id,
                             owner_party_id=party.party_id,
@@ -532,25 +528,12 @@ class Nodes:
 
     async def assess_needs(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m, now, actor = state["market"], self.now(), state.get("actor") or "CUSTOMER"
-        async with self.d.sessionmaker() as s:
-            party = await self._party(s, state)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
             current = (
-                await s.get(NeedsAssessment, _uuid(state["needs_assessment_id"]))
-                if state.get("needs_assessment_id")
-                else None
+                await uow.needs.get(_uuid(state["needs_assessment_id"])) if state.get("needs_assessment_id") else None
             )
-            objects = [
-                o
-                for o in (
-                    await s.execute(
-                        select(InsurableObject).where(
-                            InsurableObject.insurable_object_id.in_(
-                                [_uuid(i) for i in state.get("insurable_object_ids") or []]
-                            )
-                        )
-                    )
-                ).scalars()
-            ]
+            objects = await uow.objects.list(_uuid(i) for i in state.get("insurable_object_ids") or [])
         partner_objects = [o for o in objects if o.source == "PARTNER"]
 
         if state.get("last_input") != "NEEDS":
@@ -605,20 +588,14 @@ class Nodes:
         missing = compute_needs_missing(values, market=m, has_partner_device=bool(partner_objects))
         step = _step(config)
 
-        async with self.d.sessionmaker() as s, s.begin():
+        async with self.d.uow() as uow:
             if current is not None and current.completed_at is None:
-                na = await s.get(NeedsAssessment, current.needs_assessment_id)
+                na = await uow.needs.get(current.needs_assessment_id)
             else:
                 na_id = node_uuid(_thread(config), "assess_needs", step)
-                na = await s.get(NeedsAssessment, na_id)
+                na = await uow.needs.get(na_id)
                 if na is None:
-                    version = (
-                        await s.scalar(
-                            select(func.coalesce(func.max(NeedsAssessment.version), 0)).where(
-                                NeedsAssessment.party_id == party.party_id
-                            )
-                        )
-                    ) + 1
+                    version = await uow.needs.latest_version(party.party_id) + 1
                     na = NeedsAssessment(
                         needs_assessment_id=na_id,
                         party_id=party.party_id,
@@ -626,7 +603,7 @@ class Nodes:
                         version=version,
                         created_at=now,
                     )
-                    s.add(na)
+                    await uow.needs.add(na)
             na.age_range = values.get("age_range")
             na.occupation = values.get("occupation")
             na.residence_country = values.get("residence_country")
@@ -641,7 +618,7 @@ class Nodes:
                 na.completed_at = now
                 if values.get("device") and not partner_objects:
                     obj_id = node_uuid(_thread(config), "assess_needs", step, "device")
-                    await s.merge(
+                    await uow.objects.save(
                         InsurableObject(
                             insurable_object_id=obj_id,
                             owner_party_id=party.party_id,
@@ -653,7 +630,7 @@ class Nodes:
                     ids.append(str(obj_id))
                 if values.get("trip"):
                     obj_id = node_uuid(_thread(config), "assess_needs", step, "trip")
-                    await s.merge(
+                    await uow.objects.save(
                         InsurableObject(
                             insurable_object_id=obj_id,
                             owner_party_id=party.party_id,
@@ -712,32 +689,16 @@ class Nodes:
 
     async def check_eligibility(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m, today, step = state["market"], self.now().date(), _step(config)
-        async with self.d.sessionmaker() as s, s.begin():
-            party = await self._party(s, state)
-            na = await s.get(NeedsAssessment, _uuid(state["needs_assessment_id"]))
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
+            na = await uow.needs.get(_uuid(state["needs_assessment_id"]))
             objects = [
                 object_view(o)
-                for o in (
-                    await s.execute(
-                        select(InsurableObject).where(
-                            InsurableObject.insurable_object_id.in_(
-                                [_uuid(i) for i in state.get("insurable_object_ids") or []]
-                            )
-                        )
-                    )
-                ).scalars()
+                for o in await uow.objects.list(_uuid(i) for i in state.get("insurable_object_ids") or [])
             ]
-            products = list(
-                (
-                    await s.execute(
-                        select(Product)
-                        .where(Product.status == "ACTIVE", Product.jurisdictions.any(m))
-                        .order_by(Product.product_code)
-                    )
-                ).scalars()
-            )
+            products = await uow.catalog.active_products(m)
             rules_by_product: dict[str, list[RuleSpec]] = {}
-            for r in (await s.execute(select(EligibilityRule))).scalars():
+            for r in await uow.catalog.rules():
                 rules_by_product.setdefault(r.product_code, []).append(
                     RuleSpec(
                         str(r.rule_id),
@@ -777,7 +738,7 @@ class Nodes:
                     result = "ELIGIBLE" if outcome.eligible else "INELIGIBLE"
                     failed_ids, failed = outcome.failed_rule_ids, outcome.failed_reasons
                 rec_id = node_uuid(_thread(config), "check_eligibility", step, product.product_code)
-                await s.merge(
+                await uow.recommendations.save(
                     Recommendation(
                         recommendation_id=rec_id,
                         session_id=_uuid(state["session_id"]),
@@ -819,11 +780,11 @@ class Nodes:
         return out
 
     async def rank_products(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        async with self.d.sessionmaker() as s, s.begin():
-            na = await s.get(NeedsAssessment, _uuid(state["needs_assessment_id"]))
-            recs = await self._recs(s, state)
+        async with self.d.uow() as uow:
+            na = await uow.needs.get(_uuid(state["needs_assessment_id"]))
+            recs = await self._recs(uow, state)
             tms: dict[str, list[dict]] = {}
-            for tm in (await s.execute(select(TargetMarket))).scalars():
+            for tm in await uow.catalog.target_markets():
                 tms.setdefault(tm.product_code, []).append(
                     {"attribute": tm.attribute, "values": tm.values, "weight": tm.weight, "rationale": tm.rationale}
                 )
@@ -847,13 +808,13 @@ class Nodes:
     async def quote_premium(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         now, step = self.now(), _step(config)
         quote_ids: dict[str, str] = {}
-        async with self.d.sessionmaker() as s, s.begin():
+        async with self.d.uow() as uow:
             eligible = 0
-            for rec in await self._recs(s, state):
+            for rec in await self._recs(uow, state):
                 if rec.eligibility_result != "ELIGIBLE":
                     continue
-                product = await s.get(Product, rec.product_code)
-                obj = await s.get(InsurableObject, rec.insurable_object_id)
+                product = await uow.catalog.product(rec.product_code)
+                obj = await uow.objects.get(rec.insurable_object_id)
                 try:
                     quote = self._price(product, obj, now)
                 except RatingError as exc:
@@ -862,7 +823,7 @@ class Nodes:
                     continue
                 quote.quote_id = node_uuid(_thread(config), "quote_premium", step, str(rec.recommendation_id))
                 quote.recommendation_id = rec.recommendation_id
-                await s.merge(quote)
+                await uow.quotes.save(quote)
                 quote_ids[str(rec.recommendation_id)] = str(quote.quote_id)
                 eligible += 1
         for q in quote_ids.values():
@@ -894,26 +855,25 @@ class Nodes:
             created_at=now,
         )
 
-    async def _recs(self, s: AsyncSession, state: dict[str, Any]) -> list[Recommendation]:
+    async def _recs(self, uow: UnitOfWork, state: dict[str, Any]) -> list[Recommendation]:
         ids = [_uuid(i) for i in state.get("recommendation_ids") or []]
         if not ids:
             return []
-        rows = (await s.execute(select(Recommendation).where(Recommendation.recommendation_id.in_(ids)))).scalars()
-        return sorted(rows, key=lambda r: (r.rank or 0, r.product_code))
+        return sorted(await uow.recommendations.list(ids), key=lambda r: (r.rank or 0, r.product_code))
 
     async def explain_recommendation(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m = state["market"]
-        async with self.d.sessionmaker() as s:
-            party = await self._party(s, state)
-            na = await s.get(NeedsAssessment, _uuid(state["needs_assessment_id"]))
-            recs = [r for r in await self._recs(s, state) if r.eligibility_result == "ELIGIBLE"]
-            products = {r.product_code: await s.get(Product, r.product_code) for r in recs}
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
+            na = await uow.needs.get(_uuid(state["needs_assessment_id"]))
+            recs = [r for r in await self._recs(uow, state) if r.eligibility_result == "ELIGIBLE"]
+            products = {r.product_code: await uow.catalog.product(r.product_code) for r in recs}
             quotes = {
-                str(r.recommendation_id): await s.get(Quote, _uuid(state["quote_ids"][str(r.recommendation_id)]))
+                str(r.recommendation_id): await uow.quotes.get(_uuid(state["quote_ids"][str(r.recommendation_id)]))
                 for r in recs
             }
             tms: dict[str, list[dict]] = {}
-            for tm in (await s.execute(select(TargetMarket))).scalars():
+            for tm in await uow.catalog.target_markets():
                 tms.setdefault(tm.product_code, []).append(
                     {"attribute": tm.attribute, "values": tm.values, "weight": tm.weight, "rationale": tm.rationale}
                 )
@@ -943,10 +903,10 @@ class Nodes:
             [self._system(state, party, instructions), HumanMessage("Explain these recommendations.")],
         )
         by_id = {str(i.get("recommendation_id")): str(i.get("rationale") or "") for i in ext.items}
-        async with self.d.sessionmaker() as s, s.begin():
+        async with self.d.uow() as uow:
             out_lines = []
             for r in recs:
-                rec = await s.get(Recommendation, r.recommendation_id)
+                rec = await uow.recommendations.get(r.recommendation_id)
                 rec.rationale = by_id.get(str(r.recommendation_id)) or fallback[str(r.recommendation_id)]
                 q = quotes[str(r.recommendation_id)]
                 out_lines.append(
@@ -972,10 +932,10 @@ class Nodes:
         decision = value.get("decision")
         chosen_id = value.get("recommendation_id")
         extra_text = str(value.get("text") or "").strip()
-        async with self.d.sessionmaker() as s, s.begin():
-            recs = await self._recs(s, state)
+        async with self.d.uow() as uow:
+            recs = await self._recs(uow, state)
             eligible = [r for r in recs if r.eligibility_result == "ELIGIBLE" and r.status == "PROPOSED"]
-            quotes = {k: await s.get(Quote, _uuid(v)) for k, v in (state.get("quote_ids") or {}).items()}
+            quotes = {k: await uow.quotes.get(_uuid(v)) for k, v in (state.get("quote_ids") or {}).items()}
             if decision == "ACCEPT":
                 rec = next((r for r in eligible if str(r.recommendation_id) == str(chosen_id)), None)
                 rec = rec or (eligible[0] if eligible else None)
@@ -985,7 +945,7 @@ class Nodes:
                 quote = quotes.get(str(rec.recommendation_id))
                 if quote is not None:
                     quote.status = "ACCEPTED"
-                product = await s.get(Product, rec.product_code)
+                product = await uow.catalog.product(rec.product_code)
                 text = t(m, f"{product.marketing_name}에 가입할게요.", f"I'd like {product.marketing_name}.")
                 touched = [("recommendation", rec.recommendation_id)]
             elif decision == "DECLINE":
@@ -1038,14 +998,14 @@ class Nodes:
     async def open_application(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m, now, step, actor = state["market"], self.now(), _step(config), state.get("actor") or "CUSTOMER"
         app_id = node_uuid(_thread(config), "open_application", step)
-        async with self.d.sessionmaker() as s, s.begin():
-            party = await self._party(s, state)
-            rec = next((r for r in await self._recs(s, state) if r.status == "ACCEPTED"), None)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
+            rec = next((r for r in await self._recs(uow, state) if r.status == "ACCEPTED"), None)
             if rec is None:
                 raise LookupError("no accepted recommendation")
-            product = await s.get(Product, rec.product_code)
-            obj = await s.get(InsurableObject, rec.insurable_object_id)
-            quote = await s.get(Quote, _uuid(state["quote_ids"][str(rec.recommendation_id)]))
+            product = await uow.catalog.product(rec.product_code)
+            obj = await uow.objects.get(rec.insurable_object_id)
+            quote = await uow.quotes.get(_uuid(state["quote_ids"][str(rec.recommendation_id)]))
             if quote.valid_until < now:
                 # The accepted price lapsed while the customer was away: re-price at today's rules.
                 fresh = self._price(product, obj, now)
@@ -1053,9 +1013,9 @@ class Nodes:
                 fresh.recommendation_id = rec.recommendation_id
                 fresh.status = "ACCEPTED"
                 quote.status = "EXPIRED"
-                quote = await s.merge(fresh)
+                quote = await uow.quotes.save(fresh)
             answers = prefill_answers(product.required_application_fields, object_view(obj), party, now.date())
-            await s.merge(
+            await uow.applications.save(
                 Application(
                     application_id=app_id,
                     session_id=_uuid(state["session_id"]),
@@ -1096,8 +1056,8 @@ class Nodes:
             )
             return {"parties_complete": False, "waiting_for": "PARTIES", "messages": [say(text, now)]}
 
-        async with self.d.sessionmaker() as s:
-            party = await self._party(s, state)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
         instructions = (
             "Decide whether the applicant is also the insured person and the payer. If not, list the "
             "other people with their role (INSURED or PAYER), full_name and date_of_birth (ISO 8601)."
@@ -1123,12 +1083,12 @@ class Nodes:
             }
 
         app_id = _uuid(state["application_id"])
-        async with self.d.sessionmaker() as s, s.begin():
+        async with self.d.uow() as uow:
             roles: dict[str, uuid.UUID] = {"POLICYHOLDER": party.party_id}
             names = []
             for i, p in enumerate(others):
                 pid = node_uuid(_thread(config), "collect_parties", step, f"{p['role']}:{i}")
-                await s.merge(
+                await uow.parties.save(
                     Party(
                         party_id=pid,
                         party_type="PERSON",
@@ -1142,15 +1102,12 @@ class Nodes:
                 names.append(f"{p['role']}: {p['full_name']}")
             roles.setdefault("INSURED", party.party_id)
             roles.setdefault("PAYER", party.party_id)
-            await s.execute(delete(ApplicationParty).where(ApplicationParty.application_id == app_id))
-            await s.flush()
-            for role, pid in roles.items():
-                s.add(ApplicationParty(application_id=app_id, party_id=pid, role=role))
+            await uow.applications.set_parties(app_id, roles)
             # Traveller fields follow the insured person.
-            application = await s.get(Application, app_id)
-            product = await s.get(Product, application.product_code)
-            insured = await s.get(Party, roles["INSURED"])
-            obj = await s.get(InsurableObject, application.insurable_object_id)
+            application = await uow.applications.get(app_id)
+            product = await uow.catalog.product(application.product_code)
+            insured = await uow.parties.get(roles["INSURED"])
+            obj = await uow.objects.get(application.insurable_object_id)
             prefill = prefill_answers(product.required_application_fields, object_view(obj), insured, now.date())
             answers = dict(application.answers or {})
             for key in ("traveler_name", "traveler_date_of_birth", "traveler_age"):
@@ -1171,10 +1128,10 @@ class Nodes:
     async def collect_answers(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m, now, actor = state["market"], self.now(), state.get("actor") or "CUSTOMER"
         app_id = _uuid(state["application_id"])
-        async with self.d.sessionmaker() as s:
-            party = await self._party(s, state)
-            application = await s.get(Application, app_id)
-            product = await s.get(Product, application.product_code)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
+            application = await uow.applications.get(app_id)
+            product = await uow.catalog.product(application.product_code)
         required = list(product.required_application_fields)
         answers = dict(application.answers or {})
         got_input = state.get("last_input") == "ANSWERS"
@@ -1198,8 +1155,8 @@ class Nodes:
 
         missing = missing_answers(required, answers)
         rounds = int(state.get("answers_rounds") or 0) + (1 if got_input else 0)
-        async with self.d.sessionmaker() as s, s.begin():
-            application = await s.get(Application, app_id)
+        async with self.d.uow() as uow:
+            application = await uow.applications.get(app_id)
             application.answers = _jsonable(answers)
             application.missing_fields = missing
             application.status = "INCOMPLETE" if missing else "COMPLETE"
@@ -1239,12 +1196,12 @@ class Nodes:
     async def summarize_application(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m, now = state["market"], self.now()
         app_id = _uuid(state["application_id"])
-        async with self.d.sessionmaker() as s:
-            party = await self._party(s, state)
-            application = await s.get(Application, app_id)
-            product = await s.get(Product, application.product_code)
-            quote = await s.get(Quote, application.quote_id)
-            parties = await self._application_parties(s, app_id)
+        async with self.d.uow() as uow:
+            party = await self._party(uow, state)
+            application = await uow.applications.get(app_id)
+            product = await uow.catalog.product(application.product_code)
+            quote = await uow.quotes.get(application.quote_id)
+            parties = await self._application_parties(uow, app_id)
         facts = {
             "product": product.marketing_name,
             "price": price_label(m, quote.premium_minor, quote.currency, quote.billing_period),
@@ -1261,24 +1218,19 @@ class Nodes:
             ApplicationSummary,
             [self._system(state, party, instructions), HumanMessage("Summarize my application.")],
         )
-        async with self.d.sessionmaker() as s, s.begin():
-            application = await s.get(Application, app_id)
+        async with self.d.uow() as uow:
+            application = await uow.applications.get(app_id)
             application.summary = ext.summary
             application.status = "COMPLETE"
         await self._touch(state, "application", app_id)
         text = ext.summary + t(m, "\n\n이대로 제출할까요?", "\n\nShall I submit this application?")
         return {"waiting_for": "CONFIRM", "confirmed": None, "messages": [say(text, now)]}
 
-    async def _application_parties(self, s: AsyncSession, app_id: uuid.UUID) -> list[dict[str, Any]]:
-        rows = (
-            await s.execute(
-                select(ApplicationParty, Party)
-                .join(Party, Party.party_id == ApplicationParty.party_id)
-                .where(ApplicationParty.application_id == app_id)
-                .order_by(ApplicationParty.role)
-            )
-        ).all()
-        return [{"role": ap.role, "full_name": p.full_name, "date_of_birth": iso(p.date_of_birth)} for ap, p in rows]
+    async def _application_parties(self, uow: UnitOfWork, app_id: uuid.UUID) -> list[dict[str, Any]]:
+        return [
+            {"role": role, "full_name": p.full_name, "date_of_birth": iso(p.date_of_birth)}
+            for role, p in await uow.applications.parties(app_id)
+        ]
 
     async def confirm_summary(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         value = interrupt({"waiting_for": "CONFIRM"})
@@ -1307,11 +1259,11 @@ class Nodes:
     async def submit_application(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m, now = state["market"], self.now()
         app_id = _uuid(state["application_id"])
-        async with self.d.sessionmaker() as s:
-            application = await s.get(Application, app_id)
-            quote = await s.get(Quote, application.quote_id)
-            obj = await s.get(InsurableObject, application.insurable_object_id)
-            parties = await self._application_parties(s, app_id)
+        async with self.d.uow() as uow:
+            application = await uow.applications.get(app_id)
+            quote = await uow.quotes.get(application.quote_id)
+            obj = await uow.objects.get(application.insurable_object_id)
+            parties = await self._application_parties(uow, app_id)
         if application.submission_ref:
             ref = application.submission_ref
         else:
@@ -1335,8 +1287,8 @@ class Nodes:
             }
             res = await self.d.contract.submit_application(str(app_id), _jsonable(payload))
             ref = res["submission_ref"]
-            async with self.d.sessionmaker() as s, s.begin():
-                application = await s.get(Application, app_id)
+            async with self.d.uow() as uow:
+                application = await uow.applications.get(app_id)
                 application.submission_ref = ref
                 application.status = "SUBMITTED"
                 application.submitted_at = now
@@ -1397,8 +1349,8 @@ class Nodes:
             out["stage"] = "WITHDRAWN"
             msgs.append(say(t(m, "상담원이 상담을 종료했습니다.", "The agent has closed this session."), now))
         elif reason == "IDENTITY_FAILED":
-            async with self.d.sessionmaker() as s, s.begin():
-                party = await self._party(s, state)
+            async with self.d.uow() as uow:
+                party = await self._party(uow, state)
                 if resolution == "VERIFIED":
                     party.verification_status = "VERIFIED"
                     party.verification_method = "AGENT"

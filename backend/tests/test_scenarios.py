@@ -223,7 +223,7 @@ async def test_llm_failure_exhausts_retries_and_hands_off_then_resumes(runtime, 
     llm.fail["assess_needs"] = 3  # == retry_max_attempts
     s = await send(rt, sid, "NEEDS", {"text": CUSTOMERS["A"]["needs_text"]})
     assert s.waiting_for == "AGENT" and s.status == "HANDOFF"
-    values = (await rt.graph.aget_state(rt.config(s))).values
+    values = (await rt.agent.snapshot(s.thread_id)).values
     assert values["last_error"]["node"] == "assess_needs" and values["handoff_reason"] == "ERROR"
     assert [c[0] for c in llm.calls].count("assess_needs") == 3
     # the agent lets the flow continue: the failed node re-runs and succeeds

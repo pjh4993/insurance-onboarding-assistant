@@ -2,6 +2,13 @@ version = 1
 revision = 3
 requires-python = "==3.13.*"
 
+[manifest]
+members = [
+    "onboarding-agent",
+    "onboarding-backend",
+    "onboarding-core",
+]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.5"
@@ -503,22 +510,47 @@ wheels = [
 ]
 
 [[package]]
+name = "onboarding-agent"
+version = "0.1.0"
+source = { editable = "packages/agent" }
+dependencies = [
+    { name = "httpx" },
+    { name = "langchain-aws" },
+    { name = "langgraph" },
+    { name = "langgraph-checkpoint-postgres" },
+    { name = "onboarding-core" },
+    { name = "psycopg", extra = ["binary", "pool"] },
+    { name = "pycryptodome" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "langchain-aws", specifier = ">=0.2.20" },
+    { name = "langgraph", specifier = ">=0.6" },
+    { name = "langgraph-checkpoint-postgres", specifier = ">=2.0" },
+    { name = "onboarding-core", editable = "packages/core" },
+    { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2" },
+    { name = "pycryptodome", specifier = ">=3.21" },
+    { name = "pydantic", specifier = ">=2.9" },
+]
+
+[[package]]
 name = "onboarding-backend"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
-    { name = "langchain-aws" },
-    { name = "langgraph" },
-    { name = "langgraph-checkpoint-postgres" },
+    { name = "onboarding-agent" },
+    { name = "onboarding-core" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-instrumentation-botocore" },
     { name = "opentelemetry-instrumentation-fastapi" },
     { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-sdk" },
     { name = "psycopg", extra = ["binary", "pool"] },
-    { name = "pycryptodome" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "uvicorn", extra = ["standard"] },
@@ -535,16 +567,14 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
-    { name = "langchain-aws", specifier = ">=0.2.20" },
-    { name = "langgraph", specifier = ">=0.6" },
-    { name = "langgraph-checkpoint-postgres", specifier = ">=2.0" },
+    { name = "onboarding-agent", editable = "packages/agent" },
+    { name = "onboarding-core", editable = "packages/core" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.44.0" },
     { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.65b0" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.65b0" },
     { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.65b0" },
     { name = "opentelemetry-sdk", specifier = ">=1.44.0" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2" },
-    { name = "pycryptodome", specifier = ">=3.21" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.36" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
@@ -556,6 +586,17 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.24" },
     { name = "ruff", specifier = ">=0.8" },
 ]
+
+[[package]]
+name = "onboarding-core"
+version = "0.1.0"
+source = { editable = "packages/core" }
+dependencies = [
+    { name = "pycryptodome" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pycryptodome", specifier = ">=3.21" }]
 
 [[package]]
 name = "opentelemetry-api"

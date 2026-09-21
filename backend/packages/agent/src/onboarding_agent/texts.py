@@ -8,7 +8,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from app.util import iso
+from onboarding_core.util import iso
 
 
 def t(market: str, ko: str, en: str) -> str:
@@ -94,3 +94,9 @@ def field_list(market: str, fields: list[str]) -> str:
 
 def summarize_values(values: dict[str, Any]) -> str:
     return ", ".join(f"{k}={v}" for k, v in values.items() if v not in (None, "", [], {}))
+
+
+def mask_phone(phone: str | None) -> str:
+    if not phone:
+        return ""
+    return "*" * max(len(phone) - 4, 0) + phone[-4:]

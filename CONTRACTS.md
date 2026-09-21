@@ -148,7 +148,7 @@ Paths below are relative to each prefix. Seed data: `contracts/seed-customers.js
   - Pick the fixture by tool name and by which seed customer's full name appears anywhere in `messages` / `system`.
 - Tool names (they are the Pydantic class names the backend passes to `with_structured_output`):
   `NeedsExtraction`, `RecommendationRationale`, `PartiesExtraction`, `AnswersExtraction`, `ApplicationSummary`.
-  Their JSON shapes are defined by the backend in `backend/app/llm/schemas.py`; the mock's fixtures must
+  Their JSON shapes are defined by the backend in `backend/packages/agent/src/onboarding_agent/llm/schemas.py`; the mock's fixtures must
   validate against them. Coordinate through the shapes in §5.
 
 ### Mock controls — prefix `/_mock`

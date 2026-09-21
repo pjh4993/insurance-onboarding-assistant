@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import date
 
 from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from app.db.models import SCHEMAS, Base, EligibilityRule, Product, TargetMarket
-from app.domain.catalog_seed import PRODUCTS
-from app.util import catalog_uuid
+from app.db.models import SCHEMAS, EligibilityRule, Product, TargetMarket, metadata
+from onboarding_core.catalog.seed import PRODUCTS
 
 SEED_EFFECTIVE_DATE = date(2026, 1, 1)
+CATALOG_NAMESPACE = uuid.UUID("0b8e2a55-2f0b-4b7e-8a3c-7f3c6b9d8e11")
+
+
+def catalog_uuid(*parts: str) -> uuid.UUID:
+    return uuid.uuid5(CATALOG_NAMESPACE, ":".join(parts))
 
 
 def make_engine(database_url: str) -> AsyncEngine:
@@ -29,7 +34,7 @@ async def init_db(engine: AsyncEngine) -> None:
         await conn.execute(text("SELECT pg_advisory_xact_lock(724001)"))
         for schema in SCHEMAS:
             await conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(metadata.create_all)
     await seed_catalog(make_sessionmaker(engine))
 
 

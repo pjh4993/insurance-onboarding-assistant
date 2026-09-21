@@ -73,11 +73,11 @@ async def runtime(settings, external, llm, clock):
 
     from app.clients.external import ContractClient, IdentityClient, PartnerClient
     from app.db.engine import init_db, make_engine, make_sessionmaker
-    from app.graph.build import build_graph
-    from app.graph.checkpointer import open_checkpointer
-    from app.graph.deps import Deps
+    from app.db.uow import uow_factory
+    from app.main import agent_config
     from app.services.pubsub import InMemoryBroker
-    from app.services.runtime import Runtime
+    from app.services.runtime import Runtime, entity_listener
+    from onboarding_agent import AgentDeps, AgentRunner, build_graph, open_checkpointer
 
     engine = make_engine(settings.database_url)
     await init_db(engine)
@@ -89,23 +89,18 @@ async def runtime(settings, external, llm, clock):
     ]
     async with open_checkpointer(settings.psycopg_conninfo, settings.aes_key_bytes) as saver:
         broker = InMemoryBroker()
-        holder = {}
-
-        async def on_entity(sid, etype, eid):
-            await holder["rt"].publish_entity(sid, etype, eid)
-
-        deps = Deps(
-            settings=settings,
-            sessionmaker=sm,
+        deps = AgentDeps(
+            config=agent_config(settings),
+            uow=uow_factory(sm),
             partner=PartnerClient(clients[0]),
             identity=IdentityClient(clients[1]),
             contract=ContractClient(clients[2]),
             llm=llm,
             clock=clock,
-            on_entity=on_entity,
+            on_entity=entity_listener(broker),
         )
-        rt = Runtime(graph=build_graph(deps, saver), sessionmaker=sm, broker=broker, settings=settings, clock=clock)
-        holder["rt"] = rt
+        agent = AgentRunner(build_graph(deps, saver), retry_max_attempts=settings.retry_max_attempts)
+        rt = Runtime(agent=agent, sessionmaker=sm, broker=broker, settings=settings, clock=clock)
         rt.saver = saver
         yield rt
         await asyncio.gather(*(t for t in rt._tasks.values() if not t.done()), return_exceptions=True)

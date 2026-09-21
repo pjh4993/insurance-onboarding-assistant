@@ -35,7 +35,7 @@ Logs are structured. On stdout every line is one JSON object; over OTLP the same
 | `exception.type`, `exception.message`, `exception.stacktrace` | When an error is logged. The stack is not in `msg` |
 
 Backend events: `session created`, `turn finished` (once per graph run, with the stage it reached),
-`graph run failed`, `could not route the failure to human_handoff`, and the SSE broker's `could not publish event`
+`graph run failed` and `could not route the failure to human_handoff` (logger `onboarding_agent.runner`), and the SSE broker's `could not publish event`
 and `LISTEN connection lost; reconnecting`. Frontend events: `backend relay failed` and `request failed` (Next's
 unhandled errors). In code, pass context with `extra=` (Python) or the `fields` argument (`lib/server/log.ts`),
 never by formatting it into the message.

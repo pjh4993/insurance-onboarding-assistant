@@ -26,7 +26,7 @@ first question. The customer and the agent open the same thread.
 
 ## 3. State schema
 
-This is `backend/app/graph/state.py`, shortened. IDs are strings.
+This is `onboarding_agent/state.py` (`backend/packages/agent`), shortened. IDs are strings.
 
 ```python
 class OnboardingState(TypedDict, total=False):
@@ -170,7 +170,7 @@ must therefore be safe to repeat.
 
 | Technique | How |
 |---|---|
-| Deterministic entity IDs | New IDs are `uuid5(namespace, "thread_id:node:langgraph_step:extra")` (`app/util.py` `node_uuid`). A re-run of the same node at the same step produces the same ID, and rows are written with SQLAlchemy `merge` (an upsert). Partner purchases use the order ID as `extra`, so fetching them twice gives the same object |
+| Deterministic entity IDs | New IDs are `uuid5(namespace, "thread_id:node:langgraph_step:extra")` (`onboarding_agent/ids.py` `node_uuid`). A re-run of the same node at the same step produces the same ID, and rows are written with the repositories' `save` (SQLAlchemy `merge`, an upsert). Partner purchases use the order ID as `extra`, so fetching them twice gives the same object |
 | Idempotency key on external calls | `submit_application` skips the call if the application already has a `submission_ref`, and sends `Idempotency-Key: <application_id>`. The contract admin system returns the first response again (`200` with the same `submission_ref`), so an application is never received twice |
 | Retries per node | `RetryPolicy` with exponential backoff on LLM and external-call nodes. When retries run out, `last_error` is set and the graph goes to `human_handoff` |
 

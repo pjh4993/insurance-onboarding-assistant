@@ -1,5 +1,6 @@
-"""Session runtime: creates sessions, resumes the graph with customer/agent input, mirrors progress
-into `OnboardingSession`, publishes SSE events, and turns an exhausted node into a handoff."""
+"""Session runtime: creates sessions, hands customer/agent input to the agent (`AgentRunner`), mirrors
+its progress into `OnboardingSession` and publishes SSE events. Running the graph, and turning an
+exhausted node into a handoff, is the agent's job."""
 
 from __future__ import annotations
 
@@ -7,11 +8,10 @@ import asyncio
 import logging
 import secrets
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from typing import Any
 
-from langgraph.graph.state import CompiledStateGraph
-from langgraph.types import Command
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -24,14 +24,31 @@ from app.db.models import (
     Party,
     Recommendation,
 )
-from app.graph.state import initial_state
 from app.services import views
 from app.services.pubsub import Broker, Event
-from app.util import Clock, hmac_hex, utcnow
+from onboarding_agent import AgentRunner, AgentSnapshot, MessageSink
+from onboarding_core.crypto import hmac_hex
+from onboarding_core.ports import EntityListener
+from onboarding_core.util import Clock, utcnow
 
 log = logging.getLogger(__name__)
 
 TERMINAL_STATUS = {"SUBMITTED": "SUBMITTED", "DECLINED": "DECLINED", "WITHDRAWN": "WITHDRAWN"}
+
+
+def entity_listener(broker: Broker) -> EntityListener:
+    """The agent's `on_entity` hook: tell SSE subscribers a domain entity changed."""
+
+    async def on_entity(session_id: str, entity_type: str, entity_id: str) -> None:
+        await broker.publish(
+            Event(
+                session_id,
+                "entity.updated",
+                {"session_id": session_id, "entity_type": entity_type, "entity_id": entity_id},
+            )
+        )
+
+    return on_entity
 
 
 class InputError(Exception):
@@ -45,13 +62,13 @@ class Runtime:
     def __init__(
         self,
         *,
-        graph: CompiledStateGraph,
+        agent: AgentRunner,
         sessionmaker: async_sessionmaker[AsyncSession],
         broker: Broker,
         settings: Settings,
         clock: Clock = utcnow,
     ) -> None:
-        self.graph = graph
+        self.agent = agent
         self.sessionmaker = sessionmaker
         self.broker = broker
         self.settings = settings
@@ -60,10 +77,6 @@ class Runtime:
         self._tasks: dict[str, asyncio.Task] = {}
 
     # ------------------------------------------------------------------------------- lookups
-
-    @staticmethod
-    def config(session: OnboardingSession) -> dict[str, Any]:
-        return {"configurable": {"thread_id": session.thread_id}}
 
     async def get_session(self, session_id: str) -> OnboardingSession | None:
         try:
@@ -106,7 +119,17 @@ class Runtime:
             )
             s.add(session)
         log.info("session created", extra={"session_id": str(session_id), "market": market})
-        await self._run(session, initial_state(session_id=str(session_id), party_id=str(party_id), market=market))
+        await self._run(
+            session,
+            lambda sink, extra: self.agent.start(
+                session.thread_id,
+                session_id=str(session_id),
+                party_id=str(party_id),
+                market=market,
+                on_message=sink,
+                log_extra=extra,
+            ),
+        )
         return await self.get_session(str(session_id)), token
 
     def is_busy(self, session_id: str) -> bool:
@@ -120,11 +143,18 @@ class Runtime:
         if session.waiting_for != input_type:
             raise InputError(409, f"session is waiting for {session.waiting_for}, not {input_type}")
         if input_type == "DECISION" and data.get("decision") == "ACCEPT" and data.get("recommendation_id"):
-            state = (await self.graph.aget_state(self.config(session))).values
+            state = (await self.agent.snapshot(session.thread_id)).values
             if str(data["recommendation_id"]) not in (state.get("quote_ids") or {}):
                 raise InputError(422, "recommendation_id is not one of the offered recommendations")
-        command = Command(resume=data, update={"actor": actor, "mode": session.mode})
-        self._tasks[sid] = asyncio.create_task(self._run(session, command))
+        mode = session.mode
+        self._tasks[sid] = asyncio.create_task(
+            self._run(
+                session,
+                lambda sink, extra: self.agent.resume(
+                    session.thread_id, data, actor=actor, mode=mode, on_message=sink, log_extra=extra
+                ),
+            )
+        )
 
     async def wait_idle(self, session_id: str, timeout: float = 30.0) -> None:
         task = self._tasks.get(session_id)
@@ -144,41 +174,22 @@ class Runtime:
 
     # ------------------------------------------------------------------------------- running
 
-    async def _run(self, session: OnboardingSession, graph_input: Any) -> None:
+    async def _run(
+        self, session: OnboardingSession, turn: Callable[[MessageSink, dict[str, Any]], Awaitable[None]]
+    ) -> None:
+        """Run one agent turn under the session lock, streaming its messages to SSE subscribers."""
         sid = str(session.session_id)
         lock = self._locks.setdefault(sid, asyncio.Lock())
+
+        async def publish(message: dict[str, Any]) -> None:
+            await self.broker.publish(Event(sid, "message.appended", {"session_id": sid, "message": message}))
+
         async with lock:
-            config = self.config(session)
             await self._mark_processing(session)
             try:
-                await self._stream(sid, graph_input, config)
-            except Exception as exc:  # retries are exhausted (or a bug): hand the session to an agent
-                log.warning("graph run failed", extra={"session_id": sid, "error.type": type(exc).__name__})
-                try:
-                    await self._recover(sid, config, exc)
-                except Exception:
-                    log.exception("could not route the failure to human_handoff", extra={"session_id": sid})
+                await turn(publish, {"session_id": sid})
             finally:
                 await self._sync_session(session)
-
-    async def _stream(self, sid: str, graph_input: Any, config: dict[str, Any]) -> None:
-        async for chunk in self.graph.astream(graph_input, config, stream_mode="updates"):
-            for node, update in chunk.items():
-                if node.startswith("__") or not isinstance(update, dict):
-                    continue
-                for message in update.get("messages") or []:
-                    await self.broker.publish(
-                        Event(sid, "message.appended", {"session_id": sid, "message": views.message_view(message)})
-                    )
-
-    async def _recover(self, sid: str, config: dict[str, Any], exc: Exception) -> None:
-        snapshot = await self.graph.aget_state(config)
-        failed = snapshot.next[0] if snapshot.next else "unknown"
-        error = {"node": failed, "kind": type(exc).__name__, "attempts": self.settings.retry_max_attempts}
-        if failed == "unknown":
-            return
-        await self.graph.aupdate_state(config, {"last_error": error}, as_node=failed)
-        await self._stream(sid, None, config)
 
     async def _mark_processing(self, session: OnboardingSession) -> None:
         async with self.sessionmaker() as s, s.begin():
@@ -189,23 +200,17 @@ class Runtime:
         await self._publish_summary(row, party)
 
     async def _sync_session(self, session: OnboardingSession) -> None:
-        """Mirror graph progress into OnboardingSession so the agent list needs no graph reads."""
-        snapshot = await self.graph.aget_state(self.config(session))
-        values = snapshot.values or {}
-        waiting = None
-        for task in snapshot.tasks:
-            for intr in task.interrupts:
-                if isinstance(intr.value, dict) and intr.value.get("waiting_for"):
-                    waiting = intr.value["waiting_for"]
-        stage = values.get("stage") or "IDENTITY"
+        """Mirror agent progress into OnboardingSession so the agent list needs no graph reads."""
+        snapshot = await self.agent.snapshot(session.thread_id)
+        stage = snapshot.values.get("stage") or "IDENTITY"
         now = self.clock()
         async with self.sessionmaker() as s, s.begin():
             row = await s.get(OnboardingSession, session.session_id)
             row.last_stage = stage
-            row.waiting_for = waiting
-            row.current_node = snapshot.next[0] if snapshot.next else None
+            row.waiting_for = snapshot.waiting_for
+            row.current_node = snapshot.next_node
             row.last_activity_at = now
-            if stage in TERMINAL_STATUS and not snapshot.next:
+            if stage in TERMINAL_STATUS and not snapshot.next_node:
                 row.status = TERMINAL_STATUS[stage]
                 row.ended_at = row.ended_at or now
             elif stage == "HANDOFF":
@@ -224,7 +229,7 @@ class Runtime:
             },
         )
         await self._publish_summary(row, party)
-        prompt = await self.prompt(row, values)
+        prompt = await self.prompt(row, snapshot)
         await self.broker.publish(
             Event(str(row.session_id), "prompt.updated", {"session_id": str(row.session_id), "prompt": prompt})
         )
@@ -237,25 +242,16 @@ class Runtime:
             Event(str(session.session_id), "session.updated", {"session": views.summary_view(session, party)})
         )
 
-    async def publish_entity(self, session_id: str, entity_type: str, entity_id: str) -> None:
-        await self.broker.publish(
-            Event(
-                session_id,
-                "entity.updated",
-                {"session_id": session_id, "entity_type": entity_type, "entity_id": entity_id},
-            )
-        )
-
     # ------------------------------------------------------------------------------- views
 
-    async def prompt(self, session: OnboardingSession, values: dict[str, Any]) -> dict[str, Any] | None:
+    async def prompt(self, session: OnboardingSession, snapshot: AgentSnapshot) -> dict[str, Any] | None:
         if not session.waiting_for:
             return None
-        messages = values.get("messages") or []
-        last_ai = next((m for m in reversed(messages) if m.type == "ai"), None)
+        values = snapshot.values
+        last_ai = next((m for m in reversed(snapshot.messages) if m["role"] == "assistant"), None)
         prompt: dict[str, Any] = {
             "waiting_for": session.waiting_for,
-            "message": (last_ai.content if last_ai else "") or "",
+            "message": (last_ai["text"] if last_ai else "") or "",
         }
         async with self.sessionmaker() as s:
             if session.waiting_for == "DECISION":
@@ -275,20 +271,20 @@ class Runtime:
         rows = (await s.execute(select(Recommendation).where(Recommendation.recommendation_id.in_(ids)))).scalars()
         return sorted(rows, key=lambda r: (r.rank, r.product_code))
 
-    async def session_view(self, session: OnboardingSession) -> dict[str, Any]:
-        values = (await self.graph.aget_state(self.config(session))).values or {}
+    async def session_view(self, session: OnboardingSession, snapshot: AgentSnapshot | None = None) -> dict[str, Any]:
+        snapshot = snapshot or await self.agent.snapshot(session.thread_id)
         async with self.sessionmaker() as s:
             party = await s.get(Party, session.party_id)
         return {
             "session": views.summary_view(session, party),
-            "messages": [views.message_view(m) for m in values.get("messages") or []],
-            "prompt": await self.prompt(session, values),
+            "messages": snapshot.messages,
+            "prompt": await self.prompt(session, snapshot),
         }
 
     async def session_detail(self, session: OnboardingSession) -> dict[str, Any]:
-        snapshot = await self.graph.aget_state(self.config(session))
-        values = snapshot.values or {}
-        base = await self.session_view(session)
+        snapshot = await self.agent.snapshot(session.thread_id)
+        values = snapshot.values
+        base = await self.session_view(session, snapshot)
         async with self.sessionmaker() as s:
             party = await s.get(Party, session.party_id)
             na = (
@@ -324,7 +320,7 @@ class Runtime:
             cards = await views.recommendation_cards(s, recs, values.get("quote_ids"))
         return {
             **base,
-            "current_node": snapshot.next[0] if snapshot.next else None,
+            "current_node": snapshot.next_node,
             "entities": {
                 "party": views.party_detail(party),
                 "needs_assessment": views.needs_detail(na),

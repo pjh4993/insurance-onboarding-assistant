@@ -5,7 +5,7 @@ from __future__ import annotations
 import psycopg
 from langchain_core.messages import HumanMessage
 
-from app.graph.checkpointer import GzipSerde, make_serde
+from onboarding_agent.checkpointer import GzipSerde, make_serde
 from tests.fakes import CUSTOMERS, identity_input
 from tests.test_scenarios import send, start
 
@@ -59,5 +59,5 @@ async def test_raw_checkpoint_rows_hide_seeded_phone(runtime, settings):
         assert secret not in dump, f"{secret!r} visible in raw checkpoint rows"
 
     # ...yet the graph reads its own state back
-    values = (await rt.graph.aget_state({"configurable": {"thread_id": sid}})).values
+    values = (await rt.agent.graph.aget_state(rt.agent.config(sid))).values
     assert any(c["needs_text"] in str(m.content) for m in values["messages"])

@@ -1,11 +1,11 @@
-"""API view models (CONTRACTS.md §3 types) built from the domain DB and the graph state."""
+"""API view models (CONTRACTS.md §3 types) built from the domain DB and the agent's state. Chat
+messages come ready-made from `onboarding_agent.chat_message`."""
 
 from __future__ import annotations
 
 import uuid
 from typing import Any
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +20,7 @@ from app.db.models import (
     Quote,
     Recommendation,
 )
-from app.util import iso
+from onboarding_core.util import iso
 
 
 def display_name(session: OnboardingSession, party: Party | None) -> str:
@@ -40,23 +40,6 @@ def summary_view(session: OnboardingSession, party: Party | None) -> dict[str, A
         "mode": session.mode,
         "assigned_agent_id": session.assigned_agent_id,
         "last_activity_at": iso(session.last_activity_at),
-    }
-
-
-def message_view(m: BaseMessage) -> dict[str, Any]:
-    if isinstance(m, AIMessage):
-        role = "assistant"
-    elif isinstance(m, HumanMessage):
-        role = m.additional_kwargs.get("role", "customer")
-    elif isinstance(m, SystemMessage):
-        role = "system"
-    else:
-        role = "system"
-    return {
-        "id": m.id,
-        "role": role,
-        "text": m.content if isinstance(m.content, str) else str(m.content),
-        "created_at": m.additional_kwargs.get("created_at"),
     }
 
 

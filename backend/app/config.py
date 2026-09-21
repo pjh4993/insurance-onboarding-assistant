@@ -8,15 +8,6 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Nodes that call the LLM. `LLM_MODEL_OVERRIDES` may point any of them at another model id.
-LLM_NODES = (
-    "assess_needs",
-    "explain_recommendation",
-    "collect_parties",
-    "collect_answers",
-    "summarize_application",
-)
-
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore")
@@ -31,7 +22,8 @@ class Settings(BaseSettings):
     bedrock_endpoint_url: str | None = None
     bedrock_model_id: str = "global.anthropic.claude-sonnet-4-6"
     aws_region: str = "ap-northeast-2"
-    # JSON object {node_name: model_id}; e.g. {"assess_needs": "global.anthropic.claude-haiku-4-5"}
+    # JSON object {node_name: model_id} over onboarding_agent.llm.provider.LLM_NODES;
+    # e.g. {"assess_needs": "global.anthropic.claude-haiku-4-5"}
     llm_model_overrides: dict[str, str] = Field(default_factory=dict)
 
     checkpoint_aes_key: str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
@@ -69,9 +61,6 @@ class Settings(BaseSettings):
     def psycopg_conninfo(self) -> str:
         """The DATABASE_URL without the SQLAlchemy driver suffix, for raw psycopg."""
         return self.database_url.replace("postgresql+psycopg://", "postgresql://", 1)
-
-    def model_for(self, node: str) -> str:
-        return self.llm_model_overrides.get(node, self.bedrock_model_id)
 
 
 @lru_cache
