@@ -22,7 +22,7 @@ variable "frontend_port" {
 variable "health_check_path" {
   description = "Target-group health check on the frontend. Kept independent of the backend so a backend outage does not cycle frontend tasks."
   type        = string
-  default     = "/"
+  default     = "/api/healthz"
 }
 
 variable "idle_timeout" {
