@@ -66,7 +66,7 @@ resource "aws_iam_role" "task" {
 }
 
 resource "aws_iam_role_policy" "task" {
-  count = var.task_role_policy_json == null ? 0 : 1
+  count = var.attach_task_role_policy ? 1 : 0
 
   name   = "app"
   role   = aws_iam_role.task.id

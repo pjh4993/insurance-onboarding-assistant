@@ -73,9 +73,15 @@ variable "kms_key_arns" {
 }
 
 variable "task_role_policy_json" {
-  description = "Inline policy for the task role (what the app itself may call). null = no inline policy."
+  description = "Inline policy for the task role (what the app itself may call). Used when attach_task_role_policy is true."
   type        = string
   default     = null
+}
+
+# A plain bool, because the policy JSON is unknown at plan time and cannot drive count.
+variable "attach_task_role_policy" {
+  type    = bool
+  default = false
 }
 
 variable "service_connect_namespace_arn" {

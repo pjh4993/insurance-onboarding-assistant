@@ -211,7 +211,8 @@ module "backend" {
   ]
   kms_key_arns = [module.security.kms_key_arn]
 
-  task_role_policy_json = data.aws_iam_policy_document.backend_task.json
+  task_role_policy_json   = data.aws_iam_policy_document.backend_task.json
+  attach_task_role_policy = true
 }
 
 module "frontend" {
