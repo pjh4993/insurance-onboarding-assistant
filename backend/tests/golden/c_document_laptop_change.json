@@ -578,6 +578,99 @@
    "English"
   ]
  ],
+ "llm_prompts": [
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: Jane Doe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {}"
+    ],
+    [
+     "human",
+     "I'm 36, a nurse in Seattle. I just bought a $1,299 laptop and want accident cover."
+    ]
+   ]
+  },
+  {
+   "node": "explain_recommendation",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: Jane Doe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nWrite one short, customer-facing reason (1-2 sentences) for each recommended product, using only the listed grounds and the customer's needs. Do not invent coverage or prices. Return every recommendation_id exactly as given.\nCustomer needs: {\"age_range\": \"AGE_30_39\", \"occupation\": \"Nurse\", \"residence_country\": \"US\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"device_category\": \"NOTEBOOK\", \"purchase_price_minor\": 129900}, \"trip\": null}\nRecommendations:\n- recommendation_id: <uuid>\n  product: 2-Year Laptop Protection with Accidents (DEVICE_PROTECTION), rank 1\n  price: $130.00/one-time, cover 2026-09-21 to 2028-09-20\n  grounds: [\"Covers accidental damage to a new laptop for two years\"]"
+    ],
+    [
+     "human",
+     "Explain these recommendations."
+    ]
+   ]
+  },
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: Jane Doe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {\"age_range\": \"AGE_30_39\", \"occupation\": \"Nurse\", \"residence_country\": \"US\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"device_category\": \"NOTEBOOK\", \"purchase_price_minor\": 129900}, \"trip\": null}"
+    ],
+    [
+     "human",
+     "I'm 36, a nurse in Seattle. I just bought a $1,299 laptop and want accident cover.\n\nActually the laptop cost $1,499."
+    ]
+   ]
+  },
+  {
+   "node": "explain_recommendation",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: Jane Doe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nWrite one short, customer-facing reason (1-2 sentences) for each recommended product, using only the listed grounds and the customer's needs. Do not invent coverage or prices. Return every recommendation_id exactly as given.\nCustomer needs: {\"age_range\": \"AGE_30_39\", \"occupation\": \"Nurse\", \"residence_country\": \"US\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"device_category\": \"NOTEBOOK\", \"purchase_price_minor\": 129900}, \"trip\": null}\nRecommendations:\n- recommendation_id: <uuid>\n  product: 2-Year Laptop Protection with Accidents (DEVICE_PROTECTION), rank 1\n  price: $130.00/one-time, cover 2026-09-21 to 2028-09-20\n  grounds: [\"Covers accidental damage to a new laptop for two years\"]"
+    ],
+    [
+     "human",
+     "Explain these recommendations."
+    ]
+   ]
+  },
+  {
+   "node": "collect_parties",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: Jane Doe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nDecide whether the applicant is also the insured person and the payer. If not, list the other people with their role (INSURED or PAYER), full_name and date_of_birth (ISO 8601)."
+    ],
+    [
+     "human",
+     "My wife Mary Doe (born 1988-02-02) pays."
+    ]
+   ]
+  },
+  {
+   "node": "collect_answers",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: Jane Doe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract application answers from the customer's latest message into AnswersExtraction. Use exactly these field names: [\"purchase_price\", \"purchase_date\", \"serial_number\", \"order_number\"]. Dates ISO 8601, money in minor units.\nAnswers so far: {\"purchase_price\": 129900}\nStill missing: [\"purchase_date\", \"serial_number\", \"order_number\"]"
+    ],
+    [
+     "human",
+     "Serial SN-C-0001, order ORD-C-42, bought on Sept 10."
+    ]
+   ]
+  },
+  {
+   "node": "summarize_application",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: Jane Doe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nWrite a short plain-language summary of this insurance application for the customer to confirm before submission. Use only these facts:\n{\"product\": \"2-Year Laptop Protection with Accidents\", \"price\": \"$130.00/one-time\", \"cover\": \"2026-09-21 to 2028-09-20\", \"parties\": [{\"role\": \"INSURED\", \"full_name\": \"Jane Doe\", \"date_of_birth\": \"1990-06-01\"}, {\"role\": \"PAYER\", \"full_name\": \"Mary Doe\", \"date_of_birth\": \"1988-02-02\"}, {\"role\": \"POLICYHOLDER\", \"full_name\": \"Jane Doe\", \"date_of_birth\": \"1990-06-01\"}], \"answers\": {\"order_id\": \"ORD-C-42\", \"order_number\": \"ORD-C-42\", \"purchase_date\": \"2026-09-10\", \"serial_number\": \"SN-C-0001\", \"purchase_price\": 129900}}"
+    ],
+    [
+     "human",
+     "Summarize my application."
+    ]
+   ]
+  }
+ ],
  "external_calls": [
   "POST /identity/v1/otp",
   "POST /identity/v1/otp/otp-1/verify",

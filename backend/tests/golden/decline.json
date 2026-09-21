@@ -284,6 +284,34 @@
    "Korean"
   ]
  ],
+ "llm_prompts": [
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 김하늘\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: [{\"device_category\": \"SMARTPHONE\", \"manufacturer\": \"Samsung\", \"model\": \"Galaxy S26\", \"purchase_date\": \"2026-09-14\"}]\nValues captured so far: {}"
+    ],
+    [
+     "human",
+     "서른다섯 살 소프트웨어 엔지니어고 서울 살아요. 새로 산 갤럭시 폰이 깨질까 봐 걱정돼요."
+    ]
+   ]
+  },
+  {
+   "node": "explain_recommendation",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 김하늘\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nWrite one short, customer-facing reason (1-2 sentences) for each recommended product, using only the listed grounds and the customer's needs. Do not invent coverage or prices. Return every recommendation_id exactly as given.\nCustomer needs: {\"age_range\": \"AGE_30_39\", \"occupation\": \"소프트웨어 엔지니어\", \"residence_country\": \"KR\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"model\": \"Galaxy S26\", \"manufacturer\": \"Samsung\", \"device_category\": \"SMARTPHONE\"}, \"trip\": null}\nRecommendations:\n- recommendation_id: <uuid>\n  product: 폰교체 패스 (MOBILE_INSURANCE), rank 1\n  price: ₩9,990/월, cover 2026-09-21 to 2029-09-20\n  grounds: [\"새 스마트폰의 파손·고장 시 기기를 교체해 줍니다\", \"스마트폰을 자주 바꾸는 연령대에 많이 선택됩니다\"]"
+    ],
+    [
+     "human",
+     "Explain these recommendations."
+    ]
+   ]
+  }
+ ],
  "external_calls": [
   "POST /partner/v1/customers/match",
   "GET /partner/v1/customers/P-000101/purchases"

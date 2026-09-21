@@ -415,6 +415,86 @@
    "English"
   ]
  ],
+ "llm_prompts": [
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: John Roe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {}"
+    ],
+    [
+     "human",
+     "I need phone insurance."
+    ]
+   ]
+  },
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: John Roe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {\"age_range\": null, \"occupation\": null, \"residence_country\": \"US\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"device_category\": \"SMARTPHONE\"}, \"trip\": null}"
+    ],
+    [
+     "human",
+     "I need phone insurance.\n\nI need phone insurance."
+    ]
+   ]
+  },
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: John Roe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {\"age_range\": null, \"occupation\": null, \"residence_country\": \"US\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"device_category\": \"SMARTPHONE\"}, \"trip\": null}"
+    ],
+    [
+     "human",
+     "I need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance."
+    ]
+   ]
+  },
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: John Roe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {\"age_range\": null, \"occupation\": null, \"residence_country\": \"US\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"device_category\": \"SMARTPHONE\"}, \"trip\": null}"
+    ],
+    [
+     "human",
+     "I need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance."
+    ]
+   ]
+  },
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: John Roe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {\"age_range\": null, \"occupation\": null, \"residence_country\": \"US\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"device_category\": \"SMARTPHONE\"}, \"trip\": null}"
+    ],
+    [
+     "human",
+     "I need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance."
+    ]
+   ]
+  },
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: John Roe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {\"age_range\": null, \"occupation\": null, \"residence_country\": \"US\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"device_category\": \"SMARTPHONE\"}, \"trip\": null}"
+    ],
+    [
+     "human",
+     "I need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance."
+    ]
+   ]
+  }
+ ],
  "external_calls": [
   "POST /partner/v1/customers/match",
   "POST /identity/v1/otp",

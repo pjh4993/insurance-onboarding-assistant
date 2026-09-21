@@ -137,6 +137,7 @@
   "application_parties": []
  },
  "llm_calls": [],
+ "llm_prompts": [],
  "external_calls": [
   "POST /identity/v1/otp",
   "POST /identity/v1/otp/otp-1/verify",

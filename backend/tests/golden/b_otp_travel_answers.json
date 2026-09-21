@@ -483,6 +483,99 @@
    "Korean"
   ]
  ],
+ "llm_prompts": [
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {}"
+    ],
+    [
+     "human",
+     "마흔 살 회사원이에요. 다음 달 일본 여행 가는데 여행자보험이 필요해요. 10월 3일 출발, 10월 7일 귀국입니다."
+    ]
+   ]
+  },
+  {
+   "node": "explain_recommendation",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nWrite one short, customer-facing reason (1-2 sentences) for each recommended product, using only the listed grounds and the customer's needs. Do not invent coverage or prices. Return every recommendation_id exactly as given.\nCustomer needs: {\"age_range\": \"AGE_40_49\", \"occupation\": \"회사원\", \"residence_country\": \"KR\", \"existing_coverage\": [], \"objectives\": [\"TRAVEL_COVER\"], \"device\": null, \"trip\": {\"return_date\": \"2026-10-07\", \"departure_date\": \"2026-10-03\", \"destination_countries\": [\"JP\"]}}\nRecommendations:\n- recommendation_id: <uuid>\n  product: 해외여행 보험 (TRAVEL_PROTECTION), rank 1\n  price: ₩6,750/여행 1건, cover 2026-10-03 to 2026-10-07\n  grounds: [\"해외여행 중 상해·질병 의료비와 휴대품 손해를 보장합니다\"]"
+    ],
+    [
+     "human",
+     "Explain these recommendations."
+    ]
+   ]
+  },
+  {
+   "node": "collect_parties",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nDecide whether the applicant is also the insured person and the payer. If not, list the other people with their role (INSURED or PAYER), full_name and date_of_birth (ISO 8601)."
+    ],
+    [
+     "human",
+     "저 혼자 가요."
+    ]
+   ]
+  },
+  {
+   "node": "collect_answers",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract application answers from the customer's latest message into AnswersExtraction. Use exactly these field names: [\"departure_date\", \"return_date\", \"destination\", \"traveler_name\", \"traveler_date_of_birth\", \"traveler_gender\"]. Dates ISO 8601, money in minor units.\nAnswers so far: {\"destination\": \"JP\", \"return_date\": \"2026-10-07\", \"traveler_name\": \"이서준\", \"departure_date\": \"2026-10-03\"}\nStill missing: [\"traveler_date_of_birth\", \"traveler_gender\"]"
+    ],
+    [
+     "human",
+     "1985년 11월 2일생 남자입니다."
+    ]
+   ]
+  },
+  {
+   "node": "summarize_application",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nWrite a short plain-language summary of this insurance application for the customer to confirm before submission. Use only these facts:\n{\"product\": \"해외여행 보험\", \"price\": \"₩6,750/여행 1건\", \"cover\": \"2026-10-03 to 2026-10-07\", \"parties\": [{\"role\": \"INSURED\", \"full_name\": \"이서준\", \"date_of_birth\": null}, {\"role\": \"PAYER\", \"full_name\": \"이서준\", \"date_of_birth\": null}, {\"role\": \"POLICYHOLDER\", \"full_name\": \"이서준\", \"date_of_birth\": null}], \"answers\": {\"destination\": \"JP\", \"return_date\": \"2026-10-07\", \"traveler_name\": \"이서준\", \"departure_date\": \"2026-10-03\", \"traveler_gender\": \"M\", \"traveler_date_of_birth\": \"1985-11-02\"}}"
+    ],
+    [
+     "human",
+     "Summarize my application."
+    ]
+   ]
+  },
+  {
+   "node": "collect_answers",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract application answers from the customer's latest message into AnswersExtraction. Use exactly these field names: [\"departure_date\", \"return_date\", \"destination\", \"traveler_name\", \"traveler_date_of_birth\", \"traveler_gender\"]. Dates ISO 8601, money in minor units.\nAnswers so far: {\"destination\": \"JP\", \"return_date\": \"2026-10-07\", \"traveler_name\": \"이서준\", \"departure_date\": \"2026-10-03\", \"traveler_gender\": \"M\", \"traveler_date_of_birth\": \"1985-11-02\"}\nStill missing: []"
+    ],
+    [
+     "human",
+     "성별은 M이에요."
+    ]
+   ]
+  },
+  {
+   "node": "summarize_application",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nWrite a short plain-language summary of this insurance application for the customer to confirm before submission. Use only these facts:\n{\"product\": \"해외여행 보험\", \"price\": \"₩6,750/여행 1건\", \"cover\": \"2026-10-03 to 2026-10-07\", \"parties\": [{\"role\": \"INSURED\", \"full_name\": \"이서준\", \"date_of_birth\": null}, {\"role\": \"PAYER\", \"full_name\": \"이서준\", \"date_of_birth\": null}, {\"role\": \"POLICYHOLDER\", \"full_name\": \"이서준\", \"date_of_birth\": null}], \"answers\": {\"destination\": \"JP\", \"return_date\": \"2026-10-07\", \"traveler_name\": \"이서준\", \"departure_date\": \"2026-10-03\", \"traveler_gender\": \"M\", \"traveler_date_of_birth\": \"1985-11-02\"}}"
+    ],
+    [
+     "human",
+     "Summarize my application."
+    ]
+   ]
+  }
+ ],
  "external_calls": [
   "POST /partner/v1/customers/match",
   "POST /identity/v1/otp",

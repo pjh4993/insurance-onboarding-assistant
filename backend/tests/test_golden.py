@@ -203,10 +203,12 @@ async def node_path(rt, thread_id: str) -> list[str]:
 async def transcript(rt, external, llm, market: str, steps: list[tuple], locale: str | None) -> dict[str, Any]:
     session, _ = await rt.create_session(market, locale)
     replies_in: list[str] = []  # the language each LLM call was told to reply in
+    prompts: list[dict[str, Any]] = []  # every message each LLM call was sent, verbatim
     extract = llm.extract
 
     async def extract_and_record(node, schema, messages):
         replies_in.append(re.search(r"Reply in (\w+)", str(messages[0].content)).group(1))
+        prompts.append({"node": node, "messages": [[m.type, str(m.content)] for m in messages]})
         return await extract(node, schema, messages)
 
     llm.extract = extract_and_record
@@ -248,6 +250,7 @@ async def transcript(rt, external, llm, market: str, steps: list[tuple], locale:
             "node_path": await node_path(rt, s.thread_id),
             "entities": canonical_entities((await rt.session_detail(s))["entities"]),
             "llm_calls": [[*c, lang] for c, lang in zip(llm.calls, replies_in, strict=True)],
+            "llm_prompts": prompts,
             "external_calls": [f"{method} {path}" for method, path, _headers, _body in external.calls],
         }
     )
