@@ -43,13 +43,18 @@ Environment variables (backend):
 | `AGENT_CONFIG_URI` | unset | agent config bundles (models, prompts, copy): a directory or `s3://bucket/prefix` holding `<semver>/config.json`; unset → the baseline bundle in the agent package |
 | `AGENT_CONFIG_VERSION` | unset | `1.2.0`, or a prefix (`1`, `1.2`) meaning the highest published match; unset → the newest the agent supports |
 | `LLM_ALLOWED_MODEL_IDS` | unset | comma-separated model ids a bundle may name (set from the IAM policy in AWS) |
+| `AGENT_CONFIG_SEED` | `true` in compose | publish the shipped baseline into an empty `AGENT_CONFIG_URI` at startup (local only) |
+| `BACKEND_ECS_CLUSTER`, `BACKEND_ECS_SERVICE` | unset | the service the operator console restarts to load a new bundle; unset: no restart |
 | `AWS_REGION` | `ap-northeast-2` | |
 | `CHECKPOINT_AES_KEY` | 64 hex chars (dev value in compose) | checkpoint encryption |
 | `SESSION_HMAC_KEY` | dev value | session-link token HMAC; also keys the client-IP hash of self-serve sessions |
 | `SELF_SERVE_PER_IP_PER_HOUR` | `5` | self-serve starts one client IP may make in any 3600 s |
 | `SELF_SERVE_PER_HOUR` | `200` | self-serve starts across all clients in any 3600 s |
 
-Frontend: `BACKEND_URL=http://backend:8000`, `AGENT_DEV_AUTH=true` (sends `X-Agent-Id: agent-demo`).
+Frontend: `BACKEND_URL=http://backend:8000`, `AGENT_DEV_AUTH=true` (sends `X-Agent-Id: agent-demo`),
+`OPERATOR_DEV_AUTH=true` (sends `X-Operator-Id: operator-demo`; never set in AWS). In AWS the frontend verifies
+operators with `COGNITO_REGION`, `COGNITO_USER_POOL_ID`, `COGNITO_OPERATOR_CLIENT_ID`, and serves the console on
+`OPERATOR_BASE_URL`.
 The browser never calls the backend directly; Next.js route handlers under `frontend/app/api/*` proxy to `BACKEND_URL`,
 including SSE.
 
@@ -86,6 +91,16 @@ All JSON. Money is integer minor units + ISO 4217 currency. Times are ISO 8601 U
 - `POST /api/agent/sessions/{session_id}/input` body `InputBody` → `202` (actor = AGENT)
 - `PUT /api/agent/sessions/{session_id}/locale` body `{"locale": Locale}` → `SessionSummary` (same as the customer's)
 - `GET /api/agent/stream` → SSE for all sessions; `GET /api/agent/sessions/{session_id}/stream` → SSE for one
+
+### Operator (header `X-Operator-Id: <id>`, set by the frontend after verifying the operator's login)
+- `GET /api/operator/config` → `{"live": {"version", "source"}, "version_spec", "next": string | null, "restart_needed", "publishable", "restartable", "base"}`
+- `GET /api/operator/config/versions` → `{"versions": [{"version", "release": Release, "live", "latest"}]}` newest first
+- `GET /api/operator/config/versions/{version}` → `{"version", "release", "live", "files": {path: text}, "summary": {"languages", "default_language", "models", "nodes": {node: profile}, "copy_keys"}}`; `404` if not published
+- `POST /api/operator/config/validate` body `{"files": {path: text}}` → `{"ok", "problems": string[], "summary" | null}`
+- `POST /api/operator/config/versions` body `{"files", "notes", "bump": "patch" | "minor"}` → `201 {"version", "release"}`; the version is one `bump` above the latest of the draft's major; `422 {"detail": {"message", "problems"}}` for an invalid draft, `409` when this backend cannot publish
+- `POST /api/operator/restart` → `202`; `409` when `BACKEND_ECS_*` is unset
+- `GET /api/operator/graph` → `{"entry", "nodes": [{"id", "domain", "kind": "code" | "llm" | "wait", "reads": string[]}], "edges": [{"source", "target", "kind"}]}`
+- `Release = {"published_by", "published_at", "via", "based_on", "notes"}` (the version's `release.json`)
 
 ### Types
 ```ts

@@ -59,7 +59,7 @@ opens `/s/{token}`. See [networking.md](02-networking.md#5-authentication).
 | Frontend task role | Nothing beyond the defaults. The frontend holds no secrets |
 | Mock task role | Nothing beyond the defaults |
 | Task execution role (one per service) | Pull the image from ECR, write logs; for the backend also read the three secrets and decrypt them, so ECS can inject `PGPASSWORD`, `CHECKPOINT_AES_KEY` and `SESSION_HMAC_KEY` |
-| Backend task role, agent config | List and read the agent config bundle prefix in the environment's config bucket (the bundle is read once, at startup) |
+| Backend task role, agent config | List the environment's config bucket and read its bundles (the bundle is read once, at startup). For the operator console: create bundle objects (`If-None-Match: *` only, no delete), KMS encrypt through S3, and restart its own service |
 | Agent config operator role (one per environment) | Assumed by the operator: the principals in `agent_config_operator_arns`, or any principal of the account signed in with MFA when the list is empty. List, read and **create** objects under the bundle prefix: every write must carry `If-None-Match: *`, so a published version is never replaced, and there is no delete. KMS encrypt/decrypt through S3 only. Restart the backend service (`UpdateService --force-new-deployment`) so it loads the new version |
 | GitHub deploy role (one per environment) | Assumed through GitHub OIDC. `PowerUserAccess`, plus IAM limited to `onboarding-*` roles and policies, the Terraform state bucket and lock table, and ECR push. See [cicd.md](04-cicd.md#2-oidc-and-roles) |
 

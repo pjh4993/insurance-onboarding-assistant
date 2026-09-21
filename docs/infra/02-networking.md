@@ -120,6 +120,12 @@ Task egress is open (to reach the endpoints and NAT); ingress is what limits eac
    Without an agent host (`agent_domain_name` empty) the console stays on the app host behind the same rule on
    those paths. Requests for the docs host (`dev.docs.` / `docs.`) go to the docs site through a plain forward
    rule on the host header, with no login: the design docs are public.
+   The operator host (`dev.operator.` / `operator.`) has its own `authenticate-cognito` rule, through its own app
+   client of the same pool, and the operator API (`/api/operator/*`) answers 404 on the app and agent hosts, ahead
+   of the agent host's rule. Operators are staff in the pool's `operators` group: the frontend verifies the Cognito
+   access token the ALB forwards (`x-amzn-oidc-accesstoken`) against the pool's keys, and accepts it only when it
+   was issued to the operator client and carries that group. An admin adds an operator with
+   `aws cognito-idp admin-add-user-to-group --group-name operators`.
 2. The Cognito user pool accepts only accounts an admin creates (email as username, optional TOTP MFA).
 3. After login, the ALB adds `x-amzn-oidc-identity` (the user's `sub`) and a signed JWT, `x-amzn-oidc-data`, to
    each request it forwards.

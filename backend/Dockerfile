@@ -22,7 +22,8 @@ COPY packages ./packages
 RUN uv sync --frozen --no-dev --no-install-project --no-editable
 COPY app ./app
 
-RUN useradd --system --uid 10001 --no-create-home appuser
+RUN useradd --system --uid 10001 --no-create-home appuser \
+    && mkdir -p /var/lib/agent-config && chown appuser /var/lib/agent-config
 USER appuser
 
 EXPOSE 8000

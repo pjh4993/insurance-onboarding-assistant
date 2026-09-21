@@ -280,10 +280,12 @@ The code decides; what the agent says and asks the LLM, and which model it asks,
 <base>/<semver>/flows/<flow>.json  llm: node -> model profile + prompt parts; copy: key -> text per language
 ```
 
-`<base>` is a local directory or `s3://bucket/prefix`. In AWS each environment has its own bucket. The backend
+`<base>` is any fsspec location: a local directory, `s3://bucket/prefix`, `memory://...`. In AWS each environment
+has its own bucket. The backend
 reads the bundle **once, at startup** (`AGENT_CONFIG_URI`, `AGENT_CONFIG_VERSION`). A version is exact (`1.2.0`)
 or a prefix (`1`, `1.2`) that means the highest published match. With no URI, it uses the baseline bundle shipped
-in the agent package, which is what tests and `docker compose` use.
+in the agent package, which is what tests use; `docker compose` seeds a volume with it (`AGENT_CONFIG_SEED`) so the
+console can publish locally.
 
 **Validation.** Each domain module declares what it reads (`DomainModule.texts`): its copy keys, its LLM nodes'
 prompt parts, and the placeholders the code passes to each. A bundle is checked against those declarations when
@@ -306,23 +308,26 @@ reach into the objects it is rendered with.
 | Add a language, a label or a copy key | minor |
 | Remove a language or a key, or change what the code passes | major: needs an agent built for that major (`CONFIG_MAJOR`) |
 
-`python -m onboarding_agent.config publish` enforces this against what is already published:
+Every way of publishing enforces this against what is already published:
 - it never overwrites a version
 - the new version must be higher than the latest one in its major
 - within a major it may not drop a language, key, node or label
 
-It writes `config.json` last, because a version counts as published once its `config.json` exists. The usual
-edit:
-1. `pull` the version in use.
-2. Edit it and bump `version`.
-3. `validate` it.
-4. `publish` it.
-5. Restart the backend service.
+It writes `config.json` last, because a version counts as published once its `config.json` exists, and a
+`release.json` with who published it, when, from which version and why.
 
-The **operator** does this, as the environment's agent config operator role (Terraform output
-`agent_config_operator_role_arn`). That role can publish, but it cannot replace or delete: every write carries
-`If-None-Match: *` and the role is denied any other kind. Its only other permission is restarting the backend
-service:
+The **operator** publishes in one of three ways:
+
+| Way | How |
+|---|---|
+| Operator console | On the operator host: browse versions, compare two, edit a new version field by field (model profiles, prompts, copy per language, labels, languages), validate, publish it as the next patch or minor, restart the backend. The agent loop beside it highlights the nodes an entry or a change reaches, from `GET /api/operator/graph` (read from the flow code) |
+| CLI | `python -m onboarding_agent.config pull <repo> <dir>`, edit, `push <dir> <repo> --bump patch|minor --notes "..."` (picks the next version), then restart the backend |
+| Python | `Bundle.from_pretrained(repo).save_pretrained(dir)`, edit, `Bundle.from_pretrained(dir).push_to_hub(repo, bump="minor", notes="...")` |
+
+Publishing is create-only everywhere: every write carries `If-None-Match: *`, and both the backend's task role
+(behind the console) and the environment's agent config operator role (the CLI; Terraform output
+`agent_config_operator_role_arn`) are denied any other kind of put, and neither may delete. Both may restart the
+backend service:
 
 ```bash
 aws ecs update-service --cluster <cluster> --service <name>-backend --force-new-deployment

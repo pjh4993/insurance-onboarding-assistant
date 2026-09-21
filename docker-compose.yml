@@ -28,13 +28,18 @@ services:
       IDENTITY_API_URL: http://mock:8080/identity
       CONTRACT_API_URL: http://mock:8080/contract
       BEDROCK_ENDPOINT_URL: http://mock:8080
-      # Models, prompts and copy come from the baseline bundle in the agent package. To try an edited one, mount a
-      # directory and point AGENT_CONFIG_URI at it (see onboarding_agent.config).
+      # Models, prompts and copy: agent config bundles in a volume, seeded with the baseline on first start, so
+      # the operator console (http://localhost:13000/operator) can publish versions. Restart the backend
+      # (docker compose restart backend) to load a new one.
+      AGENT_CONFIG_URI: /var/lib/agent-config
+      AGENT_CONFIG_SEED: "true"
       AWS_REGION: ap-northeast-2
       AWS_ACCESS_KEY_ID: mock
       AWS_SECRET_ACCESS_KEY: mock
       CHECKPOINT_AES_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
       SESSION_HMAC_KEY: dev-session-hmac-key
+    volumes:
+      - agent-config:/var/lib/agent-config
     ports: ["18000:8000"]
 
   frontend:
@@ -43,4 +48,8 @@ services:
     environment:
       BACKEND_URL: http://backend:8000
       AGENT_DEV_AUTH: "true"
+      OPERATOR_DEV_AUTH: "true"
     ports: ["13000:3000"]
+
+volumes:
+  agent-config:
