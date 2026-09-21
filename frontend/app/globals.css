@@ -1,15 +1,17 @@
 :root {
-  --bg: #f5f5f2;
+  /* One palette for every page, taken from the customer landing page: cool gray canvas, white cards, ink
+     primary actions, blue only for links, focus and selection. */
+  --bg: #f3f4f6;
   --surface: #ffffff;
-  --surface-2: #fafaf8;
-  --ink: #16181d;
-  --ink-2: #4a4f5a;
-  --ink-3: #80858f;
-  --line: #e4e4de;
-  --line-2: #d3d3cc;
-  --accent: #2f5bd3;
+  --surface-2: #f7f8fa;
+  --ink: #191f28;
+  --ink-2: #4e5968;
+  --ink-3: #8b95a1;
+  --line: #e5e8eb;
+  --line-2: #d1d6db;
+  --accent: #3182f6;
   --accent-ink: #ffffff;
-  --accent-soft: #e9efff;
+  --accent-soft: #e8f1ff;
   --success: #1f7a4d;
   --success-soft: #e3f4ea;
   --warning: #a55a00;
@@ -17,9 +19,10 @@
   --danger: #b42323;
   --danger-soft: #fde8e8;
   --muted-soft: #efefeb;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --shadow: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-card: 20px;
+  --shadow: 0 6px 24px rgb(25 31 40 / 0.06);
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR",
     sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -127,8 +130,8 @@ textarea {
   justify-content: center;
   gap: 6px;
   min-height: 36px;
-  padding: 0 14px;
-  border-radius: var(--radius-sm);
+  padding: 0 16px;
+  border-radius: 99px;
   border: 1px solid transparent;
   background: var(--surface);
   font-weight: 600;
@@ -143,11 +146,11 @@ textarea {
   cursor: not-allowed;
 }
 .btn--primary {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--ink);
+  color: #fff;
 }
 .btn--primary:hover:not(:disabled) {
-  background: #2449b3;
+  background: #333d4b;
 }
 .btn--ghost {
   border-color: var(--line-2);

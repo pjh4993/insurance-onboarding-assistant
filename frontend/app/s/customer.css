@@ -1,12 +1,13 @@
 /* Customer app (/, /chat, /s/*): a landing screen, then a chat laid out as one centred reading column. */
 .customer-shell {
-  --c-bg: #f3f4f6;
-  --c-card: #ffffff;
-  --c-ink: #191f28;
-  --c-ink-2: #4e5968;
-  --c-ink-3: #8b95a1;
-  --c-line: #e5e8eb;
-  --c-go: #191f28;
+  /* The shared palette (globals.css), named for the customer pages. */
+  --c-bg: var(--bg);
+  --c-card: var(--surface);
+  --c-ink: var(--ink);
+  --c-ink-2: var(--ink-2);
+  --c-ink-3: var(--ink-3);
+  --c-line: var(--line);
+  --c-go: var(--ink);
   --c-radius: 24px;
   --c-tint-plane: #e8f1ff;
   --c-tint-phone: #fff4d6;
@@ -488,7 +489,10 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  padding: 12px 20px;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 16px 24px;
   background: var(--c-bg);
 }
 .customer__tools {
