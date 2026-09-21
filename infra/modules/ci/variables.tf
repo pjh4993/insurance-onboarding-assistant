@@ -10,8 +10,10 @@ variable "project" {
 }
 
 variable "github_repository" {
-  type    = string
-  default = "pjh4993/bolttech-onboarding-assistant"
+  # The repo sends immutable subjects (owner and repo ids), so a recreated repo of the same name gets no access.
+  description = "Repository part of the OIDC 'sub' claim: <owner>@<owner_id>/<repo>@<repo_id> (GET repos/{repo}/actions/oidc/customization/sub)."
+  type        = string
+  default     = "pjh4993@12472082/bolttech-onboarding-assistant@1379320933"
 }
 
 variable "oidc_subjects" {

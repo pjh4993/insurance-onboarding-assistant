@@ -28,6 +28,9 @@ locally (see the README).
   identity provider is account-wide: develop creates it, prod looks it up.
 - Each role's trust policy is limited to this repository (`pjh4993/bolttech-onboarding-assistant`) and one
   subject: the develop role to `ref:refs/heads/main`, the prod role to `environment:prod`.
+  The repository sends GitHub's immutable subject, which carries the owner and repository ids
+  (`repo:pjh4993@12472082/bolttech-onboarding-assistant@1379320933:…`), so a repository recreated under the same
+  name gets no access. `modules/ci` variable `github_repository` holds that prefix.
 - The role has `PowerUserAccess` (it applies the whole environment), plus IAM limited to `onboarding-*` roles and
   policies and the OIDC provider, read/write on the Terraform state bucket and lock table, and ECR push.
 - Workflows request `id-token: write` and use `aws-actions/configure-aws-credentials` to assume the role.
