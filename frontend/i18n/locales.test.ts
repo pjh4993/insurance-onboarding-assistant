@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import en from "@/messages/en.json";
 import ko from "@/messages/ko.json";
-import { marketLocale, negotiateLocale, sessionLocale } from "./locales";
+import { localeMarket, marketLocale, negotiateLocale, sessionLocale } from "./locales";
 
 function keys(obj: object, prefix = ""): string[] {
   return Object.entries(obj).flatMap(([k, v]) =>
@@ -19,6 +19,11 @@ describe("locale resolution", () => {
   it("defaults a session to its market's language", () => {
     expect(marketLocale("KR")).toBe("ko");
     expect(marketLocale("US")).toBe("en");
+  });
+
+  it("defaults a self-serve visitor's market to their language", () => {
+    expect(localeMarket("ko")).toBe("KR");
+    expect(localeMarket("en")).toBe("US");
   });
 
   it("uses the session's locale, or the market's when an older backend omits it", () => {

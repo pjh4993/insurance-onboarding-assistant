@@ -23,7 +23,7 @@ function useNow(intervalMs = 30_000): number {
   return now;
 }
 
-export function AgentConsole() {
+export function AgentConsole({ customerBaseUrl = null }: { customerBaseUrl?: string | null }) {
   const t = useTranslations("agent");
   const tc = useTranslations("common");
   const [me, setMe] = useState<string | null>(null);
@@ -193,7 +193,7 @@ export function AgentConsole() {
       </header>
 
       <aside className="col col--list">
-        <NewSession onCreated={loadList} />
+        <NewSession onCreated={loadList} customerBaseUrl={customerBaseUrl} />
         {listError && <p className="input-panel__error">{listError}</p>}
         <SessionList sessions={sessions} selectedId={selectedId} onSelect={select} me={me} now={now} />
       </aside>

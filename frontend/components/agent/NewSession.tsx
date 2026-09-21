@@ -4,9 +4,11 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { LOCALES, marketLocale } from "@/i18n/locales";
 import { agentApi, ApiError } from "@/lib/api";
+import { customerLink } from "@/lib/hosts";
 import type { Locale, Market } from "@/lib/types";
 
-export function NewSession({ onCreated }: { onCreated: () => void }) {
+/** `customerBaseUrl`: the customer host (CUSTOMER_BASE_URL) when it differs from this one; null = this origin. */
+export function NewSession({ onCreated, customerBaseUrl }: { onCreated: () => void; customerBaseUrl: string | null }) {
   const [open, setOpen] = useState(false);
   const t = useTranslations("agent.newSession");
   const tc = useTranslations("common");
@@ -24,7 +26,7 @@ export function NewSession({ onCreated }: { onCreated: () => void }) {
     setCopied(false);
     try {
       const res = await agentApi.createSession(market, locale ?? undefined);
-      setLink(`${window.location.origin}${res.customer_path}`);
+      setLink(customerLink(customerBaseUrl, window.location.origin, res.customer_path));
       onCreated();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t("createFailed"));

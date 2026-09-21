@@ -1,4 +1,4 @@
-/* Customer app (/s/*): a landing screen, then a chat laid out as one centred reading column. */
+/* Customer app (/, /chat, /s/*): a landing screen, then a chat laid out as one centred reading column. */
 .customer-shell {
   --c-bg: #f3f4f6;
   --c-card: #ffffff;
@@ -363,6 +363,72 @@
   word-break: keep-all;
 }
 
+/* ---- public landing (/): notices in Landing's notice slot, busy state, the agents link */
+.landing-notices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.landing-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--c-card);
+  border: 1px solid var(--c-line);
+  font-size: 14.5px;
+  color: var(--c-ink);
+  word-break: keep-all;
+}
+.landing-notice--error {
+  background: var(--danger-soft);
+  border-color: transparent;
+  color: var(--danger);
+}
+.landing-notice__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.landing-notice__go {
+  padding: 6px 14px;
+  border-radius: 99px;
+  background: var(--c-go);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13.5px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.landing-notice__alt {
+  border: none;
+  background: none;
+  padding: 6px 0;
+  color: var(--c-ink-2);
+  font-size: 13.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.public-landing--busy {
+  cursor: progress;
+}
+.public-landing--busy .landing {
+  pointer-events: none;
+}
+.public-landing__agents {
+  margin: -20px 0 0;
+  padding: 0 16px 28px;
+  text-align: center;
+  font-size: 12.5px;
+}
+.public-landing__agents a {
+  color: var(--c-ink-3);
+}
+
 @media (max-width: 860px) {
   .landing__hero {
     grid-template-columns: 1fr;
@@ -378,6 +444,10 @@
   }
   .landing__nav {
     padding: 16px 0;
+    flex-wrap: wrap;
+  }
+  .landing__tools {
+    margin-left: auto;
   }
   /* the switch matters more than the market label on a phone */
   .landing__market {

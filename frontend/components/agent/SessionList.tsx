@@ -52,6 +52,9 @@ export function SessionList({
                 {s.assigned_agent_id === me ? t("agent.list.mine") : `@${s.assigned_agent_id}`}
               </Badge>
             )}
+            {s.origin && (
+              <Badge tone={s.origin === "SELF_SERVE" ? "accent" : "muted"}>{t(`agent.list.origin.${s.origin}`)}</Badge>
+            )}
             <Badge tone="muted">{s.market}</Badge>
             <Badge tone="muted" title={t(`common.localeName.${sessionLocale(s)}`)}>
               {t(`common.localeShort.${sessionLocale(s)}`)}

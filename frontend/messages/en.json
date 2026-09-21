@@ -15,8 +15,15 @@
     "localeShort": { "ko": "KO", "en": "EN" }
   },
   "home": {
-    "body": "Customers open a session link (<code>/s/…</code>). Agents work in the console.",
-    "openConsole": "Open the agent console"
+    "market": "Market",
+    "marketName": { "KR": "Korea", "US": "United States" },
+    "forAgents": "For agents",
+    "resumeBody": "You have an application in progress.",
+    "resumeContinue": "Continue your application",
+    "resumeStartNew": "Start new",
+    "rateLimited": "Too many new sessions from your network. Try again in {minutes, plural, one {# minute} other {# minutes}}.",
+    "rateLimitedLater": "Too many new sessions from your network. Please try again later.",
+    "startFailed": "We could not start your session. Please try again."
   },
   "stage": {
     "IDENTITY": "Identity",
@@ -244,7 +251,8 @@
       "sessions": "Sessions · {count}",
       "handoff": "Handoff",
       "waits": "Waits: {what}",
-      "mine": "Mine"
+      "mine": "Mine",
+      "origin": { "AGENT_LINK": "Link", "SELF_SERVE": "Self-serve" }
     },
     "conversation": {
       "waits": "Waits: {what}",

@@ -15,8 +15,15 @@
     "localeShort": { "ko": "KO", "en": "EN" }
   },
   "home": {
-    "body": "고객은 상담 링크(<code>/s/…</code>)로 들어오고, 상담원은 콘솔에서 일해요.",
-    "openConsole": "상담원 콘솔 열기"
+    "market": "시장",
+    "marketName": { "KR": "한국", "US": "미국" },
+    "forAgents": "상담원용",
+    "resumeBody": "진행 중인 가입 상담이 있어요.",
+    "resumeContinue": "이어서 하기",
+    "resumeStartNew": "새로 시작",
+    "rateLimited": "같은 네트워크에서 새 상담이 너무 많이 시작됐어요. {minutes}분 뒤에 다시 시도해 주세요.",
+    "rateLimitedLater": "같은 네트워크에서 새 상담이 너무 많이 시작됐어요. 잠시 뒤에 다시 시도해 주세요.",
+    "startFailed": "상담을 시작하지 못했어요. 다시 시도해 주세요."
   },
   "stage": {
     "IDENTITY": "본인 확인",
@@ -244,7 +251,8 @@
       "sessions": "상담 · {count}",
       "handoff": "연결 요청",
       "waits": "대기: {what}",
-      "mine": "내 상담"
+      "mine": "내 상담",
+      "origin": { "AGENT_LINK": "링크", "SELF_SERVE": "셀프 시작" }
     },
     "conversation": {
       "waits": "대기: {what}",

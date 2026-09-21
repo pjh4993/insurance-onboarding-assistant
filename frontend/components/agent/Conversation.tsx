@@ -42,6 +42,11 @@ export function Conversation({
               </Badge>
             )}
             <Badge tone={session.mode === "ASSIST" ? "success" : "muted"}>{session.mode}</Badge>
+            {session.origin && (
+              <Badge tone={session.origin === "SELF_SERVE" ? "accent" : "muted"}>
+                {t(`agent.list.origin.${session.origin}`)}
+              </Badge>
+            )}
             <Badge tone="muted">{session.market}</Badge>
             <Badge tone="muted">{t(`common.localeName.${sessionLocale(session)}`)}</Badge>
           </div>

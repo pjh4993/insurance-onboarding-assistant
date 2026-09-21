@@ -40,7 +40,11 @@ export type SessionSummary = {
   mode: "AUTO" | "ASSIST";
   assigned_agent_id: string | null;
   last_activity_at: string;
+  /** How the session began: an agent's link, or the public landing page. Missing from older backends. */
+  origin?: SessionOrigin;
 };
+
+export type SessionOrigin = "AGENT_LINK" | "SELF_SERVE";
 
 export type Message = {
   id: string;

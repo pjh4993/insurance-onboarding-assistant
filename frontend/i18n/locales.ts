@@ -19,6 +19,11 @@ export function marketLocale(market: Market): Locale {
   return market === "KR" ? "ko" : "en";
 }
 
+/** The market a visitor starting on the public landing page gets by default: ko → KR, en → US. */
+export function localeMarket(locale: Locale): Market {
+  return locale === "ko" ? "KR" : "US";
+}
+
 /**
  * The first supported language in an Accept-Language header or navigator.languages list,
  * matched on the primary subtag ("ko-KR" → "ko"), else `fallback`.
