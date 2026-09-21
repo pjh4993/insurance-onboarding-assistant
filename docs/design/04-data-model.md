@@ -5,10 +5,13 @@ Domain entities in the `domain` and `catalog` schemas. Names follow ACORD where 
 separate and described in [state-management.md](03-state-management.md).
 
 This page matches `backend/app/db/models.py`, which maps the entity dataclasses of `onboarding-core`
-(`backend/packages/core`) onto these tables. The backend creates the schemas and tables at startup with
-SQLAlchemy `create_all` and then upserts the catalog seed. Both steps are idempotent and run under a Postgres
-advisory lock, so several starting replicas do not race. There are no Alembic migrations: `create_all` adds
-missing tables but does not change existing ones.
+(`backend/packages/core`) onto these tables. The backend runs its Alembic migrations
+(`backend/app/db/migrations/`) to head at startup and then upserts the catalog seed. Both steps are idempotent
+and run under a Postgres advisory lock, so several starting replicas do not race. `0001` is the schema as
+`create_all` built it before migrations existed; a database from that time has the tables but no
+`alembic_version`, so it is stamped at `0001` instead of running it. A test checks that the models and the
+migrated schema do not drift. New migrations come from `uv run alembic revision --autogenerate -m "..."` in
+`backend/`.
 
 ## 1. Entity groups
 
@@ -46,6 +49,7 @@ erDiagram
         string thread_id
         uuid party_id FK
         string market
+        string locale
         string token_hmac
         timestamp token_expires_at
         enum status
@@ -192,7 +196,7 @@ Enum columns are stored as short strings; the allowed values are enforced by the
 | `Quote` | One per eligible recommendation. Price computed from `Product.rating` (`TIERED`, `PERCENT`, `PER_TRIP_DAY`, `FLAT`) and object values; `rating_inputs` records how. `valid_until` is `min(created_at + 24h, term start 00:00 UTC)` when the term starts in the future, otherwise `created_at + 24h`. An accepted quote that has expired is re-priced when the application is opened |
 | `Application` | Opened as `DRAFT` with answers pre-filled from the insured object and verified data. Missing fields = `Product.required_application_fields` without a value. `INCOMPLETE` while any are missing, `COMPLETE` when none are, `SUBMITTED` with the `submission_ref` from the contract admin system |
 | `ApplicationParty` | One row per role: `POLICYHOLDER` is the customer; `INSURED` and `PAYER` default to the customer unless someone else was named |
-| `OnboardingSession` | One per graph thread. Holds the session link HMAC, the market, and a progress summary so the agent list does not read checkpoints. `token_expires_at` (48 hours) is stored but not checked yet |
+| `OnboardingSession` | One per graph thread. Holds the session link HMAC, the market, the language (`locale`, `ko` or `en`: defaults to the market's, the customer or an agent can change it), and a progress summary so the agent list does not read checkpoints. `token_expires_at` (48 hours) is stored but not checked yet |
 
 ## 4. State transitions
 

@@ -17,6 +17,7 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.65b0",
     "opentelemetry-instrumentation-httpx>=0.65b0",
     "opentelemetry-instrumentation-botocore>=0.65b0",
+    "alembic>=1.14",
 ]
 
 [dependency-groups]

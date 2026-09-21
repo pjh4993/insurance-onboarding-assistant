@@ -53,9 +53,10 @@ matches the images. Rolling back means deploying an earlier SHA.
 - Rolling deploys keep 100% of tasks healthy and allow up to 200% during the switch.
 - The ALB checks the frontend at `/api/healthz`. The images carry their own health checks (frontend `/api/healthz`, backend
   `/healthz`).
-- There is no separate migration step. The backend creates missing tables and upserts the catalog seed when it
-  starts, under a Postgres advisory lock. This does not alter existing tables; schema changes to them would need
-  migrations (see [future-improvements.md](../decisions/future-improvements.md)).
+- There is no separate migration step. The backend runs its Alembic migrations to head and upserts the catalog seed
+  when it starts, under a Postgres advisory lock. A migration therefore reaches develop before prod, and runs
+  while the old tasks still serve, so a migration must keep the previous release working (add a column, backfill,
+  then tighten; drop only in a later release).
 - Deploy workflows use a concurrency group, so two deploys to one environment never overlap.
 
 ## 5. Smoke test

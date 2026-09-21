@@ -18,7 +18,7 @@ Each row names what we chose, what we gave up, and why.
 | Frontend relays all backend calls | A little latency and one more hop for SSE | The backend is never public; one place handles auth |
 | One frontend service with two apps (`/s`, `/agent`) | Deploying the agent console on its own | The brief asks for two services. Separate layouts and routes still keep them apart for users |
 | Fixed AES key for checkpoints, no rotation | Key rotation | Simple, no extra calls. Checkpoints are meant to expire after 30 days, so rotation can be added later with a reader that accepts the old key for 30 days |
-| Tables created at startup (`create_all` + idempotent seed) | Versioned migrations (Alembic) | No migration step to run or order in the deploy. It only adds missing tables; changing an existing table will need migrations |
+| Alembic migrations run by the backend at startup | A separate migration task in the deploy | No extra step to order in the deploy; an advisory lock serialises replicas. A migration runs while the previous release still serves, so it must stay backward compatible |
 
 ## 2. LLM: Claude Sonnet 4.6 on Bedrock
 

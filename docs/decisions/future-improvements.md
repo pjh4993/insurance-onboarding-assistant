@@ -15,7 +15,6 @@ be closed before real use.
 | Agent header is not verified | The frontend's agent auth is a development switch (`AGENT_DEV_AUTH=true`, every agent is `agent-demo`). The hook for the ALB's Cognito headers exists, but verifying the signed `x-amzn-oidc-data` JWT is a `TODO` | Verify the JWT with the ALB public key (fetched through NAT), use its `sub` as the agent ID, then turn `AGENT_DEV_AUTH` off |
 | One customer session per browser | The session cookie holds one token; opening a second link replaces it | Scope the cookie per session, or keep the token in the page URL path for API calls |
 | Assignment is not a lock | `assign` records the agent and `mode = ASSIST`, but any agent can send input | Reject agent input from anyone but the assigned agent |
-| No schema migrations | Tables are created with `create_all` at startup, which never alters an existing table | Add Alembic before the first schema change |
 
 ## 2. Product and workflow
 

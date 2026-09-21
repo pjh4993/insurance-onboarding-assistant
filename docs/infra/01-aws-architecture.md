@@ -100,7 +100,7 @@ opens `/s/{token}`. See [networking.md](02-networking.md#5-authentication).
 |---|---|---|---|
 | `checkpoint` | LangGraph checkpoint tables (`AsyncPostgresSaver`) | The LangGraph runtime | Meant to be 30 days without activity (cleanup not built) |
 | `domain` | Customer and transaction entities, session links | Graph nodes and the API | The customer relationship |
-| `catalog` | Products, eligibility rules, target markets | The backend at startup: `create_all` plus an idempotent seed of the eight products | While a product is on sale |
+| `catalog` | Products, eligibility rules, target markets | The backend at startup: Alembic migrations plus an idempotent seed of the eight products | While a product is on sale |
 
 - Encrypted at rest with the KMS key; the parameter group forces TLS and the backend connects with
   `sslmode=require`. The password comes from the RDS-managed secret as `PGPASSWORD`.

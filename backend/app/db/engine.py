@@ -1,4 +1,4 @@
-"""Engine, session factory and idempotent bootstrap (schemas, tables, catalog seed)."""
+"""Engine, session factory and idempotent bootstrap (migrations, catalog seed)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ from datetime import date
 from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from app.db.models import SCHEMAS, EligibilityRule, Product, TargetMarket, metadata
+from app.db import migrate
+from app.db.models import EligibilityRule, Product, TargetMarket
 from onboarding_core.catalog.seed import PRODUCTS
 
 SEED_EFFECTIVE_DATE = date(2026, 1, 1)
@@ -28,13 +29,11 @@ def make_sessionmaker(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
 
 
 async def init_db(engine: AsyncEngine) -> None:
-    """Create schemas and tables, then upsert the catalog seed. Safe to run on every start."""
+    """Migrate the schema to head, then upsert the catalog seed. Safe to run on every start."""
     async with engine.begin() as conn:
         # Serialise concurrent starts (several replicas) on one advisory lock.
         await conn.execute(text("SELECT pg_advisory_xact_lock(724001)"))
-        for schema in SCHEMAS:
-            await conn.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
-        await conn.run_sync(metadata.create_all)
+        await conn.run_sync(migrate.upgrade)
     await seed_catalog(make_sessionmaker(engine))
 
 
