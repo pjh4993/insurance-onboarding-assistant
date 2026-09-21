@@ -50,7 +50,7 @@ be closed before real use.
 
 | Item | What it would do | Notes |
 |---|---|---|
-| Per-node model switch to Haiku 4.5 | Move extraction nodes (`assess_needs`, `collect_parties`, `collect_answers`) to `global.anthropic.claude-haiku-4-5-20251001-v1:0` | The setting exists (`LLM_MODEL_OVERRIDES`) and the IAM policy already allows Haiku 4.5; the switch needs measurement first |
+| Per-node model switch to Haiku 4.5 | Move extraction nodes (`assess_needs`, `collect_parties`, `collect_answers`) to `global.anthropic.claude-haiku-4-5-20251001-v1:0` | Model profiles are per node in the agent config bundle and the IAM policy already allows Haiku 4.5; the switch is a new bundle version, after measurement |
 | Evaluation set | A labelled set of customer utterances (Korean and English) with expected extractions, run against each model and structured-output method | Needed to justify the Haiku switch and to settle `function_calling` vs `json_schema` with more than one measurement each |
 | Real compression ratio | Measure checkpoint size with real conversations | The test conversation compressed unrealistically well |
 

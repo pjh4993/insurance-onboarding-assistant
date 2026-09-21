@@ -28,7 +28,8 @@ services:
       IDENTITY_API_URL: http://mock:8080/identity
       CONTRACT_API_URL: http://mock:8080/contract
       BEDROCK_ENDPOINT_URL: http://mock:8080
-      BEDROCK_MODEL_ID: global.anthropic.claude-sonnet-4-6
+      # Models, prompts and copy come from the baseline bundle in the agent package. To try an edited one, mount a
+      # directory and point AGENT_CONFIG_URI at it (see onboarding_agent.config).
       AWS_REGION: ap-northeast-2
       AWS_ACCESS_KEY_ID: mock
       AWS_SECRET_ACCESS_KEY: mock

@@ -184,11 +184,12 @@ retries and handoff. See [demo.md](../guides/demo.md#3-error-handling).
 
 ## 7. LLM use
 
-All LLM calls go through `langchain-aws` `ChatBedrockConverse` to the Bedrock Converse API with model
-`global.anthropic.claude-sonnet-4-6` (global cross-region inference from `ap-northeast-2`). Each LLM node has
+All LLM calls go through `langchain-aws` `ChatBedrockConverse` to the Bedrock Converse API. Each LLM node has
 one Pydantic output schema and uses `with_structured_output` (`function_calling` method: the schema is passed as
-a Converse tool and the model answers with a `toolUse` block). Temperature is 0. The model can be changed per
-node with `LLM_MODEL_OVERRIDES` (a JSON map of node name to model ID); no override is set today.
+a Converse tool and the model answers with a `toolUse` block). Which model a node uses, with which arguments, and
+its prompt come from the config bundle ([§10](#10-models-prompts-and-copy-the-config-bundle)); the baseline gives
+every node `global.anthropic.claude-sonnet-4-6` (global cross-region inference from `ap-northeast-2`) at
+temperature 0.
 
 | Node | Output schema |
 |---|---|
@@ -257,3 +258,61 @@ To add a product line:
 | `tests/test_golden.py` | Eleven scripted flows, including a KR session in English and a language switch mid-session. Each records the node path, every turn's state, messages and prompt, the entities, the LLM calls with the language each was told to reply in, and the external calls, all pinned to `tests/golden/*.json`. Regenerate with `UPDATE_GOLDEN=1` only for an intended behavior change, and review the diff |
 | `test_node_names_are_stable`, `test_state_fields_are_stable` | Pin the checkpointed names. Renaming a node or a field is a migration, not a refactor |
 | `test_domain_registries_cover_the_state_vocabulary` | Every `WaitingFor` input has a handler node, and every `HandoffReason` has a resolution |
+
+## 10. Models, prompts and copy: the config bundle
+
+The code decides; what the agent says and asks the LLM, and which model it asks, is data. It lives in a
+**config bundle** (`onboarding_agent.config`):
+
+```text
+<base>/<semver>/config.json       languages, model profiles, system prompt, field labels, billing units
+<base>/<semver>/flows/<flow>.json  llm: node -> model profile + prompt parts; copy: key -> text per language
+```
+
+`<base>` is a local directory or `s3://bucket/prefix`. In AWS each environment has its own bucket. The backend
+reads the bundle **once, at startup** (`AGENT_CONFIG_URI`, `AGENT_CONFIG_VERSION`). A version is exact (`1.2.0`)
+or a prefix (`1`, `1.2`) that means the highest published match. With no URI, it uses the baseline bundle shipped
+in the agent package, which is what tests and `docker compose` use.
+
+**Validation.** Each domain module declares what it reads (`DomainModule.texts`): its copy keys, its LLM nodes'
+prompt parts, and the placeholders the code passes to each. A bundle is checked against those declarations when
+it loads, and every problem is reported at once, so a bad bundle stops the backend at startup instead of failing
+a customer's turn. Checks cover:
+- a missing or unknown key
+- a placeholder the code does not pass
+- a missing language
+- an unknown model profile or argument
+- a model id the IAM policy does not allow (`LLM_ALLOWED_MODEL_IDS`)
+
+Templates take plain names only (`{fields}`): the bundle is edited outside the codebase, so a template must not
+reach into the objects it is rendered with.
+
+**Versions are the contract.**
+
+| Change | Version |
+|---|---|
+| Edit a prompt, a model or its arguments, or copy | patch or minor |
+| Add a language, a label or a copy key | minor |
+| Remove a language or a key, or change what the code passes | major: needs an agent built for that major (`CONFIG_MAJOR`) |
+
+`python -m onboarding_agent.config publish` enforces this against what is already published:
+- it never overwrites a version
+- the new version must be higher than the latest one in its major
+- within a major it may not drop a language, key, node or label
+
+It writes `config.json` last, because a version counts as published once its `config.json` exists. The usual
+edit:
+1. `pull` the version in use.
+2. Edit it and bump `version`.
+3. `validate` it.
+4. `publish` it.
+5. Restart the backend service.
+
+Publishing to S3 directly needs write access to the bucket and `kms:GenerateDataKey` on the environment's key.
+
+**Languages are data.** A bundle declares its languages. The API accepts a session locale only if the loaded
+bundle has it (`GET /api/languages`). A session in a language the bundle lacks falls back to the bundle's default
+language. The customer UI's own strings are the frontend's (next-intl), so a new language needs those too.
+
+The golden transcripts (`tests/test_golden.py`) record every message and every LLM prompt verbatim. Moving the
+text out of the code left them unchanged.

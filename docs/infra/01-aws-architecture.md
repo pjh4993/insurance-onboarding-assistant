@@ -45,9 +45,11 @@ opens `/s/{token}`. See [networking.md](02-networking.md#5-authentication).
 - **Endpoint:** `BEDROCK_ENDPOINT_URL` points to the mock only in `docker compose`. In both AWS environments it is
   unset, so the SDK uses the regional endpoint through the `bedrock-runtime` VPC endpoint. Develop calls real
   Bedrock.
-- **Per-node model:** `LLM_MODEL_OVERRIDES` can point any LLM node at another model ID, so extraction nodes can
-  move to Claude Haiku 4.5 (`global.anthropic.claude-haiku-4-5-20251001-v1:0`) to save cost. No override is set;
-  the switch is future work.
+- **Per-node model:** the agent config bundle (an S3 bucket per environment, read by the backend at startup) names
+  a model profile for each LLM node, so extraction nodes can move to Claude Haiku 4.5
+  (`global.anthropic.claude-haiku-4-5-20251001-v1:0`) to save cost by publishing a new bundle version. The backend
+  refuses a bundle naming a model outside `bedrock_foundation_models`, which is also what the IAM policy allows.
+  See [langgraph-design.md](../design/02-langgraph-design.md#10-models-prompts-and-copy-the-config-bundle).
 
 ## 4. IAM roles
 

@@ -40,7 +40,9 @@ Environment variables (backend):
 | `IDENTITY_API_URL` | `http://mock:8080/identity` | |
 | `CONTRACT_API_URL` | `http://mock:8080/contract` | |
 | `BEDROCK_ENDPOINT_URL` | `http://mock:8080` | unset in prod → AWS default endpoint |
-| `BEDROCK_MODEL_ID` | `global.anthropic.claude-sonnet-4-6` | |
+| `AGENT_CONFIG_URI` | unset | agent config bundles (models, prompts, copy): a directory or `s3://bucket/prefix` holding `<semver>/config.json`; unset → the baseline bundle in the agent package |
+| `AGENT_CONFIG_VERSION` | unset | `1.2.0`, or a prefix (`1`, `1.2`) meaning the highest published match; unset → the newest the agent supports |
+| `LLM_ALLOWED_MODEL_IDS` | unset | comma-separated model ids a bundle may name (set from the IAM policy in AWS) |
 | `AWS_REGION` | `ap-northeast-2` | |
 | `CHECKPOINT_AES_KEY` | 64 hex chars (dev value in compose) | checkpoint encryption |
 | `SESSION_HMAC_KEY` | dev value | session-link token HMAC; also keys the client-IP hash of self-serve sessions |
@@ -57,7 +59,8 @@ All JSON. Money is integer minor units + ISO 4217 currency. Times are ISO 8601 U
 
 ### Session links
 - `POST /api/sessions` body `{"market": "KR" | "US", "locale"?: Locale}` → `201 {"session_id", "token", "customer_path": "/s/{token}"}`.
-  `locale` defaults to the market's language (`KR` → `ko`, `US` → `en`). The session's `origin` is `"AGENT_LINK"`.
+  `locale` defaults to the market's language (`KR` → `ko`, `US` → `en`) when the agent's config bundle has it, else the
+  bundle's default language; a `locale` the bundle lacks → `422`. The session's `origin` is `"AGENT_LINK"`.
 - `POST /api/public/sessions` (public landing page, no agent auth) body as `POST /api/sessions`, header
   `X-Client-IP: <ip>` set by the frontend → `201` with the same body as `POST /api/sessions`; the session's `origin` is
   `"SELF_SERVE"`. Rate-limited, counted in the DB over the last 3600 s across all replicas: `SELF_SERVE_PER_IP_PER_HOUR`
@@ -65,6 +68,8 @@ All JSON. Money is integer minor units + ISO 4217 currency. Times are ISO 8601 U
   is treated as `"unknown"`, one shared bucket. Over a limit → `429 {"detail": "rate_limited", "retry_after": <int s>}`
   with a `Retry-After: <int s>` header (seconds until the oldest counted session leaves the window, at least 1).
   Only an HMAC-SHA256 of the IP (keyed with `SESSION_HMAC_KEY`) is stored, never the IP itself
+- `GET /api/languages` → `{"languages": [{"code": Locale, "name": string}], "default": Locale}`: the languages the agent's
+  config bundle is written in, which a session's `locale` must be one of
 - `GET /healthz` → `{"status": "ok"}`
 
 ### Customer (header `X-Session-Token: <token>`)
@@ -87,7 +92,7 @@ All JSON. Money is integer minor units + ISO 4217 currency. Times are ISO 8601 U
 type Stage = "IDENTITY" | "PROFILING" | "RECOMMENDATION" | "APPLICATION" | "SUBMITTED" | "HANDOFF" | "DECLINED" | "WITHDRAWN";
 type WaitingFor = "IDENTITY_INFO" | "OTP_CODE" | "NEEDS" | "DECISION" | "PARTIES" | "ANSWERS" | "CONFIRM" | "AGENT" | null;
 
-type Locale = "ko" | "en";                            // the session's language: the customer UI, fixed copy and LLM replies
+type Locale = string;  // a language code the agent's config bundle declares (today "ko" | "en"): fixed copy, LLM replies, the customer UI
 
 type SessionSummary = {
   session_id: string; display_name: string;          // "Unverified #1a2b" until identity is verified

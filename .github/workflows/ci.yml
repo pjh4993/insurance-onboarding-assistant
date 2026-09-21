@@ -37,7 +37,6 @@ jobs:
       IDENTITY_API_URL: http://localhost:8080/identity
       CONTRACT_API_URL: http://localhost:8080/contract
       BEDROCK_ENDPOINT_URL: http://localhost:8080
-      BEDROCK_MODEL_ID: global.anthropic.claude-sonnet-4-6
       AWS_REGION: ap-northeast-2
       AWS_ACCESS_KEY_ID: mock
       AWS_SECRET_ACCESS_KEY: mock
