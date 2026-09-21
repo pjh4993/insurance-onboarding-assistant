@@ -45,11 +45,10 @@ from onboarding_core.crypto import decrypt_field, encrypt_field, hmac_hex
 from onboarding_core.needs.models import InsurableObject, NeedsAssessment
 from onboarding_core.needs.rules import (
     compute_needs_missing,
-    device_attributes,
+    described_objects,
     merge_needs,
     needs_view,
     object_view,
-    trip_attributes,
 )
 from onboarding_core.party.models import Party
 from onboarding_core.party.rules import party_view
@@ -409,7 +408,8 @@ class Nodes:
             [self._system(state, party, instructions), HumanMessage("\n\n".join(texts) or "-")],
         )
         values = merge_needs(base, ext.model_dump(), m)
-        missing = compute_needs_missing(values, market=m, has_partner_device=bool(partner_objects))
+        partner_types = {o.object_type for o in partner_objects}
+        missing = compute_needs_missing(values, market=m, partner_object_types=partner_types)
         step = _step(config)
 
         async with self.d.uow() as uow:
@@ -440,27 +440,17 @@ class Nodes:
             ids = [str(o.insurable_object_id) for o in partner_objects]
             if not missing:
                 na.completed_at = now
-                if values.get("device") and not partner_objects:
-                    obj_id = node_uuid(_thread(config), "assess_needs", step, "device")
+                for key, object_type, attrs in described_objects(
+                    values, partner_object_types=partner_types, today=now.date()
+                ):
+                    obj_id = node_uuid(_thread(config), "assess_needs", step, key)
                     await uow.objects.save(
                         InsurableObject(
                             insurable_object_id=obj_id,
                             owner_party_id=party.party_id,
-                            object_type="DEVICE",
+                            object_type=object_type,
                             source=actor,
-                            attributes=_jsonable(device_attributes(values["device"], now.date())),
-                        )
-                    )
-                    ids.append(str(obj_id))
-                if values.get("trip"):
-                    obj_id = node_uuid(_thread(config), "assess_needs", step, "trip")
-                    await uow.objects.save(
-                        InsurableObject(
-                            insurable_object_id=obj_id,
-                            owner_party_id=party.party_id,
-                            object_type="TRIP",
-                            source=actor,
-                            attributes=_jsonable(trip_attributes(values["trip"], values.get("residence_country"))),
+                            attributes=_jsonable(attrs),
                         )
                     )
                     ids.append(str(obj_id))

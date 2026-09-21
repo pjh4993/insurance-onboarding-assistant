@@ -4,13 +4,10 @@ from __future__ import annotations
 
 from datetime import date
 
-from onboarding_core.needs.rules import (
-    compute_needs_missing,
-    device_attributes,
-    merge_needs,
-    normalize_device_category,
-    trip_attributes,
-)
+from onboarding_core.needs.rules import compute_needs_missing, described_objects, merge_needs
+from onboarding_core.product_lines import LINES, line_for_object_type
+from onboarding_core.product_lines.device import DEVICE, normalize_device_category
+from onboarding_core.product_lines.travel import TRAVEL
 
 TODAY = date(2026, 9, 21)
 BASE = {"age_range": "AGE_30_39", "residence_country": "KR", "objectives": ["PROTECT_DEVICE"]}
@@ -25,11 +22,11 @@ def test_device_categories_are_normalized():
 
 
 def test_device_needs_require_category_and_price_unless_the_partner_knows_the_device():
-    assert compute_needs_missing(BASE, market="KR", has_partner_device=False) == [
+    assert compute_needs_missing(BASE, market="KR") == [
         "device.device_category",
         "device.purchase_price_minor",
     ]
-    assert compute_needs_missing(BASE, market="KR", has_partner_device=True) == []
+    assert compute_needs_missing(BASE, market="KR", partner_object_types={"DEVICE"}) == []
 
 
 def test_trip_cost_is_required_only_in_the_us():
@@ -38,12 +35,12 @@ def test_trip_cost_is_required_only_in_the_us():
         "objectives": ["TRAVEL_COVER"],
         "trip": {"departure_date": "2026-10-03", "return_date": "2026-10-07", "destination_countries": ["JP"]},
     }
-    assert compute_needs_missing(values, market="KR", has_partner_device=False) == []
-    assert compute_needs_missing(values, market="US", has_partner_device=False) == ["trip.trip_cost_minor"]
+    assert compute_needs_missing(values, market="KR", partner_object_types=()) == []
+    assert compute_needs_missing(values, market="US", partner_object_types=()) == ["trip.trip_cost_minor"]
 
 
 def test_profile_fields_and_objectives_are_required():
-    assert compute_needs_missing({}, market="US", has_partner_device=False) == [
+    assert compute_needs_missing({}, market="US", partner_object_types=()) == [
         "age_range",
         "residence_country",
         "objectives",
@@ -73,7 +70,11 @@ def test_merge_normalizes_country_and_defaults_it_to_the_market():
 
 
 def test_device_assumptions_are_recorded():
-    attrs = device_attributes({"device_category": "laptop", "purchase_price_minor": 129900, "model": None}, TODAY)
+    attrs = DEVICE.object_attributes(
+        {"device_category": "laptop", "purchase_price_minor": 129900, "model": None},
+        residence_country="US",
+        today=TODAY,
+    )
     assert attrs == {
         "device_category": "NOTEBOOK",
         "purchase_price_minor": 129900,
@@ -82,12 +83,37 @@ def test_device_assumptions_are_recorded():
         "purchase_date": "2026-09-21",
         "assumed_fields": ["condition", "has_existing_damage", "purchase_date"],
     }
-    stated = device_attributes({"condition": "USED", "has_existing_damage": True, "purchase_date": "2026-01-02"}, TODAY)
+    stated = DEVICE.object_attributes(
+        {"condition": "USED", "has_existing_damage": True, "purchase_date": "2026-01-02"},
+        residence_country="US",
+        today=TODAY,
+    )
     assert "assumed_fields" not in stated
 
 
 def test_trip_destination_becomes_a_list_and_departs_from_home():
-    assert trip_attributes({"destination_countries": "JP", "trip_cost_minor": None}, "KR") == {
+    attrs = TRAVEL.object_attributes(
+        {"destination_countries": "JP", "trip_cost_minor": None}, residence_country="KR", today=TODAY
+    )
+    assert attrs == {
         "destination_countries": ["JP"],
         "departure_country": "KR",
     }
+
+
+def test_described_objects_skip_what_the_partner_supplied():
+    values = {
+        "residence_country": "KR",
+        "device": {"device_category": "PHONE"},
+        "trip": {"destination_countries": ["JP"]},
+    }
+    objects = described_objects(values, partner_object_types={"DEVICE"}, today=TODAY)
+    assert [(key, object_type) for key, object_type, _ in objects] == [("trip", "TRIP")]
+    both = described_objects(values, today=TODAY)
+    assert [key for key, _, _ in both] == ["device", "trip"]
+    assert both[0][2]["device_category"] == "SMARTPHONE"
+
+
+def test_every_line_is_reachable_by_its_object_type():
+    assert [line_for_object_type(line.object_type) for line in LINES] == list(LINES)
+    assert len({line.needs_key for line in LINES}) == len(LINES)
