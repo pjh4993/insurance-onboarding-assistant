@@ -16,7 +16,7 @@ flowchart LR
 | Workflow | Trigger | Steps |
 |---|---|---|
 | `ci.yml` | Pull request; push to `main` | **backend**: `uv sync`, `ruff check`, `pytest` against a Postgres 16 service container (graph tests use in-process fakes built from the seed customers). **mock**: `ruff check`, `pytest`. **frontend**: `pnpm install`, `pnpm lint`, `tsc --noEmit`, `pnpm build`. **terraform** (1.5.7): `fmt -recursive -check`, then `init -backend=false` and `validate` for `envs/develop`, `envs/prod` and `bootstrap`. **docker**: build all three images (no push) |
-| `deploy-develop.yml` | Push to `main`; manual run | Runs only when the repository variable `AWS_DEPLOY_ROLE_ARN_DEVELOP` is set. **images**: assume the develop role, build and push `onboarding/{backend,mock,frontend}:<sha>` to ECR. **deploy**: `terraform init` with the state bucket, `terraform apply` on `envs/develop` with `image_tag=<sha>`, `aws ecs wait services-stable`, then the smoke test |
+| `deploy-develop.yml` | Push to `main`; manual run | Runs only when the repository variable `AWS_DEPLOY_ROLE_ARN_DEVELOP` is set. **images**: assume the develop role, build and push `onboarding/{backend,mock,frontend}:<sha>` to ECR. **deploy**: `terraform init` with the state bucket, `terraform apply` on `envs/develop` with `image_tag=<sha>`, `.github/scripts/wait-for-rollout.sh`, then the smoke test |
 | `deploy-prod.yml` | Manual (`workflow_dispatch`) with a full 40-character SHA | Runs in the `prod` GitHub Environment, so its required reviewers must approve. Checks out that SHA, assumes the prod role, checks that the backend and frontend images for that SHA exist in ECR (no rebuild), `terraform apply` on `envs/prod`, waits for ECS, smoke test |
 
 Not built: a `terraform plan` posted on the PR, and running the frontend unit tests (`pnpm test`) in CI; both run
@@ -45,9 +45,13 @@ matches the images. Rolling back means deploying an earlier SHA.
 ## 4. Deployment safety
 
 - **ECS deployment circuit breaker** with rollback: if new tasks fail to become healthy, ECS returns to the
-  previous task definition. The workflow then fails at `aws ecs wait services-stable`.
+  previous task definition. The workflow then fails at `wait-for-rollout.sh`.
+- The workflow waits until each service's new tasks are serving and no old task is still running, not for the old
+  tasks to be fully torn down (`aws ecs wait services-stable` waits about two minutes longer, after traffic has
+  already moved). Containers get 10 s after SIGTERM (`stopTimeout`), and uvicorn gives open SSE streams 5 s; browsers
+  reconnect to the new tasks.
 - Rolling deploys keep 100% of tasks healthy and allow up to 200% during the switch.
-- The ALB checks the frontend at `/`. The images carry their own health checks (frontend `/api/healthz`, backend
+- The ALB checks the frontend at `/api/healthz`. The images carry their own health checks (frontend `/api/healthz`, backend
   `/healthz`).
 - There is no separate migration step. The backend creates missing tables and upserts the catalog seed when it
   starts, under a Postgres advisory lock. This does not alter existing tables; schema changes to them would need

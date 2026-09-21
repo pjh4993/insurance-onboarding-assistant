@@ -119,3 +119,10 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "stop_timeout_seconds" {
+  # Open SSE streams keep a server from exiting on SIGTERM; clients reconnect, so do not wait the 30 s default.
+  description = "Seconds ECS waits after SIGTERM before killing the container."
+  type        = number
+  default     = 10
+}
