@@ -218,7 +218,9 @@ class ProfilingFlow(Flow):
             for obj_id in ids:
                 await self._touch(state, "insurable_object", obj_id)
             text = t(
-                m, "감사합니다. 가입할 수 있는 상품을 확인해 볼게요.", "Thanks — let me check which products fit you."
+                lang,
+                "감사합니다. 가입할 수 있는 상품을 확인해 볼게요.",
+                "Thanks — let me check which products fit you.",
             )
             return {
                 "needs_assessment_id": na_id,
