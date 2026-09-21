@@ -33,9 +33,9 @@ from onboarding_agent.llm.schemas import (
 )
 from onboarding_agent.texts import field_list, human, locale_of, mask_phone, note, price_label, say, t
 from onboarding_core.application.models import Application
+from onboarding_core.application.rules import apply_answer_aliases, missing_answers, prefill_answers
 from onboarding_core.catalog.eligibility import (
     RuleSpec,
-    age_on,
     evaluate_product,
     rank_order,
     target_market_score,
@@ -43,7 +43,16 @@ from onboarding_core.catalog.eligibility import (
 from onboarding_core.catalog.models import Product
 from onboarding_core.crypto import decrypt_field, encrypt_field, hmac_hex
 from onboarding_core.needs.models import InsurableObject, NeedsAssessment
+from onboarding_core.needs.rules import (
+    compute_needs_missing,
+    device_attributes,
+    merge_needs,
+    needs_view,
+    object_view,
+    trip_attributes,
+)
 from onboarding_core.party.models import Party
+from onboarding_core.party.rules import party_view
 from onboarding_core.ports import UnitOfWork
 from onboarding_core.quoting.models import Quote
 from onboarding_core.quoting.pricing import RatingError, compute_premium, compute_term, quote_valid_until
@@ -52,61 +61,6 @@ from onboarding_core.util import iso, parse_date
 
 MAX_NEEDS_ROUNDS = 3
 MAX_ANSWERS_ROUNDS = 3
-DEVICE_OBJECTIVES = {"PROTECT_DEVICE", "EXTEND_WARRANTY"}
-
-DEVICE_CATEGORY_ALIASES = {
-    "LAPTOP": "NOTEBOOK",
-    "NOTEBOOK_COMPUTER": "NOTEBOOK",
-    "COMPUTER": "NOTEBOOK",
-    "PHONE": "SMARTPHONE",
-    "MOBILE": "SMARTPHONE",
-    "MOBILE_PHONE": "SMARTPHONE",
-    "CELLPHONE": "SMARTPHONE",
-    "CELL_PHONE": "SMARTPHONE",
-    "HANDSET": "SMARTPHONE",
-    "TELEVISION": "TV",
-    "IPAD": "TABLET",
-    "PAD": "TABLET",
-    "WATCH": "WEARABLE",
-    "SMARTWATCH": "WEARABLE",
-    "SMART_WATCH": "WEARABLE",
-}
-
-# LLM answer keys that mean a required application field (the first matching alias fills it).
-ANSWER_ALIASES = {
-    "destination": ("destination_countries", "destinations", "destination_country"),
-    "trip_cost": ("trip_cost_minor",),
-    "purchase_price": ("purchase_price_minor", "price_minor", "price"),
-    "device_model": ("model",),
-    "msrp": ("msrp_minor",),
-    "order_number": ("order_id", "order_no"),
-    "traveler_gender": ("gender",),
-    "traveler_date_of_birth": ("date_of_birth", "birth_date"),
-    "traveler_name": ("full_name", "name"),
-    "departure_date": ("departure_datetime",),
-    "return_date": ("return_datetime",),
-    "imei": ("serial_number",),
-}
-
-
-def normalize_device_category(value: Any) -> str | None:
-    if not value:
-        return None
-    key = str(value).strip().upper().replace(" ", "_").replace("-", "_")
-    return DEVICE_CATEGORY_ALIASES.get(key, key)
-
-
-def apply_answer_aliases(required: list[str], answers: dict[str, Any]) -> dict[str, Any]:
-    out = dict(answers)
-    for field_name in required:
-        if out.get(field_name) not in (None, "", []):
-            continue
-        for alias in ANSWER_ALIASES.get(field_name, ()):
-            value = out.get(alias)
-            if value not in (None, "", []):
-                out[field_name] = ", ".join(map(str, value)) if isinstance(value, list) else value
-                break
-    return out
 
 
 def _thread(config: RunnableConfig) -> str:
@@ -123,137 +77,6 @@ def _uuid(value: str | uuid.UUID) -> uuid.UUID:
 
 def _jsonable(value: Any) -> Any:
     return json.loads(json.dumps(value, default=str))
-
-
-def party_view(p: Party) -> dict[str, Any]:
-    return {"party_type": p.party_type, "date_of_birth": iso(p.date_of_birth)}
-
-
-def needs_view(na: NeedsAssessment | None) -> dict[str, Any]:
-    if na is None:
-        return {}
-    return {
-        "age_range": na.age_range,
-        "occupation": na.occupation,
-        "residence_country": na.residence_country,
-        "existing_coverage": na.existing_coverage or [],
-        "objectives": na.objectives or [],
-        "device": na.device,
-        "trip": na.trip,
-    }
-
-
-def object_view(o: InsurableObject) -> dict[str, Any]:
-    return {
-        "insurable_object_id": str(o.insurable_object_id),
-        "object_type": o.object_type,
-        "source": o.source,
-        "attributes": o.attributes,
-    }
-
-
-def compute_needs_missing(values: dict[str, Any], *, market: str, has_partner_device: bool) -> list[str]:
-    """Deterministic profiling completeness; the LLM's own `missing_fields` is advisory only."""
-    missing = [f for f in ("age_range", "residence_country") if not values.get(f)]
-    objectives = set(values.get("objectives") or [])
-    if not objectives:
-        missing.append("objectives")
-    device, trip = values.get("device") or {}, values.get("trip") or {}
-    if (objectives & DEVICE_OBJECTIVES or device) and not has_partner_device:
-        # purchase_date is not required here: when unknown, eligibility assumes "bought today" and
-        # the application step asks for the real date (see device_attributes / prefill_answers).
-        for key in ("device_category", "purchase_price_minor"):
-            if device.get(key) in (None, ""):
-                missing.append(f"device.{key}")
-    if "TRAVEL_COVER" in objectives or trip:
-        keys = ["departure_date", "return_date", "destination_countries"]
-        if market == "US":
-            keys.append("trip_cost_minor")
-        for key in keys:
-            if trip.get(key) in (None, "", []):
-                missing.append(f"trip.{key}")
-    return missing
-
-
-def merge_needs(base: dict[str, Any], ext: NeedsExtraction, market: str) -> dict[str, Any]:
-    merged = dict(base)
-    for key in ("age_range", "occupation", "residence_country"):
-        value = getattr(ext, key)
-        if value:
-            merged[key] = value
-    if ext.existing_coverage:
-        merged["existing_coverage"] = ext.existing_coverage
-    if ext.objectives:
-        merged["objectives"] = list(dict.fromkeys(ext.objectives))
-    for key in ("device", "trip"):
-        value = getattr(ext, key)
-        if value:
-            merged[key] = {**(merged.get(key) or {}), **{k: v for k, v in value.items() if v is not None}}
-    if merged.get("device") and merged["device"].get("device_category"):
-        merged["device"]["device_category"] = normalize_device_category(merged["device"]["device_category"])
-    if merged.get("residence_country"):
-        merged["residence_country"] = str(merged["residence_country"]).upper()[:2]
-    else:
-        # Assumption: a customer onboarding in a market lives there unless they say otherwise.
-        merged["residence_country"] = market
-    return merged
-
-
-def device_attributes(device: dict[str, Any], today: Any) -> dict[str, Any]:
-    attrs = {k: v for k, v in device.items() if v is not None}
-    if attrs.get("device_category"):
-        attrs["device_category"] = normalize_device_category(attrs["device_category"])
-    # Assumptions, recorded in `assumed_fields` so they are never copied into the application:
-    # a device the customer is insuring now is new, undamaged and was bought today unless stated.
-    assumed = []
-    for key, default in (("condition", "NEW"), ("has_existing_damage", False), ("purchase_date", today.isoformat())):
-        if key not in attrs:
-            attrs[key] = default
-            assumed.append(key)
-    if assumed:
-        attrs["assumed_fields"] = assumed
-    return attrs
-
-
-def trip_attributes(trip: dict[str, Any], residence_country: str | None) -> dict[str, Any]:
-    attrs = {k: v for k, v in trip.items() if v is not None}
-    if isinstance(attrs.get("destination_countries"), str):
-        attrs["destination_countries"] = [attrs["destination_countries"]]
-    attrs.setdefault("departure_country", residence_country)
-    return attrs
-
-
-def prefill_answers(
-    required: list[str], obj: dict[str, Any] | None, insured: Party | None, today: Any
-) -> dict[str, Any]:
-    """Answers the application can take from data already verified or collected."""
-    attrs = (obj or {}).get("attributes", {})
-    assumed = set(attrs.get("assumed_fields") or [])
-    a = {k: v for k, v in attrs.items() if k not in assumed}
-    dob = insured.date_of_birth if insured else None
-    candidates: dict[str, Any] = {
-        "imei": a.get("imei"),
-        "device_model": " ".join(x for x in (a.get("manufacturer"), a.get("model")) if x) or None,
-        "msrp": a.get("msrp_minor") or a.get("purchase_price_minor"),
-        "activation_date": a.get("activation_date"),
-        "serial_number": a.get("serial_number"),
-        "purchase_date": a.get("purchase_date"),
-        "purchase_price": a.get("purchase_price_minor"),
-        "order_number": a.get("order_id"),
-        "proof_of_purchase": f"partner order {a['order_id']}" if a.get("order_id") else None,
-        "departure_date": a.get("departure_date"),
-        "return_date": a.get("return_date"),
-        "destination": ", ".join(a["destination_countries"]) if a.get("destination_countries") else None,
-        "trip_cost": a.get("trip_cost_minor"),
-        "traveler_name": insured.full_name if insured else None,
-        "traveler_date_of_birth": iso(dob) if dob else None,
-        "traveler_age": age_on(dob, today) if dob else None,
-    }
-    return {k: candidates[k] for k in required if candidates.get(k) not in (None, "")}
-
-
-def missing_answers(required: list[str], answers: dict[str, Any]) -> list[str]:
-    return [f for f in required if answers.get(f) in (None, "", [])]
 
 
 def latest_texts(messages: list[BaseMessage], input_types: tuple[str, ...]) -> list[str]:
@@ -585,7 +408,7 @@ class Nodes:
             NeedsExtraction,
             [self._system(state, party, instructions), HumanMessage("\n\n".join(texts) or "-")],
         )
-        values = merge_needs(base, ext, m)
+        values = merge_needs(base, ext.model_dump(), m)
         missing = compute_needs_missing(values, market=m, has_partner_device=bool(partner_objects))
         step = _step(config)
 
