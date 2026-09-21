@@ -103,8 +103,12 @@ ANSWERS: dict[str, dict[str, Any]] = {
     "B": {
         "answers": {
             "destination_countries": ["JP"],
+            "destination": "JP",
             "departure_date": "2026-10-03",
             "return_date": "2026-10-07",
+            "traveler_name": "이서준",
+            "traveler_date_of_birth": "1985-11-02",
+            "traveler_gender": "M",
             "payment_method": "CARD",
         },
         "missing_fields": [],
@@ -115,6 +119,7 @@ ANSWERS: dict[str, dict[str, Any]] = {
             "device_model": "Laptop",
             "purchase_price": 129900,
             "purchase_date": "2026-09-10",
+            "order_number": "TGT-90210-4471",
             "device_condition_confirmed": True,
             "payment_method": "CARD",
         },
