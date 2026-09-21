@@ -93,10 +93,15 @@ CONVERSATIONS = TableDef(
             pa.field("messages_json", pa.string()),
             pa.field("entities_json", pa.string()),
             pa.field("created_at", TS),
+            pa.field("suite", pa.string()),
+            pa.field("scenario_id", pa.string()),
+            pa.field("repeat_idx", pa.int32()),
+            pa.field("git_sha", pa.string()),
+            pa.field("handoff_reason", pa.string()),
         ]
     ),
     partition_by=("run_id",),
-    doc="One simulated onboarding conversation per persona and run",
+    doc="One simulated onboarding conversation per scenario, repeat and run",
 )
 
 TURNS = TableDef(
@@ -114,6 +119,8 @@ TURNS = TableDef(
             pa.field("summary", pa.string()),
             pa.field("stage_after", pa.string()),
             pa.field("status_after", pa.string()),
+            pa.field("customer_s", pa.float64()),
+            pa.field("agent_s", pa.float64()),
         ]
     ),
     partition_by=("run_id",),
@@ -142,14 +149,77 @@ LLM_CALLS = TableDef(
     doc="The agent's structured-output LLM calls made while handling each turn",
 )
 
-TABLES = [NEMOTRON_KO, SAMPLES, CONVERSATIONS, TURNS, LLM_CALLS]
+QA_SCENARIOS = TableDef(
+    "onboarding_traces.qa_scenarios",
+    pa.schema(
+        [
+            pa.field("scenario_id", pa.string(), nullable=False),
+            pa.field("suite", pa.string(), nullable=False),
+            pa.field("persona_uuid", pa.string()),
+            pa.field("persona_json", pa.string()),
+            pa.field("situation_json", pa.string()),
+            pa.field("brief_json", pa.string()),
+            pa.field("behavior", pa.string()),
+            pa.field("expect_json", pa.string()),
+            pa.field("source", pa.string()),
+            pa.field("created_at", TS, nullable=False),
+        ]
+    ),
+    partition_by=("suite",),
+    doc="QA scenarios; the latest row per scenario_id is its current version",
+)
+
+QA_RUNS = TableDef(
+    "onboarding_traces.qa_runs",
+    pa.schema(
+        [
+            pa.field("run_id", pa.string(), nullable=False),
+            pa.field("suites", pa.string()),
+            pa.field("scenario_ids", pa.string()),
+            pa.field("repeat", pa.int32()),
+            pa.field("git_sha", pa.string()),
+            pa.field("git_dirty", pa.bool_()),
+            pa.field("agent_model", pa.string()),
+            pa.field("customer_model", pa.string()),
+            pa.field("note", pa.string()),
+            pa.field("started_at", TS),
+            pa.field("finished_at", TS),
+        ]
+    ),
+    doc="One QA run: which scenarios, how often, against which commit and models",
+)
+
+QA_CHECKS = TableDef(
+    "onboarding_traces.qa_checks",
+    pa.schema(
+        [
+            pa.field("run_id", pa.string(), nullable=False),
+            pa.field("trace_id", pa.string(), nullable=False),
+            pa.field("scenario_id", pa.string(), nullable=False),
+            pa.field("repeat_idx", pa.int32()),
+            pa.field("check_name", pa.string(), nullable=False),
+            pa.field("status", pa.string(), nullable=False),
+            pa.field("detail", pa.string()),
+        ]
+    ),
+    partition_by=("run_id",),
+    doc="Each QA check's verdict on each trace (PASS, FAIL or SKIP)",
+)
+
+TABLES = [NEMOTRON_KO, SAMPLES, CONVERSATIONS, TURNS, LLM_CALLS, QA_SCENARIOS, QA_RUNS, QA_CHECKS]
 
 
 def ensure(cat: Catalog, t: TableDef) -> Table:
-    """Load the table, creating it (with its partition spec) if missing. Namespaces are Glue databases
-    managed by infra/bootstrap, so a missing one is an error here rather than created."""
+    """Load the table, creating it (with its partition spec) if missing and adding any column the definition
+    has gained. Namespaces are Glue databases managed by infra/bootstrap, so a missing one is an error here
+    rather than created."""
     if cat.table_exists(t.identifier):
-        return cat.load_table(t.identifier)
+        table = cat.load_table(t.identifier)
+        if set(t.schema.names) - {f.name for f in table.schema().fields}:
+            with table.update_schema() as update:
+                update.union_by_name(t.schema)
+            table = cat.load_table(t.identifier)
+        return table
     table = cat.create_table(t.identifier, schema=t.schema, properties={"comment": t.doc} if t.doc else {})
     if t.partition_by:
         with table.update_spec() as spec:

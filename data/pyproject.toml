@@ -38,4 +38,5 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 # imports the backend source tree after putting it on sys.path; the Korean prompts are long lines
-"pipeline/generate_traces.py" = ["E402", "E501"]
+"qa/harness.py" = ["E402", "E501"]
+"qa/scenario.py" = ["E501"]

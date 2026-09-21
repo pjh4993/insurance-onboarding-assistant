@@ -1,0 +1,101 @@
+# Regressions: each scenario reproduces an agent failure found in persona traces. Dates are relative
+# ("today", "today+21"); the harness replaces phone and email with values unique to the scenario.
+suite: regressions
+
+scenarios:
+  - id: reg-krw-price-in-man-won
+    # "299만 원" was extracted as 29900000 (x100) and the TV failed PRICE_TOO_HIGH.
+    persona_uuid: ecf66d1929b544afaa0c6f6d6ec49f70
+    situation: {identity: OTP, need: APPLIANCE, decision: ACCEPT, note: "오늘 산 TV의 연장 보증"}
+    behavior: 가격은 반드시 "299만 원"처럼 만 원 단위의 한국식 표현으로 말합니다.
+    expect: {status: SUBMITTED, product: KR-EW-HOME}
+    brief:
+      full_name: 김창영
+      email: kimchangyoung@example.com
+      phone: "+821000000000"
+      date_of_birth: "1984-05-18"
+      gender: M
+      need_story: 오늘 거실 TV를 새로 샀는데, 제조사 보증이 끝난 뒤 고장 나면 수리비가 부담될까 봐 연장 보증을 알아봅니다.
+      device: {category: TV, manufacturer: Samsung, model: Neo QLED 65QN85D, purchase_date: today, price_krw: 2990000, serial_or_imei: SN65QN85D0001}
+      trip: null
+      other_people: []
+      change_story: ""
+      speaking_style: 차분하고 실용적인 40대 직장인 말투. 핵심만 또박또박 말합니다.
+
+  - id: reg-phone-maker-unstated
+    # A phone was judged without its maker (MANUFACTURER_NOT_COVERED) instead of being asked for it.
+    persona_uuid: 621f9e6cb55d4cbe89e8b64727145f18
+    situation: {identity: OTP, need: PHONE, decision: ACCEPT, note: "새 스마트폰 보장. 제조사는 물어봐야 말함"}
+    behavior: 처음에는 "새 폰"이라고만 하고 제조사·모델은 챗봇이 물어볼 때만 답합니다.
+    expect: {status: SUBMITTED, product: KR-MOB-SWAP}
+    brief:
+      full_name: 김성권
+      email: kimseonggwon@example.com
+      phone: "+821000000000"
+      date_of_birth: "1987-05-14"
+      gender: M
+      need_story: 며칠 전 새 스마트폰을 샀는데 액정이 깨지거나 고장 나면 수리비가 커서 보장을 알아봅니다.
+      device: {category: SMARTPHONE, manufacturer: Samsung, model: Galaxy S25, purchase_date: today-5, price_krw: 1694000, serial_or_imei: "350000000000101"}
+      trip: null
+      other_people: []
+      change_story: ""
+      speaking_style: 대구 출신 30대, 또렷하고 현실적인 말투.
+
+  - id: reg-phone-maker-in-korean
+    # "삼성" did not match the catalog's "Samsung" and the phone failed MANUFACTURER_NOT_COVERED.
+    persona_uuid: 621f9e6cb55d4cbe89e8b64727145f18
+    situation: {identity: OTP, need: PHONE, decision: ACCEPT, note: "새 스마트폰 보장. 제조사를 한국어로 말함"}
+    behavior: 제조사는 반드시 "삼성"처럼 한국어로만 말하고, 영어 표기는 쓰지 않습니다.
+    expect: {status: SUBMITTED, product: KR-MOB-SWAP}
+    brief:
+      full_name: 김성권
+      email: seonggwon.kim@example.com
+      phone: "+821000000000"
+      date_of_birth: "1987-05-14"
+      gender: M
+      need_story: 새로 산 갤럭시 폰을 떨어뜨릴까 걱정돼서 파손 보장을 알아봅니다.
+      device: {category: SMARTPHONE, manufacturer: 삼성, model: 갤럭시 S25, purchase_date: today-3, price_krw: 1450000, serial_or_imei: "350000000000102"}
+      trip: null
+      other_people: []
+      change_story: ""
+      speaking_style: 대구 출신 30대, 편한 구어체.
+
+  - id: reg-travel-phone-loss
+    # Losing a phone on a trip was extracted as PROTECT_DEVICE; device questions looped into a handoff.
+    persona_uuid: 0f96130a60324ceb83e28c3639c73fee
+    situation: {identity: OTP, need: TRAVEL, decision: ACCEPT, note: "해외여행 중 휴대폰·수하물 분실 보장을 원함"}
+    behavior: 여행 중 질병과 휴대폰·수하물 분실을 보장받고 싶다고 말합니다. 기기 보험은 원하지 않으며, 기기에 대해 물으면 여행자보험만 원한다고 답합니다.
+    expect: {status: SUBMITTED, product: KR-TRV-OVERSEAS}
+    brief:
+      full_name: 박건우
+      email: parkgunwoo@example.com
+      phone: "+821000000000"
+      date_of_birth: "2004-03-15"
+      gender: M
+      need_story: 친구들과 일본 여행을 가는데 현지에서 아프거나 휴대폰·짐을 잃어버릴까 걱정돼서 여행자보험을 알아봅니다.
+      device: null
+      trip: {destination_country: JP, destination_city: 도쿄, departure_date: today+29, return_date: today+34}
+      other_people: []
+      change_story: ""
+      speaking_style: 20대 초반 직장인, 차분하고 예의 바른 말투.
+
+  - id: reg-payer-is-spouse
+    # The spouse (payer) was extracted as the insured; corrections at CONFIRM never reached the parties
+    # and the summary was re-confirmed 23 times.
+    persona_uuid: be2a5eadd01b42c98c2a724fc48495d4
+    situation: {identity: PARTNER, need: PHONE, decision: ACCEPT, note: "본인 폰 보장, 보험료는 남편이 냄"}
+    behavior: 피보험자는 본인이고 보험료는 남편이 낸다고 말합니다. 계약자(신청한 사람)는 본인이 맞습니다. 요약에서 피보험자나 납입자가 틀리면 고쳐 달라고 합니다.
+    expect: {status: SUBMITTED, product: KR-MOB-SWAP}
+    brief:
+      full_name: 김다움
+      email: daumkim@example.com
+      phone: "+821000000000"
+      date_of_birth: "2006-03-14"
+      gender: F
+      need_story: 제휴 매장에서 산 새 폰을 보장받고 싶고, 보험료는 남편이 내기로 했습니다.
+      device: {category: SMARTPHONE, manufacturer: Samsung, model: Galaxy S25, purchase_date: today-4, price_krw: 1298000, serial_or_imei: "353912340567891"}
+      trip: null
+      other_people:
+        - {relation: 남편, full_name: 김민수, date_of_birth: "2005-11-20", gender: M, role: PAYER}
+      change_story: ""
+      speaking_style: 경기권 20대 초반, 차분한 생활형 말투.
