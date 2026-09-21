@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import type { Market } from "@/lib/types";
+import { MarketIcon } from "../SwitchIcons";
 
 const MARKETS = ["KR", "US"] as const satisfies readonly Market[];
 
@@ -17,7 +18,10 @@ export function MarketSwitch({
 }) {
   const t = useTranslations("home");
   return (
-    <div className="locale-switch" role="radiogroup" aria-label={t("market")}>
+    <div className="locale-switch" role="radiogroup" aria-label={t("marketHint")} title={t("marketHint")}>
+      <span className="locale-switch__icon">
+        <MarketIcon />
+      </span>
       {MARKETS.map((m) => (
         <button
           key={m}

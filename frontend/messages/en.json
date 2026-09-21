@@ -11,11 +11,13 @@
     "empty": "Empty",
     "dash": "—",
     "languageLabel": "Language",
+    "languageHint": "Language: screens and the assistant's replies",
     "localeName": { "ko": "한국어", "en": "English" },
     "localeShort": { "ko": "KO", "en": "EN" }
   },
   "home": {
     "market": "Market",
+    "marketHint": "Market: which country's products, rules and currency",
     "marketName": { "KR": "Korea", "US": "United States" },
     "forAgents": "For agents",
     "resumeBody": "You have an application in progress.",

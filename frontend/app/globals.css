@@ -767,6 +767,12 @@ textarea {
   border-radius: 99px;
   background: var(--surface);
 }
+.locale-switch__icon {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px 0 7px;
+  color: var(--ink-2);
+}
 .locale-switch button {
   border: none;
   background: none;

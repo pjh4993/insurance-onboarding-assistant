@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { LOCALES, type Locale } from "@/i18n/locales";
+import { LanguageIcon } from "./SwitchIcons";
 
 /** Two-way language toggle (한국어 / English). Each option is labelled in its own language. */
 export function LocaleSwitch({
@@ -17,7 +18,15 @@ export function LocaleSwitch({
 }) {
   const t = useTranslations("common");
   return (
-    <div className={`locale-switch ${className}`} role="radiogroup" aria-label={t("languageLabel")}>
+    <div
+      className={`locale-switch ${className}`}
+      role="radiogroup"
+      aria-label={t("languageHint")}
+      title={t("languageHint")}
+    >
+      <span className="locale-switch__icon">
+        <LanguageIcon />
+      </span>
       {LOCALES.map((l) => (
         <button
           key={l}

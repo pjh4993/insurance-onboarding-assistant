@@ -11,11 +11,13 @@
     "empty": "비어 있음",
     "dash": "—",
     "languageLabel": "언어",
+    "languageHint": "언어: 화면과 상담 답변의 언어",
     "localeName": { "ko": "한국어", "en": "English" },
     "localeShort": { "ko": "KO", "en": "EN" }
   },
   "home": {
     "market": "시장",
+    "marketHint": "시장: 어느 나라의 상품·규정·통화로 상담할지",
     "marketName": { "KR": "한국", "US": "미국" },
     "forAgents": "상담원용",
     "resumeBody": "진행 중인 가입 상담이 있어요.",
