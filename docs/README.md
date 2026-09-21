@@ -11,6 +11,7 @@ The design documents for the onboarding assistant, grouped by what they answer. 
 | [`infra/`](infra/01-aws-architecture.md) | How it runs on AWS and gets there | AWS architecture, networking, Terraform, CI/CD |
 | [`decisions/`](decisions/tradeoffs.md) | Why it is built this way, and what is left | Assumptions, tradeoffs, future improvements |
 | [`guides/`](guides/demo.md) | How to try it | Demo walkthrough with the four seed customers |
+| [`research/`](research/README.md) | What was found before designing | Insurance journey models, competitor onboarding flows, embedded insurance, product catalog research |
 
 The numbers in `design/` and `infra/` are a reading order: each document assumes the ones before it.
 

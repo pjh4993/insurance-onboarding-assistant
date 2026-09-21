@@ -127,6 +127,8 @@ Grouped by what they answer; [docs/README.md](docs/README.md) maps each item the
 | [Future improvements](docs/decisions/future-improvements.md) | Known limits of what is built, and designed but deferred work |
 | **Guides** | |
 | [Demo walkthrough](docs/guides/demo.md) | Seed customers A–D, what each one shows, and the expected outcomes |
+| **Research** | |
+| [Research notes](docs/research/README.md) | Insurance journey models, competitor onboarding flows, embedded insurance, product catalog research, and how the design relates to each |
 
 ## Scope and what is deferred
 

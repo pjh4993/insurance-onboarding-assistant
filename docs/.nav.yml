@@ -7,3 +7,9 @@ nav:
       - decisions/tradeoffs.md
       - decisions/future-improvements.md
   - Guides: guides
+  - Research:
+      - research/README.md
+      - research/insurance-journey-models.md
+      - research/competitor-onboarding-flows.md
+      - research/embedded-insurance-implications.md
+      - research/catalog-research.md
