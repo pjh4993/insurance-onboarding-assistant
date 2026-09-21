@@ -188,7 +188,8 @@ HTTPS nor Cognito. See [future-improvements.md](future-improvements.md).
 
 Customers have no account.
 
-1. An agent clicks **New session** in the console. The frontend relays `POST /api/sessions {market}` with the
+1. An agent clicks **New session** in the console. The browser calls `POST /api/agent/sessions {market}`, which
+   sits behind the ALB's Cognito rule, and the frontend relays it to the backend's `POST /api/sessions` with the
    agent identity. The backend creates the session and a random token (`secrets.token_urlsafe(32)`) and returns
    `customer_path: /s/{token}`.
 2. The backend stores only the token's HMAC (`token_hmac`, keyed with `SESSION_HMAC_KEY`), never the token

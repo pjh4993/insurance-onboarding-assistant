@@ -133,7 +133,7 @@ The API contract is in [`CONTRACTS.md`](../CONTRACTS.md) §3. Main endpoints:
 
 | Caller | Endpoint | Purpose |
 |---|---|---|
-| Agent console | `POST /api/sessions` | Create a session and return the customer link `/s/{token}`. The frontend requires an agent identity for it |
+| Agent console | `POST /api/sessions` | Create a session and return the customer link `/s/{token}`. The browser reaches it only through the frontend's `POST /api/agent/sessions`, which the ALB's Cognito rule covers |
 | Customer app | `GET /api/customer/session`, `POST .../input`, `GET .../stream` | Read the session, send input, stream updates |
 | Agent console | `GET /api/agent/sessions`, `GET /api/agent/sessions/{id}`, `POST .../assign`, `POST .../input`, `GET /api/agent/sessions/{id}/stream`, `GET /api/agent/stream` | Session list, session detail with entities, take over, answer as agent, stream one session or all |
 | Agent console | `GET /api/agent/me` (frontend only) | Who the signed-in agent is, for "Assign to me" |

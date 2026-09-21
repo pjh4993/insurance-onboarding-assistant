@@ -48,7 +48,7 @@ export const customerApi = {
 
 export const agentApi = {
   me: () => request<{ agent_id: string }>("/api/agent/me"),
-  createSession: (market: Market) => post<CreateSessionResponse>("/api/sessions", { market }),
+  createSession: (market: Market) => post<CreateSessionResponse>("/api/agent/sessions", { market }),
   listSessions: () => request<{ sessions: SessionSummary[] }>("/api/agent/sessions"),
   getSession: (id: string) => request<SessionDetail>(`/api/agent/sessions/${encodeURIComponent(id)}`),
   assign: (id: string) => post<SessionSummary>(`/api/agent/sessions/${encodeURIComponent(id)}/assign`),
