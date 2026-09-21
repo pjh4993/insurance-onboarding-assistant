@@ -133,10 +133,7 @@ every node.
 alone lets anyone who can read the table see plain text. So the checkpoint content is encrypted in the
 application too:
 
-```mermaid
-flowchart LR
-    s["state"] --> ser["JsonPlusSerializer<br/>(msgpack)"] --> z["gzip"] --> aes["AES encrypt<br/>(CHECKPOINT_AES_KEY)"] --> pg[("checkpoint schema<br/>RDS encrypted with KMS")]
-```
+![Checkpoint encryption pipeline](assets/state-checkpoint-encryption.svg)
 
 - The serializer passed to the saver (`serde=`) is
   `EncryptedSerializer.from_pycryptodome_aes(serde=GzipSerde(JsonPlusSerializer()))`. It compresses first and

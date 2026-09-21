@@ -65,61 +65,7 @@ confirmation and agent resolutions have their own wait nodes because they carry 
 
 ## 3. Graph
 
-```mermaid
-flowchart TD
-    s0(["start"]) --> greet:::code
-    greet --> ask_id["ask_customer<br/>IDENTITY_INFO"]:::wait
-    ask_id --> verify_identity:::code
-
-    verify_identity -- "MATCHED" --> fetch_purchases:::code
-    verify_identity -- "NOT_MATCHED" --> ask_otp["ask_customer<br/>OTP_CODE"]:::wait
-    ask_otp --> check_otp:::code
-    check_otp -- "OTP_OK" --> fetch_purchases
-    check_otp -- "OTP_FAILED" --> check_document:::code
-    check_document -- "DOC_OK" --> fetch_purchases
-    check_document -- "DOC_FAILED" --> human_handoff:::code
-
-    fetch_purchases --> assess_needs:::llm
-    assess_needs -- "no input yet, or fields missing" --> ask_needs["ask_customer<br/>NEEDS"]:::wait
-    ask_needs --> assess_needs
-    assess_needs -- "3 rounds, still missing" --> human_handoff
-    assess_needs -- "needs_complete" --> check_eligibility:::code
-
-    check_eligibility -- "eligible_count = 0" --> human_handoff
-    check_eligibility -- "eligible_count >= 1" --> rank_products:::code
-    rank_products --> quote_premium:::code
-    quote_premium --> explain_recommendation:::llm
-    explain_recommendation --> await_decision:::wait
-
-    await_decision -- "ACCEPT" --> open_application:::code
-    await_decision -- "CHANGE" --> assess_needs
-    await_decision -- "DECLINE" --> e_declined(["stop: DECLINED"])
-
-    open_application --> collect_parties:::llm
-    collect_parties -- "no input yet, or a name missing" --> ask_parties["ask_customer<br/>PARTIES"]:::wait
-    ask_parties --> collect_parties
-    collect_parties -- "parties_complete" --> collect_answers:::llm
-    collect_answers -- "fields missing" --> ask_answers["ask_customer<br/>ANSWERS"]:::wait
-    ask_answers --> collect_answers
-    collect_answers -- "3 rounds, still missing" --> human_handoff
-    collect_answers -- "answers_complete" --> summarize_application:::llm
-    summarize_application --> confirm_summary:::wait
-    confirm_summary -- "confirmed" --> submit_application:::code
-    confirm_summary -- "not confirmed" --> collect_answers
-    submit_application --> e_submitted(["stop: SUBMITTED"])
-
-    human_handoff --> await_agent:::wait
-    await_agent -- "VERIFIED after identity failure" --> fetch_purchases
-    await_agent -- "CONTINUE after identity failure" --> greet
-    await_agent -- "needs or no product" --> assess_needs
-    await_agent -- "answers incomplete" --> collect_answers
-    await_agent -- "error: re-run failed node" --> e_rerun(["the node in resume_node"])
-    await_agent -- "END" --> e_withdrawn(["stop: WITHDRAWN"])
-
-    classDef code fill:#dbeafe,stroke:#1d4ed8,color:#0b1b3f
-    classDef llm fill:#ede9fe,stroke:#6d28d9,color:#1e0b3f
-    classDef wait fill:#ffedd5,stroke:#c2410c,color:#3f1a0b
-```
+![The onboarding LangGraph graph](assets/langgraph-graph.svg)
 
 Blue is code, purple is LLM, orange is a wait node. Not drawn: every node routes to `human_handoff` when
 `last_error` is set, and `quote_premium` also hands off if rating errors leave no eligible product.
