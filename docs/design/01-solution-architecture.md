@@ -6,27 +6,7 @@ is in [langgraph-design.md](02-langgraph-design.md). The AWS mapping is in [aws-
 
 ## 1. System context
 
-```mermaid
-flowchart LR
-    customer(["Customer<br/>(no account, session link)"])
-    agent(["Support agent<br/>(staff account)"])
-
-    subgraph sys["Onboarding assistant"]
-        app["Frontend + Backend"]
-    end
-
-    partner["Partner system<br/>purchase records"]
-    identity["Identity provider<br/>OTP + ID document check"]
-    contract["Contract admin system<br/>receives applications"]
-    llm["Amazon Bedrock<br/>Claude Sonnet 4.6"]
-
-    customer -- "onboards through chat" --> app
-    agent -- "watches sessions, takes over" --> app
-    app -- "match customer, read purchases<br/>(only with consent)" --> partner
-    app -- "send / verify OTP, verify document" --> identity
-    app -- "submit application" --> contract
-    app -- "extract, explain, summarize" --> llm
-```
+![System context](assets/solution-architecture-context.svg)
 
 Two kinds of people use the system.
 
@@ -66,39 +46,7 @@ the code.
 
 The brief requires two services that are deployed separately. We keep that split.
 
-```mermaid
-flowchart LR
-    browser(["Browser"])
-
-    subgraph fe["Frontend service (Next.js)"]
-        s["Customer app<br/>/s/*"]
-        ag["Agent console<br/>/agent/*"]
-        proxy["Route handlers<br/>/api/* (relay + SSE)"]
-    end
-
-    subgraph be["Backend service (FastAPI + LangGraph)"]
-        api["HTTP API + SSE"]
-        lg["Onboarding graph"]
-        domain["Eligibility, ranking,<br/>pricing (code)"]
-    end
-
-    subgraph db["PostgreSQL (one instance)"]
-        cp[("checkpoint schema")]
-        dm[("domain schema")]
-        cat[("catalog schema")]
-    end
-
-    mock["Mock service<br/>/partner /identity /contract<br/>/model/{id}/converse"]
-
-    browser --> s & ag
-    s & ag --> proxy
-    proxy -- "HTTP, internal only" --> api
-    api --> lg --> domain
-    lg --> cp
-    lg & api --> dm
-    domain --> cat
-    lg -- "local and develop: mock<br/>prod: real endpoints" --> mock
-```
+![Containers](assets/solution-architecture-containers.svg)
 
 | Container | Technology | Responsibility |
 |---|---|---|
@@ -112,14 +60,7 @@ flowchart LR
 The backend is one deployable service built from three Python packages in a uv workspace (`backend/`). The
 agent and the domain are libraries; the API service depends on them, never the other way round.
 
-```mermaid
-flowchart LR
-    api["app/ (API service)<br/>FastAPI, sessions, SSE,<br/>SQLAlchemy + HTTP adapters"]
-    agent["onboarding-agent<br/>graph, nodes, routing,<br/>LLM, checkpointer, runner"]
-    core["onboarding-core<br/>entities, eligibility, pricing,<br/>catalog seed, ports"]
-    api --> agent --> core
-    api --> core
-```
+![Backend packages](assets/solution-architecture-packages.svg)
 
 | Package | Path | Owns | Must not import |
 |---|---|---|---|
@@ -165,34 +106,7 @@ The API contract is in [`CONTRACTS.md`](../../CONTRACTS.md) §3. Main endpoints:
 
 ## 3. Inside the backend
 
-```mermaid
-flowchart LR
-    subgraph edge["Edge"]
-        http["HTTP API"]
-        threads["Runtime: session lookup,<br/>per-session lock, SSE broker"]
-        saver["Checkpointer<br/>(AsyncPostgresSaver, gzip + AES serde)"]
-    end
-    subgraph g["Graph"]
-        code["Code nodes"]
-        llmn["LLM nodes"]
-        wait["Wait nodes (interrupt)"]
-    end
-    subgraph logic["Decision logic"]
-        elig["Eligibility rules"]
-        rank["Ranking"]
-        price["Pricing"]
-    end
-    subgraph adapters["Adapters"]
-        repo["SQLAlchemy models (domain, catalog)"]
-        clients["Partner / Identity / Contract clients (httpx)"]
-        bedrock["ChatBedrockConverse"]
-    end
-    http --> threads --> saver --> g
-    code --> logic
-    code --> clients
-    llmn --> bedrock
-    g --> repo
-```
+![Inside the backend](assets/solution-architecture-backend.svg)
 
 The left column is why sessions can be resumed: the API receives input, finds the thread for the session,
 and the checkpointer loads the paused state. SSE events reach every backend replica through Postgres `LISTEN/NOTIFY`

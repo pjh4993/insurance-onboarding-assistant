@@ -12,33 +12,7 @@ mock stands in for Bedrock locally, while develop calls real Bedrock.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    customer(["Customer<br/>/s/{token}"])
-    agent(["Support agent<br/>/agent"])
-
-    subgraph fe["Frontend service: Next.js"]
-        apps["Customer app + agent console"]
-        relay["/api/* relay (incl. SSE)"]
-    end
-
-    subgraph be["Backend service: FastAPI + LangGraph"]
-        lg["Onboarding graph<br/>code / LLM / wait nodes"]
-    end
-
-    pg[("PostgreSQL<br/>checkpoint · domain · catalog")]
-
-    subgraph ext["External systems (mock locally)"]
-        partner["Partner"]
-        identity["Identity (OTP, document)"]
-        contract["Contract admin"]
-        bedrock["Bedrock: Claude Sonnet 4.6"]
-    end
-
-    customer & agent --> apps --> relay --> lg
-    lg --> pg
-    lg --> partner & identity & contract & bedrock
-```
+![Architecture overview](docs/assets/overview.svg)
 
 In AWS: ALB (HTTPS and Cognito for the agent paths once a domain is set; develop uses `onboardassist.click`) →
 frontend on ECS → backend on ECS via Service Connect → RDS PostgreSQL; Bedrock and other AWS APIs through VPC
