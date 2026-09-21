@@ -1,0 +1,10 @@
+# Context is the repo root; send only what the site build reads.
+*
+!mkdocs.yml
+!.nav.yml
+!README.md
+!CONTRACTS.md
+!.mkdocs/
+!docs/
+!contracts/
+!docs-site/nginx.conf

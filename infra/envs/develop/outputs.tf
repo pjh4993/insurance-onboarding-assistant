@@ -17,6 +17,7 @@ output "ecs_service_names" {
     module.frontend.service_name,
     module.backend.service_name,
     var.enable_mocks ? module.mock[0].service_name : "",
+    module.docs.service_name,
   ]))
 }
 

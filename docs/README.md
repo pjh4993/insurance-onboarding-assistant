@@ -39,6 +39,7 @@ Beyond the brief: [design/04-data-model.md](design/04-data-model.md) (entities a
 
 ## Reading the site locally
 
-`make docs` serves this folder, the README and the contracts as one searchable site with the diagrams rendered;
+The deployed site is at [onboardassist.click/docs](https://onboardassist.click/docs/), behind the same Cognito login as
+the agent console. `make docs` serves this folder, the README and the contracts as the same site locally;
 `make docs-build` is the same build with `--strict`, which fails on a broken link. Both need only `uv`. On GitHub
 the same pages read as they are, mermaid included.

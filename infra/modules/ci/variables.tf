@@ -40,6 +40,7 @@ variable "ecr_repository_names" {
     backend  = "onboarding/backend"
     frontend = "onboarding/frontend"
     mock     = "onboarding/mock"
+    docs     = "onboarding/docs"
   }
 }
 

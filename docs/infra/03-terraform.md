@@ -49,11 +49,11 @@ flowchart TB
 | `security` | ALB, frontend, backend, mock and RDS security groups and the rules between them; endpoint SG rules; KMS key | VPC ID, `enable_mocks` | SG IDs, KMS key ARN |
 | `data` | RDS instance, subnet group, parameter group (`rds.force_ssl`), RDS-managed master secret, generated checkpoint AES key and session HMAC key in Secrets Manager | Instance class, Multi-AZ, deletion protection, KMS key | Address, DB name/user, secret ARNs |
 | `auth` | Cognito user pool (admin-created users, optional TOTP MFA), hosted UI domain, app client for the ALB | Domain | Pool ARN, client ID, pool domain |
-| `edge` | ALB (idle timeout 300 s), frontend target group (health check `/api/healthz`), HTTP listener, and with a domain: ACM certificate validated in Route 53, alias record, HTTPS listener, Cognito rule on `/agent`, `/agent/*`, `/api/agent/*` | Domain, Route 53 zone, subnets, SG, Cognito settings | Target group ARN, DNS name, `base_url` |
+| `edge` | ALB (idle timeout 300 s), frontend target group (health check `/api/healthz`), docs target group (`/docs/`) and its path rule, HTTP listener, and with a domain: ACM certificate validated in Route 53, alias record, HTTPS listener, Cognito rules on `/agent`, `/agent/*`, `/api/agent/*` and `/docs`, `/docs/*` | Domain, Route 53 zone, subnets, SG, Cognito settings | Target group ARN, DNS name, `base_url` |
 | `service` | ECS service (circuit breaker with rollback), task definition, Service Connect (server or client only), task and execution roles, log group (30 days) | Image, port, CPU/memory, env vars, secrets, desired count, SG, optional target group | Service name |
 | `ci` | GitHub OIDC provider and ECR repositories (created or looked up), deploy role trusted for the listed OIDC subjects | Repository, OIDC subjects, `create_shared_resources`, state bucket and lock table | Deploy role ARN, ECR URLs |
 
-The `service` module is used three times: frontend, backend and mock. The mock instance is created only when
+The `service` module is used four times: frontend, backend, docs and mock. The mock instance is created only when
 `enable_mocks = true`.
 
 HTTPS and Cognito depend on a domain. The certificate, HTTPS listener, alias record and Cognito rule are

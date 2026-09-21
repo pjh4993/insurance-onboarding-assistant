@@ -21,3 +21,7 @@ output "rds_security_group_id" {
 output "kms_key_arn" {
   value = aws_kms_key.this.arn
 }
+
+output "docs_security_group_id" {
+  value = aws_security_group.docs.id
+}

@@ -124,8 +124,9 @@ Each group admits traffic only from the group in front of it.
 | `sg-frontend` | 3000 from `sg-alb` | Frontend tasks |
 | `sg-backend` | 8000 from `sg-frontend` | Backend tasks |
 | `sg-mock` | 8080 from `sg-backend` | Mock tasks (develop) |
+| `sg-docs` | 8080 from `sg-alb` | Docs site tasks (static, nginx) |
 | `sg-rds` | 5432 from `sg-backend` | RDS |
-| `sg-endpoints` | 443 from `sg-frontend`, `sg-backend`, `sg-mock` | Interface endpoints |
+| `sg-endpoints` | 443 from `sg-frontend`, `sg-backend`, `sg-mock`, `sg-docs` | Interface endpoints |
 
 Only the backend reaches the database. The frontend does not know about the database, the mock or Bedrock.
 Task egress is open (to reach the endpoints and NAT); ingress is what limits each hop.
@@ -165,7 +166,8 @@ flowchart LR
 
 1. When a domain is set (develop: `onboardassist.click`), the HTTPS listener has a rule for `/agent`, `/agent/*`
    and `/api/agent/*` with an `authenticate-cognito` action. The console's own API calls are covered by the same
-   ALB session cookie (8 hours).
+   ALB session cookie (8 hours). A second rule does the same for `/docs` and `/docs/*`, forwarding to the docs
+   site, so the design docs need the same login.
 2. The Cognito user pool accepts only accounts an admin creates (email as username, optional TOTP MFA).
 3. After login, the ALB adds `x-amzn-oidc-identity` (the user's `sub`) and a signed JWT, `x-amzn-oidc-data`, to
    each request it forwards.

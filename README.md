@@ -77,6 +77,7 @@ docs/               design documents: design/, infra/, decisions/, guides/ (inde
 CONTRACTS.md        API, mock and LLM-shape contracts between the services
 docker-compose.yml  local stack: postgres, mock, backend, frontend
 Makefile            make docs / make docs-build: the documents as a local site (mkdocs, via uvx)
+docs-site/          nginx image serving that site at https://onboardassist.click/docs (Cognito login)
 ```
 
 ## Running tests

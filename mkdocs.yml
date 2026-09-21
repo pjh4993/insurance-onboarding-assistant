@@ -14,6 +14,8 @@ exclude_docs: |
   !/CONTRACTS.md
   !/docs/
   !/contracts/
+  # The theme's CSS, JS and fonts are collected as files at assets/; the /* above would drop them.
+  !/assets/
 
 plugins:
   - same-dir

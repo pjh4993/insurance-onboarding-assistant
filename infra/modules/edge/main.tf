@@ -38,6 +38,27 @@ resource "aws_lb_target_group" "frontend" {
   tags = var.tags
 }
 
+resource "aws_lb_target_group" "docs" {
+  name        = "${var.name}-docs"
+  port        = var.docs_port
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = var.vpc_id
+
+  deregistration_delay = 5 # static files: nothing in flight worth waiting for
+
+  health_check {
+    path                = "/docs/"
+    matcher             = "200"
+    interval            = 15
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+  }
+
+  tags = var.tags
+}
+
 # ---------------------------------------------------------------------------
 # HTTP-only mode (no domain yet): port 80 forwards to the frontend.
 # HTTPS mode: port 80 redirects to 443.
@@ -181,6 +202,60 @@ resource "aws_lb_listener_rule" "agent_cognito" {
     precondition {
       condition     = var.cognito != null
       error_message = "cognito must be set when domain_name is set."
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
+# /docs: the design docs site. Behind the same Cognito login as /agent when a
+# domain is set; plain forward in HTTP-only mode.
+# ---------------------------------------------------------------------------
+
+resource "aws_lb_listener_rule" "docs_cognito" {
+  count = local.https_enabled ? 1 : 0
+
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 20
+
+  action {
+    type = "authenticate-cognito"
+
+    authenticate_cognito {
+      user_pool_arn              = var.cognito.user_pool_arn
+      user_pool_client_id        = var.cognito.user_pool_client_id
+      user_pool_domain           = var.cognito.user_pool_domain
+      on_unauthenticated_request = "authenticate"
+      scope                      = "openid email profile"
+      session_timeout            = 28800
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.docs.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/docs", "/docs/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "docs_http" {
+  count = local.https_enabled ? 0 : 1
+
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 20
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.docs.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/docs", "/docs/*"]
     }
   }
 }

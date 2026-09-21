@@ -46,3 +46,8 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "docs_port" {
+  type    = number
+  default = 8080
+}

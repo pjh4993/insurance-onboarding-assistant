@@ -268,3 +268,25 @@ module "mock" {
   service_connect_namespace_arn = aws_service_discovery_http_namespace.this.arn
   service_connect_server        = true
 }
+
+# Design docs site (static, nginx) at /docs, behind the agent Cognito login.
+module "docs" {
+  source = "../../modules/service"
+
+  name           = "${local.name}-docs"
+  container_name = "docs"
+  region         = var.region
+  cluster_arn    = aws_ecs_cluster.this.arn
+  image          = "${module.ci.ecr_repository_urls["docs"]}:${var.image_tag}"
+  container_port = 8080
+  desired_count  = 1
+
+  subnet_ids         = module.network.app_subnet_ids
+  security_group_ids = [module.security.docs_security_group_id]
+
+  service_connect_namespace_arn = aws_service_discovery_http_namespace.this.arn
+  service_connect_server        = false
+  target_group_arn              = module.edge.docs_target_group_arn
+
+  depends_on = [module.edge]
+}

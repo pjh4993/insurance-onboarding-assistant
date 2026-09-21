@@ -1,4 +1,4 @@
-# Security-group chain: alb -> frontend -> backend -> (rds, mock).
+# Security-group chain: alb -> (frontend -> backend -> (rds, mock), docs).
 # Rules are separate resources so SGs can reference each other without cycles.
 
 resource "aws_security_group" "alb" {
@@ -29,6 +29,13 @@ resource "aws_security_group" "mock" {
   description = "Mock external systems (develop only)"
   vpc_id      = var.vpc_id
   tags        = merge(var.tags, { Name = "${var.name}-mock" })
+}
+
+resource "aws_security_group" "docs" {
+  name        = "${var.name}-docs"
+  description = "Docs site (static, nginx) tasks"
+  vpc_id      = var.vpc_id
+  tags        = merge(var.tags, { Name = "${var.name}-docs" })
 }
 
 resource "aws_security_group" "rds" {
@@ -104,6 +111,26 @@ resource "aws_vpc_security_group_ingress_rule" "backend_from_frontend" {
   referenced_security_group_id = aws_security_group.frontend.id
 }
 
+# --- Docs -------------------------------------------------------------------
+
+resource "aws_vpc_security_group_egress_rule" "alb_to_docs" {
+  security_group_id            = aws_security_group.alb.id
+  description                  = "ALB to docs targets"
+  ip_protocol                  = "tcp"
+  from_port                    = var.docs_port
+  to_port                      = var.docs_port
+  referenced_security_group_id = aws_security_group.docs.id
+}
+
+resource "aws_vpc_security_group_ingress_rule" "docs_from_alb" {
+  security_group_id            = aws_security_group.docs.id
+  description                  = "From ALB"
+  ip_protocol                  = "tcp"
+  from_port                    = var.docs_port
+  to_port                      = var.docs_port
+  referenced_security_group_id = aws_security_group.alb.id
+}
+
 # --- Mock -------------------------------------------------------------------
 
 resource "aws_vpc_security_group_ingress_rule" "mock_from_backend" {
@@ -137,6 +164,7 @@ locals {
     {
       frontend = aws_security_group.frontend.id
       backend  = aws_security_group.backend.id
+      docs     = aws_security_group.docs.id
     },
     var.enable_mocks ? { mock = aws_security_group.mock[0].id } : {},
   )
