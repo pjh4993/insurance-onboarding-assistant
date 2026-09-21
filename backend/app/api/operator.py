@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.services.operator import OperatorConsole, OperatorError
+from onboarding_agent.flows.outline import agent_outline
 
 router = APIRouter(prefix="/api/operator")
 
@@ -49,6 +50,12 @@ async def run(fn, *args, **kwargs) -> Any:
 async def config_status(op: ConsoleDep, _who: OperatorDep) -> dict[str, Any]:
     """Which version the backend runs (live), which one a restart would load (next), what can be done here."""
     return await run(op.status)
+
+
+@router.get("/graph")
+async def graph(_who: OperatorDep) -> dict[str, Any]:
+    """The agent loop: nodes (domain, kind, the config each reads) and edges, read from the flow code."""
+    return agent_outline()
 
 
 @router.get("/config/versions")

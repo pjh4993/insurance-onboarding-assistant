@@ -129,3 +129,11 @@ def test_without_a_config_repo_the_console_only_reads(settings, external, llm):
         r = client.post("/api/operator/config/versions", headers=OPERATOR, json={"files": files})
         assert r.status_code == 409
         assert client.post("/api/operator/restart", headers=OPERATOR).status_code == 409
+
+
+def test_graph_shows_the_agent_loop_and_what_each_node_reads(operator_client):
+    graph = operator_client.get("/api/operator/graph", headers=OPERATOR).json()
+    nodes = {n["id"]: n for n in graph["nodes"]}
+    assert nodes["assess_needs"]["kind"] == "llm" and "llm:assess_needs.instructions" in nodes["assess_needs"]["reads"]
+    assert nodes["greet"]["reads"] == ["copy:conversation.greeting"]
+    assert {"source": "greet", "target": "ask_customer", "kind": "route"} in graph["edges"]
