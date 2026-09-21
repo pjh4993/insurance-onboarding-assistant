@@ -37,7 +37,7 @@ jobs:
     # Skip until prod's one-time AWS setup has set the deploy role variable.
     if: ${{ vars.AWS_DEPLOY_ROLE_ARN_PROD != '' }}
     runs-on: ubuntu-latest
-    environment: prod # OIDC sub = repo:pjh4993/bolttech-onboarding-assistant:environment:prod
+    environment: prod # OIDC sub = repo:pjh4993@12472082/insurance-onboarding-assistant@1379320933:environment:prod
     defaults:
       run:
         working-directory: ${{ env.TF_ROOT }}
