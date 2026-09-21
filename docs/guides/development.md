@@ -12,8 +12,8 @@ docker compose up --build
 
 | Service | URL |
 |---|---|
-| Agent console | http://localhost:13000/agent (development auth: you are `agent-demo`) |
-| Customer app | Click **New session** in the agent console, pick KR or US, and open the `/s/{token}` link it shows |
+| Agent console | http://localhost:13000/agent (development auth: you are `agent-demo`). In AWS it has its own host, `dev.agent.onboardassist.click`, behind Cognito |
+| Customer app | http://localhost:13000: the landing page; pick KR or US and start. Agents can also create a `/s/{token}` link with **New session** in the console |
 | Backend API | http://localhost:18000 (health: `/healthz`) |
 | Mock external systems | http://localhost:18080 (faults: `/_mock/faults`, reset: `/_mock/reset`) |
 | PostgreSQL | `localhost:15432`, user / password / db `onboarding` |

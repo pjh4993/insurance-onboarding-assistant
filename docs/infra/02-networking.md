@@ -137,14 +137,33 @@ Verifying the signature of `x-amzn-oidc-data` (ES256, with the ALB public key fo
 open the console, but every signed-in agent acts as `agent-demo`. Prod has no domain yet, so it has neither
 HTTPS nor Cognito. See [future-improvements.md](../decisions/future-improvements.md).
 
-### Customers: session links
+### Customers: the landing page or a session link
 
-Customers have no account.
+Customers have no account. They start in one of two ways.
+
+**On their own, from the landing page** (the app host's root):
+
+1. The customer clicks start (or types a first message) on `/`. The browser calls the frontend's public
+   `POST /api/start {market, locale}`, which relays to the backend's `POST /api/public/sessions` with
+   `X-Client-IP`: the **last** `X-Forwarded-For` entry, the address the ALB accepted the connection from. Earlier
+   entries are whatever the client sent and are ignored, so a client cannot choose its own bucket.
+2. The backend allows 5 new sessions per client address and 200 in total per hour (`SELF_SERVE_PER_IP_PER_HOUR`,
+   `SELF_SERVE_PER_HOUR`), counted in Postgres under an advisory lock so replicas share the limit and two requests
+   cannot both take the last slot. Over a limit it answers `429` with `retry_after`, and the landing page says
+   when to try again. It stores an HMAC of the address (`client_ip_hash`), never the address, and marks the
+   session `origin = SELF_SERVE`.
+3. The frontend puts the returned token straight into the `onb_session` cookie (the same cookie as below) and
+   returns only the session ID, so the token never reaches browser code. The browser goes to `/chat`.
+4. A returning visitor whose cookie still points to a session that has not ended is offered to continue it or
+   start a new one.
+
+**From a link an agent created:**
 
 1. An agent clicks **New session** in the console. The browser calls `POST /api/agent/sessions {market}`, which
    sits behind the ALB's Cognito rule, and the frontend relays it to the backend's `POST /api/sessions` with the
    agent identity. The backend creates the session and a random token (`secrets.token_urlsafe(32)`) and returns
-   `customer_path: /s/{token}`.
+   `customer_path: /s/{token}`, which the console shows on the customer host (`CUSTOMER_BASE_URL`). The session is
+   marked `origin = AGENT_LINK`; the console shows each session's origin.
 2. The backend stores only the token's HMAC (`token_hmac`, keyed with `SESSION_HMAC_KEY`), never the token
    itself. It also stores `token_expires_at` (48 hours), but does not check it yet.
 3. The customer opens `/s/{token}`. `proxy.ts` (Next.js 16's middleware) stores the token in an httpOnly cookie,

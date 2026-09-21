@@ -12,7 +12,7 @@ Two kinds of people use the system.
 
 | Person | How they get in | What they do |
 |---|---|---|
-| Customer | A session link `/s/{token}`. No account | Goes through the four onboarding stages in a chat |
+| Customer | The landing page (start on their own, rate-limited per address) or a session link `/s/{token}` from an agent. No account | Goes through the four onboarding stages in a chat |
 | Support agent | Agent console `/agent`. Staff login: Cognito at the ALB in develop; a development identity (`agent-demo`) locally, and behind Cognito until the frontend verifies the ALB's signed header | Sees all sessions, opens a new session link, takes over a stuck session, answers on the customer's behalf |
 
 The brief says the assistant "helps support agents guide customers" and also asks for a "customer onboarding
@@ -98,6 +98,7 @@ The API contract is in [`CONTRACTS.md`](../../CONTRACTS.md) §3. Main endpoints:
 
 | Caller | Endpoint | Purpose |
 |---|---|---|
+| Landing page | `POST /api/public/sessions` | Start a session on the customer's own: 5 per client address and 200 in total per hour, `429` with `retry_after` over a limit. The browser reaches it through the frontend's `POST /api/start`, which sets the session cookie itself |
 | Agent console | `POST /api/sessions` | Create a session and return the customer link `/s/{token}`. The browser reaches it only through the frontend's `POST /api/agent/sessions`, which the ALB's Cognito rule covers |
 | Customer app | `GET /api/customer/session`, `POST .../input`, `GET .../stream` | Read the session, send input, stream updates |
 | Agent console | `GET /api/agent/sessions`, `GET /api/agent/sessions/{id}`, `POST .../assign`, `POST .../input`, `GET /api/agent/sessions/{id}/stream`, `GET /api/agent/stream` | Session list, session detail with entities, take over, answer as agent, stream one session or all |

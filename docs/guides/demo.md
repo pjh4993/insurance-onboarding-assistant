@@ -11,13 +11,13 @@ through `docker compose`.
 docker compose up --build
 ```
 
-1. Open the agent console at http://localhost:13000/agent. Locally the agent is `agent-demo` (development auth,
-   `AGENT_DEV_AUTH=true`).
-2. Click **New session** and pick the market (KR for A and B, US for C and D). The console shows the customer
-   link `/s/{token}`.
-3. Open that link in another tab or window. This is the customer's view. The link is stored in a session cookie,
-   and one browser holds one customer session at a time: to run two customers side by side, use a second browser
-   or a private window.
+1. Open the landing page at http://localhost:13000 and pick the market (KR for A and B, US for C and D), then
+   click start. This is the customer's view. The session lives in a cookie, and one browser holds one customer
+   session at a time: to run two customers side by side, use a second browser or a private window.
+2. Open the agent console at http://localhost:13000/agent in another window. Locally the agent is `agent-demo`
+   (development auth, `AGENT_DEV_AUTH=true`). Sessions started on the landing page show as **Self-serve**.
+3. An agent can also create a session for a customer: **New session** in the console gives a link `/s/{token}`
+   to send them (shown as **Link** in the list).
 4. Keep the agent console open next to it. The session appears in the list and updates live (SSE): stage and
    what the graph is waiting for, and on the detail view the current node and entities.
 

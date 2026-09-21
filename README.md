@@ -37,7 +37,7 @@ recommendation and policy application**, while support agents watch every sessio
 docker compose up --build
 ```
 
-Open http://localhost:13000/agent, click **New session**, and open the customer link it shows. The
+Open http://localhost:13000 and start as a customer; the agent console is at http://localhost:13000/agent. The
 [demo walkthrough](docs/guides/demo.md) takes you through the four seed customers; the
 [development guide](docs/guides/development.md) covers the other services, the repository layout and the tests.
 
