@@ -17,7 +17,7 @@ from onboarding_agent.llm.provider import BedrockStructuredLLM
 from onboarding_agent.llm.schemas import NeedsExtraction
 
 REQUESTS: list[tuple[str, dict]] = []
-BUNDLED_1_0_0 = Path(str(BUNDLED)) / "1.0.0"
+BUNDLED_BASELINE = Path(str(BUNDLED)) / "1.1.0"
 
 
 class ConverseHandler(BaseHTTPRequestHandler):
@@ -75,7 +75,7 @@ def converse_url(monkeypatch):
 def bundle_with_profiles(tmp_path: Path):
     """The baseline bundle, with assess_needs moved to a second model profile."""
     bundle_dir = tmp_path / "bundle"
-    shutil.copytree(BUNDLED_1_0_0, bundle_dir)
+    shutil.copytree(BUNDLED_BASELINE, bundle_dir)
     config = json.loads((bundle_dir / "config.json").read_text())
     config["models"]["fast"] = {
         "provider": "bedrock",

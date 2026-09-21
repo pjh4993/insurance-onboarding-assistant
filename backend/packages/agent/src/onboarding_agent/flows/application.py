@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from langchain_core.messages import BaseMessage, HumanMessage
@@ -36,13 +36,17 @@ from onboarding_agent.routing import HANDOFF, has_error
 from onboarding_agent.texts import human, locale_of, price_label, say
 from onboarding_core.application.models import Application
 from onboarding_core.application.rules import apply_answer_aliases, missing_answers, prefill_answers
-from onboarding_core.needs.rules import object_view
+from onboarding_core.catalog.eligibility import RuleSpec, evaluate_product
+from onboarding_core.needs.rules import needs_view, object_view
 from onboarding_core.party.models import Party
+from onboarding_core.party.rules import party_view
 from onboarding_core.ports import UnitOfWork
 from onboarding_core.util import iso, parse_date
 
 # ANSWERS replies that leave fields missing before an agent takes over.
 MAX_ANSWERS_ROUNDS = 3
+# Summaries the customer rejects before an agent takes over.
+MAX_CONFIRM_REJECTIONS = 3
 
 
 async def restart_answers(
@@ -54,6 +58,35 @@ async def restart_answers(
 
 def resume_answers(state: dict[str, Any]) -> str:
     return "collect_answers"
+
+
+async def restart_summary(
+    flow: Flow, state: dict[str, Any], resolution: str | None, now: datetime
+) -> tuple[list[BaseMessage], dict[str, Any]]:
+    """A fresh summary to confirm, after an agent fixed what the customer kept rejecting."""
+    return [], {"stage": "APPLICATION", "confirm_rejections": 0, "correcting": False, "confirmed": None}
+
+
+def resume_summary(state: dict[str, Any]) -> str:
+    return "summarize_application"
+
+
+def _who(parties: list[dict[str, Any]], applicant: Party) -> dict[str, tuple[str, str | None]]:
+    """INSURED and PAYER as (name, date of birth), the applicant standing in for a role nobody else has."""
+    who = {
+        "INSURED": (applicant.full_name, iso(applicant.date_of_birth)),
+        "PAYER": (applicant.full_name, iso(applicant.date_of_birth)),
+    }
+    for p in parties:
+        if p.get("role") in who:
+            who[p["role"]] = (str(p.get("full_name") or "").strip(), iso(parse_date(p.get("date_of_birth"))))
+    return who
+
+
+def plausible_birth_date(value: Any, today: date) -> bool:
+    """A real date of birth, not a model's placeholder (1900-01-01) or a date in the future."""
+    born = parse_date(value)
+    return born is not None and date(1901, 1, 1) <= born <= today
 
 
 class ApplicationFlow(Flow):
@@ -70,13 +103,13 @@ class ApplicationFlow(Flow):
             quote = await uow.quotes.get(as_uuid(state["quote_ids"][str(rec.recommendation_id)]))
             if quote.valid_until < now:
                 # The accepted price lapsed while the customer was away: re-price at today's rules.
-                fresh = price_quote(product, obj, now)
+                fresh = price_quote(product, obj, now, self.today(state))
                 fresh.quote_id = node_uuid(thread_of(config), "open_application", step, "requote")
                 fresh.recommendation_id = rec.recommendation_id
                 fresh.status = "ACCEPTED"
                 quote.status = "EXPIRED"
                 quote = await uow.quotes.save(fresh)
-            answers = prefill_answers(product.required_application_fields, object_view(obj), party, now.date())
+            answers = prefill_answers(product.required_application_fields, object_view(obj), party, self.today(state))
             await uow.applications.save(
                 Application(
                     application_id=app_id,
@@ -102,36 +135,65 @@ class ApplicationFlow(Flow):
             "parties_complete": False,
             "answers_complete": False,
             "confirmed": None,
+            "confirm_rejections": 0,
+            "correcting": False,
             "last_input": None,
             "messages": [say(text, now)],
         }
 
     async def collect_parties(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         lang, now, step = locale_of(state), self.now(), step_of(config)
-        if state.get("last_input") != "PARTIES":
+        correcting = bool(state.get("correcting"))
+        if state.get("last_input") != "PARTIES" and not correcting:
             text = self.text(lang, "application.ask_parties")
             return {"parties_complete": False, "waiting_for": "PARTIES", "messages": [say(text, now)]}
 
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
+            current = await self._application_parties(uow, as_uuid(state["application_id"]))
         instructions = self.prompt("collect_parties", "instructions")
-        texts = latest_texts(state.get("messages") or [], ("PARTIES",))
+        if correcting:
+            # A correction to the summary: it may or may not be about the parties.
+            instructions += "\n" + self.prompt(
+                "collect_parties", "correction", parties=json.dumps(current, ensure_ascii=False)
+            )
+        texts = latest_texts(state.get("messages") or [], ("ANSWERS",) if correcting else ("PARTIES",))
         ext = await self.d.llm.extract(
             "collect_parties",
             PartiesExtraction,
             [self._system(state, party, instructions), HumanMessage(texts[-1] if texts else "-")],
         )
-        others = [] if ext.all_self else [p for p in ext.parties if p.get("role") in ("INSURED", "PAYER")]
-        if any(not str(p.get("full_name") or "").strip() for p in others):
+        me = (party.full_name or "").strip()
+        others = [
+            p
+            for p in ([] if ext.all_self else ext.parties)
+            # the applicant listed in a role is "self", not another person
+            if p.get("role") in ("INSURED", "PAYER") and str(p.get("full_name") or "").strip() != me
+        ]
+        today = self.today(state)
+        for p in others:
+            if not plausible_birth_date(p.get("date_of_birth"), today):
+                p["date_of_birth"] = None  # a model's placeholder is no date
+        # Ask for a missing date of birth once; after that the party is recorded without it.
+        ask_birth_dates = len(latest_texts(state.get("messages") or [], ("PARTIES",))) < 2
+        if any(
+            not str(p.get("full_name") or "").strip() or (ask_birth_dates and not p.get("date_of_birth"))
+            for p in others
+        ):
             text = self.text(lang, "application.ask_party_details")
             return {
                 "parties_complete": False,
+                "correcting": False,
+                "confirmed": None,
                 "last_input": None,
                 "waiting_for": "PARTIES",
                 "messages": [say(text, now)],
             }
 
         app_id = as_uuid(state["application_id"])
+        if correcting and _who(others, party) == _who(current, party):
+            # The correction was about something else: the parties stay, collect_answers takes the message.
+            return {"parties_complete": True, "correcting": False, "last_input": "ANSWERS"}
         async with self.d.uow() as uow:
             roles: dict[str, uuid.UUID] = {"POLICYHOLDER": party.party_id}
             names = []
@@ -157,7 +219,7 @@ class ApplicationFlow(Flow):
             product = await uow.catalog.product(application.product_code)
             insured = await uow.parties.get(roles["INSURED"])
             obj = await uow.objects.get(application.insurable_object_id)
-            prefill = prefill_answers(product.required_application_fields, object_view(obj), insured, now.date())
+            prefill = prefill_answers(product.required_application_fields, object_view(obj), insured, self.today(state))
             answers = dict(application.answers or {})
             for key in ("traveler_name", "traveler_date_of_birth", "traveler_age"):
                 if key in prefill:
@@ -173,7 +235,13 @@ class ApplicationFlow(Flow):
             if names
             else self.text(lang, "application.parties_self")
         )
-        return {"parties_complete": True, "last_input": None, "messages": [say(text, now)]}
+        # A correction goes on to collect_answers with the same message, for whatever else it changes.
+        return {
+            "parties_complete": True,
+            "correcting": False,
+            "last_input": "ANSWERS" if correcting else None,
+            "messages": [say(text, now)],
+        }
 
     async def collect_answers(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         lang, now, actor = locale_of(state), self.now(), state.get("actor") or "CUSTOMER"
@@ -220,6 +288,21 @@ class ApplicationFlow(Flow):
             "answers_rounds": rounds,
             "confirmed": None if got_input else state.get("confirmed"),
         }
+        refuted = await self._recheck_assumptions(state, app_id, answers) if got_input else None
+        if refuted:
+            name, reasons = refuted
+            text = self.text(
+                lang,
+                "application.no_longer_eligible",
+                product=name,
+                reasons="\n".join(f"- {r}" for r in reasons),
+            )
+            return {
+                **base,
+                "answers_complete": False,
+                "handoff_reason": "NO_ELIGIBLE_PRODUCT",
+                "messages": [say(text, now)],
+            }
         if missing and rounds >= MAX_ANSWERS_ROUNDS:
             text = self.text(lang, "application.answers_handoff")
             return {
@@ -282,9 +365,22 @@ class ApplicationFlow(Flow):
             actor=actor,
             input_type="ANSWERS" if extra else "CONFIRM",
         )
+        rejections = int(state.get("confirm_rejections") or 0) + 1
+        if rejections >= MAX_CONFIRM_REJECTIONS:
+            text = self.text(lang, "application.summary_handoff")
+            return {
+                "confirmed": False,
+                "confirm_rejections": rejections,
+                "waiting_for": None,
+                "last_input": None,
+                "handoff_reason": "SUMMARY_REJECTED",
+                "messages": [msg, say(text, now)],
+            }
         return {
             "confirmed": False,
+            "confirm_rejections": rejections,
             "answers_complete": False,
+            "correcting": bool(extra),
             "waiting_for": None,
             "last_input": "ANSWERS" if extra else None,
             "messages": [msg],
@@ -330,6 +426,42 @@ class ApplicationFlow(Flow):
         text = self.text(lang, "application.submitted", ref=ref)
         return {"stage": "SUBMITTED", "waiting_for": None, "messages": [say(text, now)]}
 
+    async def _recheck_assumptions(
+        self, state: dict[str, Any], app_id: uuid.UUID, answers: dict[str, Any]
+    ) -> tuple[str, list[str]] | None:
+        """Eligibility ran on assumed values ("bought today"); the application asks for the real ones. Once the
+        customer states them they replace the assumptions and the product is checked again. Returns the product
+        name and failed reasons when the real values rule it out."""
+        async with self.d.uow() as uow:
+            application = await uow.applications.get(app_id)
+            obj = await uow.objects.get(application.insurable_object_id)
+            assumed = list((obj.attributes or {}).get("assumed_fields") or [])
+            stated = {k: answers[k] for k in assumed if answers.get(k) not in (None, "")}
+            if not stated:
+                return None
+            attrs = {**obj.attributes, **stated}
+            left = [k for k in assumed if k not in stated]
+            if left:
+                attrs["assumed_fields"] = left
+            else:
+                attrs.pop("assumed_fields")
+            obj.attributes = jsonable(attrs)
+            party = await self._party(uow, state)
+            na = await uow.needs.get(as_uuid(state["needs_assessment_id"]))
+            product = await uow.catalog.product(application.product_code)
+            rules = [
+                RuleSpec(
+                    str(r.rule_id), r.subject, r.attribute, r.operator, r.value, r.failure_reason_code, r.description
+                )
+                for r in await uow.catalog.rules()
+                if r.product_code == product.product_code
+            ]
+            outcome = evaluate_product(
+                rules, party=party_view(party), needs=needs_view(na), obj=object_view(obj), today=self.today(state)
+            )
+        await self._touch(state, "insurable_object", str(obj.insurable_object_id))
+        return None if outcome.eligible else (product.marketing_name, outcome.failed_reasons)
+
     async def _application_parties(self, uow: UnitOfWork, app_id: uuid.UUID) -> list[dict[str, Any]]:
         return [
             {"role": role, "full_name": p.full_name, "date_of_birth": iso(p.date_of_birth)}
@@ -348,7 +480,7 @@ def after_collect_parties(state: dict[str, Any]) -> str:
 
 
 def after_collect_answers(state: dict[str, Any]) -> str:
-    if has_error(state) or state.get("handoff_reason") == "ANSWERS_INCOMPLETE":
+    if has_error(state) or state.get("handoff_reason") in ("ANSWERS_INCOMPLETE", "NO_ELIGIBLE_PRODUCT"):
         return HANDOFF
     return "summarize_application" if state.get("answers_complete") else "ask_customer"
 
@@ -358,9 +490,11 @@ def after_summarize_application(state: dict[str, Any]) -> str:
 
 
 def after_confirm_summary(state: dict[str, Any]) -> str:
-    if has_error(state):
+    if has_error(state) or state.get("handoff_reason") == "SUMMARY_REJECTED":
         return HANDOFF
-    return "submit_application" if state.get("confirmed") else "collect_answers"
+    if state.get("confirmed"):
+        return "submit_application"
+    return "collect_parties" if state.get("correcting") else "collect_answers"
 
 
 def after_submit_application(state: dict[str, Any]) -> str:
@@ -375,6 +509,8 @@ TEXTS = TextSpec(
         "parties_named": frozenset({"names"}),
         "parties_self": frozenset(),
         "answers_handoff": frozenset(),
+        "summary_handoff": frozenset(),
+        "no_longer_eligible": frozenset({"product", "reasons"}),
         "ask_answers": frozenset({"fields"}),
         "ask_correction": frozenset(),
         "confirm_summary": frozenset({"summary"}),
@@ -385,6 +521,7 @@ TEXTS = TextSpec(
     llm={
         "collect_parties": {
             "instructions": frozenset(),
+            "correction": frozenset({"parties"}),
         },
         "collect_answers": {
             "instructions": frozenset({"fields", "answers", "missing"}),
@@ -411,5 +548,8 @@ MODULE = DomainModule(
     },
     retrying=frozenset({"collect_answers", "collect_parties", "submit_application", "summarize_application"}),
     inputs={"PARTIES": InputKind("collect_parties"), "ANSWERS": InputKind("collect_answers")},
-    handoffs={"ANSWERS_INCOMPLETE": HandoffKind(resume_answers, restart_answers)},
+    handoffs={
+        "ANSWERS_INCOMPLETE": HandoffKind(resume_answers, restart_answers),
+        "SUMMARY_REJECTED": HandoffKind(resume_summary, restart_summary),
+    },
 )

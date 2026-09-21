@@ -140,10 +140,10 @@ def bundle_in_japanese(tmp_path):
     import shutil
     from pathlib import Path
 
-    from onboarding_agent.config import BUNDLED, load_bundle
+    from onboarding_agent.config import BUNDLED, default_bundle, load_bundle
 
     target = tmp_path / "1.1.0"
-    shutil.copytree(Path(str(BUNDLED)) / "1.0.0", target)
+    shutil.copytree(Path(str(BUNDLED)) / default_bundle().version, target)
     config = json.loads((target / "config.json").read_text())
     config["version"] = "1.1.0"
     config["languages"]["ja"] = {"name": "Japanese"}
@@ -177,10 +177,10 @@ def test_a_bad_config_bundle_stops_startup_and_says_why(settings, external, llm,
     import shutil
     from pathlib import Path
 
-    from onboarding_agent.config import BUNDLED, ConfigError
+    from onboarding_agent.config import BUNDLED, ConfigError, default_bundle
 
     bad = tmp_path / "1.0.1"
-    shutil.copytree(Path(str(BUNDLED)) / "1.0.0", bad)
+    shutil.copytree(Path(str(BUNDLED)) / default_bundle().version, bad)
     config = json.loads((bad / "config.json").read_text())
     config["version"] = "1.0.1"
     config["models"]["default"]["model_id"] = "anthropic.claude-opus-9"

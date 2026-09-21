@@ -20,7 +20,9 @@ Stage = Literal[
 ]
 WaitingFor = Literal["IDENTITY_INFO", "OTP_CODE", "NEEDS", "DECISION", "PARTIES", "ANSWERS", "CONFIRM", "AGENT"]
 IdentityResult = Literal["MATCHED", "NOT_MATCHED", "OTP_OK", "OTP_FAILED", "DOC_OK", "DOC_FAILED"]
-HandoffReason = Literal["IDENTITY_FAILED", "NO_ELIGIBLE_PRODUCT", "NEEDS_INCOMPLETE", "ANSWERS_INCOMPLETE", "ERROR"]
+HandoffReason = Literal[
+    "IDENTITY_FAILED", "NO_ELIGIBLE_PRODUCT", "NEEDS_INCOMPLETE", "ANSWERS_INCOMPLETE", "SUMMARY_REJECTED", "ERROR"
+]
 
 
 class ErrorInfo(TypedDict):
@@ -70,6 +72,8 @@ class ApplicationState(TypedDict, total=False):
     answers_complete: bool
     answers_rounds: int  # ANSWERS replies that left fields missing (loop guard)
     confirmed: bool | None
+    confirm_rejections: int  # summaries the customer rejected (loop guard)
+    correcting: bool  # a rejection came with a correction, which may concern the parties as well as the answers
 
 
 class HandoffState(TypedDict, total=False):
@@ -119,6 +123,8 @@ def initial_state(*, session_id: str, party_id: str, market: str, locale: str) -
         "answers_complete": False,
         "answers_rounds": 0,
         "confirmed": None,
+        "confirm_rejections": 0,
+        "correcting": False,
         # handoff
         "handoff_reason": None,
         "handoff_resolution": None,

@@ -166,4 +166,4 @@ async def application_parties(s: AsyncSession, application_id: uuid.UUID) -> lis
             .order_by(ApplicationParty.role)
         )
     ).all()
-    return [{"role": ap.role, "full_name": p.full_name} for ap, p in rows]
+    return [{"role": ap.role, "full_name": p.full_name, "date_of_birth": iso(p.date_of_birth)} for ap, p in rows]

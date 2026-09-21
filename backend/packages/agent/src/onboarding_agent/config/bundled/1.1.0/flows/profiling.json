@@ -1,0 +1,43 @@
+{
+  "llm": {
+    "assess_needs": {
+      "model": "default",
+      "instructions": [
+        "Extract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.",
+        "objectives are the cover the customer wants now: drop one they rule out. Losing a phone, luggage or belongings during a trip is TRAVEL_COVER (belongings cover), not PROTECT_DEVICE; only a device they want insured in its own right is PROTECT_DEVICE or EXTEND_WARRANTY.",
+        "Devices already known from partner purchase records: {known_devices}",
+        "Values captured so far: {values}"
+      ]
+    }
+  },
+  "copy": {
+    "purchases_found": {
+      "ko": "파트너사 구매 기록에서 {purchases} 구매를 찾았습니다.",
+      "en": "I found your recent purchase: {purchases}."
+    },
+    "ask_missing": {
+      "ko": "추천을 위해 {fields}을(를) 알려 주세요.",
+      "en": "To recommend cover, please tell me {fields}."
+    },
+    "ask_change": {
+      "ko": "어떤 점을 바꾸고 싶으신가요? 달라진 내용을 알려 주세요.",
+      "en": "What would you like to change? Tell me what's different."
+    },
+    "ask_needs": {
+      "ko": "이제 맞는 보험을 찾아볼게요. 나이, 직업, 거주 국가와 무엇을 보장받고 싶은지(기기, 여행 등) 알려 주세요. 기존에 가입한 보험이 있다면 함께 알려 주세요.",
+      "en": "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+    },
+    "needs_complete": {
+      "ko": "감사합니다. 가입할 수 있는 상품을 확인해 볼게요.",
+      "en": "Thanks — let me check which products fit you."
+    },
+    "needs_handoff": {
+      "ko": "필요한 정보를 다 받지 못해 상담원을 연결해 드릴게요.",
+      "en": "I still don't have everything I need, so I'm bringing in an agent to help."
+    },
+    "ask_more": {
+      "ko": "추천을 위해 {fields}을(를) 더 알려 주세요.",
+      "en": "Thanks! To recommend cover I also need {fields}."
+    }
+  }
+}

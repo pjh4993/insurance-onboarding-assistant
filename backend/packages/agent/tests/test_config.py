@@ -14,7 +14,7 @@ import pytest
 from onboarding_agent.config import BUNDLED, ConfigError, Template, default_bundle, load_bundle, publish
 from onboarding_agent.config.source import S3Source, published, resolve
 
-BASELINE = Path(str(BUNDLED)) / "1.0.0"
+BASELINE = Path(str(BUNDLED)) / default_bundle().version  # the newest bundle shipped with the package
 
 
 def variant(root: Path, version: str, change: Callable[[dict, dict[str, dict]], None] | None = None) -> Path:
@@ -64,7 +64,7 @@ def test_templates_take_plain_names_only():
 
 def test_the_baseline_bundle_covers_everything_the_agent_uses():
     bundle = default_bundle()
-    assert bundle.version == "1.0.0" and set(bundle.languages) == {"ko", "en"}
+    assert bundle.version == "1.1.0" and set(bundle.languages) == {"ko", "en"}
     assert bundle.model("assess_needs").model_id == "global.anthropic.claude-sonnet-4-6"
     assert bundle.text("profiling.ask_more", "ko", fields="나이") == "추천을 위해 나이을(를) 더 알려 주세요."
     assert bundle.field_list("en", ["age_range", "trip.trip_cost_minor"]) == "your age, the total trip cost"

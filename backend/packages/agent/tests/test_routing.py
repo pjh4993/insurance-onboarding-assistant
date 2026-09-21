@@ -43,9 +43,13 @@ ERR = {"last_error": {"node": "x", "kind": "ValueError", "attempts": 3}}
         (EDGES["collect_answers"], {"answers_complete": False}, "ask_customer"),
         (EDGES["collect_answers"], {"answers_complete": True}, "summarize_application"),
         (EDGES["collect_answers"], {"handoff_reason": "ANSWERS_INCOMPLETE"}, "human_handoff"),
+        (EDGES["collect_answers"], {"handoff_reason": "NO_ELIGIBLE_PRODUCT"}, "human_handoff"),
         (EDGES["summarize_application"], {}, "confirm_summary"),
         (EDGES["confirm_summary"], {"confirmed": True}, "submit_application"),
         (EDGES["confirm_summary"], {"confirmed": False}, "collect_answers"),
+        (EDGES["confirm_summary"], {"confirmed": False, "correcting": True}, "collect_parties"),
+        (EDGES["confirm_summary"], {"confirmed": False, "handoff_reason": "SUMMARY_REJECTED"}, "human_handoff"),
+        (EDGES["collect_parties"], {"parties_complete": True, "last_input": "ANSWERS"}, "collect_answers"),
         (EDGES["submit_application"], {}, END),
         (EDGES["human_handoff"], {}, "await_agent"),
     ],
@@ -81,6 +85,7 @@ def test_every_router_sends_last_error_to_handoff(fn):
         ({"handoff_resolution": "CONTINUE", "handoff_reason": "NO_ELIGIBLE_PRODUCT"}, "assess_needs"),
         ({"handoff_resolution": "CONTINUE", "handoff_reason": "NEEDS_INCOMPLETE"}, "assess_needs"),
         ({"handoff_resolution": "CONTINUE", "handoff_reason": "ANSWERS_INCOMPLETE"}, "collect_answers"),
+        ({"handoff_resolution": "CONTINUE", "handoff_reason": "SUMMARY_REJECTED"}, "summarize_application"),
         (
             {"handoff_resolution": "CONTINUE", "handoff_reason": "ERROR", "resume_node": "submit_application"},
             "submit_application",
@@ -180,5 +185,6 @@ def test_state_fields_are_stable():
         "needs_assessment_id", "insurable_object_ids", "needs_complete", "needs_rounds",
         "recommendation_ids", "quote_ids", "eligible_count", "decision",
         "application_id", "parties_complete", "answers_complete", "answers_rounds", "confirmed",
+        "confirm_rejections", "correcting",
         "handoff_reason", "handoff_resolution", "resume_node", "resume_stage", "last_error",
     }  # fmt: skip

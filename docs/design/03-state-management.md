@@ -70,8 +70,10 @@ class OnboardingState(TypedDict, total=False):
     answers_complete: bool
     answers_rounds: int                       # loop guard, max 3
     confirmed: bool | None
+    confirm_rejections: int                   # loop guard, max 3
+    correcting: bool                          # a rejected summary came with a correction
     handoff_reason: Literal["IDENTITY_FAILED", "NO_ELIGIBLE_PRODUCT", "NEEDS_INCOMPLETE",
-                            "ANSWERS_INCOMPLETE", "ERROR"] | None
+                            "ANSWERS_INCOMPLETE", "SUMMARY_REJECTED", "ERROR"] | None
     handoff_resolution: Literal["VERIFIED", "CONTINUE", "END"] | None
     resume_node: str | None                   # node to re-run after an ERROR handoff
     resume_stage: ... | None

@@ -284,6 +284,7 @@
   "collect_answers",
   "summarize_application",
   "confirm_summary",
+  "collect_parties",
   "collect_answers",
   "summarize_application",
   "confirm_summary",
@@ -427,15 +428,18 @@
   "application_parties": [
    {
     "role": "INSURED",
-    "full_name": "이서준"
+    "full_name": "이서준",
+    "date_of_birth": null
    },
    {
     "role": "PAYER",
-    "full_name": "이서준"
+    "full_name": "이서준",
+    "date_of_birth": null
    },
    {
     "role": "POLICYHOLDER",
-    "full_name": "이서준"
+    "full_name": "이서준",
+    "date_of_birth": null
    }
   ]
  },
@@ -471,6 +475,12 @@
    "Korean"
   ],
   [
+   "collect_parties",
+   "PartiesExtraction",
+   "B",
+   "Korean"
+  ],
+  [
    "collect_answers",
    "AnswersExtraction",
    "B",
@@ -489,7 +499,7 @@
    "messages": [
     [
      "system",
-     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {}"
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nobjectives are the cover the customer wants now: drop one they rule out. Losing a phone, luggage or belongings during a trip is TRAVEL_COVER (belongings cover), not PROTECT_DEVICE; only a device they want insured in its own right is PROTECT_DEVICE or EXTEND_WARRANTY.\nDevices already known from partner purchase records: []\nValues captured so far: {}"
     ],
     [
      "human",
@@ -515,7 +525,7 @@
    "messages": [
     [
      "system",
-     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nDecide whether the applicant is also the insured person and the payer. If not, list the other people with their role (INSURED or PAYER), full_name and date_of_birth (ISO 8601)."
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nDecide whether the applicant is also the insured person and the payer. If not, list the other people with their role (INSURED or PAYER), full_name and date_of_birth (ISO 8601). Use null for a date of birth the customer has not given; never invent one."
     ],
     [
      "human",
@@ -546,6 +556,19 @@
     [
      "human",
      "Summarize my application."
+    ]
+   ]
+  },
+  {
+   "node": "collect_parties",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: 이서준\nMarket: KR. Reply in Korean. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nDecide whether the applicant is also the insured person and the payer. If not, list the other people with their role (INSURED or PAYER), full_name and date_of_birth (ISO 8601). Use null for a date of birth the customer has not given; never invent one.\nThe parties recorded so far: [{\"role\": \"INSURED\", \"full_name\": \"이서준\", \"date_of_birth\": null}, {\"role\": \"PAYER\", \"full_name\": \"이서준\", \"date_of_birth\": null}, {\"role\": \"POLICYHOLDER\", \"full_name\": \"이서준\", \"date_of_birth\": null}]. The customer is correcting the application; return the complete corrected parties. If the correction is not about who is insured or who pays, return the recorded parties unchanged."
+    ],
+    [
+     "human",
+     "성별은 M이에요."
     ]
    ]
   },

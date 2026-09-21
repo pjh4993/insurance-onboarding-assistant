@@ -35,7 +35,7 @@ is intentionally not prescribed"). These are the calls we made and why.
 | 21 | Money and time | Money is an integer in minor units plus an ISO 4217 currency. Times are ISO 8601 UTC |
 | 22 | Missing profile details | A customer onboarding in a market lives there unless they say otherwise. A device the customer describes is new, undamaged and bought today unless they say otherwise. These defaults let eligibility run; they are recorded as assumed and never copied into the application, which asks for the real values |
 | 23 | Date of birth | Identity input may include a date of birth (optional; the UI form does not ask). The partner record supplies it when matched, and the document check uses it when present |
-| 24 | Unfinished answers | If three answers in a row still leave needs or application fields missing, an agent takes over (`NEEDS_INCOMPLETE`, `ANSWERS_INCOMPLETE`) |
+| 24 | Unfinished answers | If three answers in a row still leave needs or application fields missing, or the customer rejects three summaries, an agent takes over (`NEEDS_INCOMPLETE`, `ANSWERS_INCOMPLETE`, `SUMMARY_REJECTED`) |
 
 ## 3. Technical assumptions
 
@@ -47,3 +47,4 @@ is intentionally not prescribed"). These are the calls we made and why.
 | 28 | Environments | One AWS account with develop and prod, each with its own VPC and Terraform state |
 | 29 | Agent login | Cognito at the ALB once an environment has a domain (develop does). The frontend still identifies every agent as `agent-demo` until it verifies the ALB's signed header |
 | 30 | Customer login | No account. A per-session link with a random token, kept in a browser cookie. One customer session per browser at a time |
+| 31 | Market calendar | "Today" (bought today, departs tomorrow, cover starts) is the market's local date: `Asia/Seoul` for KR, `America/New_York` for US, since a US market has several time zones |

@@ -182,7 +182,7 @@ class ProfilingFlow(Flow):
             if not missing:
                 na.completed_at = now
                 for key, object_type, attrs in described_objects(
-                    values, partner_object_types=partner_types, today=now.date()
+                    values, partner_object_types=partner_types, today=self.today(state)
                 ):
                     obj_id = node_uuid(thread_of(config), "assess_needs", step, key)
                     await uow.objects.save(

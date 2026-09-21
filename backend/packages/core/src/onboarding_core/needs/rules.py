@@ -39,15 +39,17 @@ def object_view(o: InsurableObject) -> dict[str, Any]:
 def compute_needs_missing(
     values: dict[str, Any], *, market: str, partner_object_types: Collection[str] = ()
 ) -> list[str]:
-    """Deterministic profiling completeness; the LLM's own `missing_fields` is advisory only. A line whose
-    object the partner already supplied (a purchased device) needs no description from the customer."""
+    """Deterministic profiling completeness; the LLM's own `missing_fields` is advisory only. Only lines the
+    customer currently wants cover from count: a device mentioned once and then ruled out ("not device
+    insurance, just the trip") asks nothing. A line whose object the partner already supplied (a purchased
+    device) needs no description from the customer."""
     missing = [f for f in ("age_range", "residence_country") if not values.get(f)]
     objectives = set(values.get("objectives") or [])
     if not objectives:
         missing.append("objectives")
     for line in LINES:
         described = values.get(line.needs_key) or {}
-        if not (objectives & line.objectives or described) or line.object_type in partner_object_types:
+        if not objectives & line.objectives or line.object_type in partner_object_types:
             continue
         required = line.required_needs(market, described)
         missing += [f"{line.needs_key}.{key}" for key in required if described.get(key) in BLANK]
@@ -82,8 +84,8 @@ def merge_needs(base: dict[str, Any], extracted: Mapping[str, Any], market: str)
 def described_objects(
     values: dict[str, Any], *, partner_object_types: Collection[str] = (), today: date
 ) -> list[tuple[str, str, dict[str, Any]]]:
-    """(needs_key, object_type, attributes) for each object the customer described, except those the
-    partner already supplied."""
+    """(needs_key, object_type, attributes) for each object the customer described for cover they still want,
+    except those the partner already supplied."""
     return [
         (
             line.needs_key,
@@ -93,5 +95,7 @@ def described_objects(
             ),
         )
         for line in LINES
-        if values.get(line.needs_key) and line.object_type not in partner_object_types
+        if values.get(line.needs_key)
+        and set(values.get("objectives") or []) & line.objectives
+        and line.object_type not in partner_object_types
     ]

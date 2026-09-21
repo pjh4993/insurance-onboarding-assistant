@@ -4,7 +4,7 @@ accepts, declines or changes their answers."""
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from langchain_core.messages import HumanMessage
@@ -38,11 +38,11 @@ async def session_recommendations(uow: UnitOfWork, state: dict[str, Any]) -> lis
     return sorted(await uow.recommendations.list(ids), key=lambda r: (r.rank or 0, r.product_code))
 
 
-def price_quote(product: Product, obj: InsurableObject, now: datetime) -> Quote:
-    """A fresh quote for insuring `obj` with `product` at today's rules (no id yet)."""
+def price_quote(product: Product, obj: InsurableObject, now: datetime, today: date) -> Quote:
+    """A fresh quote for insuring `obj` with `product` at today's rules (no id yet); `today` is the market's date."""
     attrs = obj.attributes or {}
     premium = compute_premium(product.rating, attrs)
-    start, end = compute_term(product.term_rule, attrs, now.date())
+    start, end = compute_term(product.term_rule, attrs, today)
     return Quote(
         product_code=product.product_code,
         insurable_object_id=obj.insurable_object_id,
@@ -64,7 +64,7 @@ def price_quote(product: Product, obj: InsurableObject, now: datetime) -> Quote:
 
 class RecommendationFlow(Flow):
     async def check_eligibility(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m, today, step = state["market"], self.now().date(), step_of(config)
+        m, today, step = state["market"], self.today(state), step_of(config)
         lang = locale_of(state)
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
@@ -190,7 +190,7 @@ class RecommendationFlow(Flow):
                 product = await uow.catalog.product(rec.product_code)
                 obj = await uow.objects.get(rec.insurable_object_id)
                 try:
-                    quote = price_quote(product, obj, now)
+                    quote = price_quote(product, obj, now, self.today(state))
                 except RatingError as exc:
                     rec.eligibility_result = "INELIGIBLE"
                     rec.failed_reasons = [*rec.failed_reasons, f"RATING_ERROR: {exc}"]

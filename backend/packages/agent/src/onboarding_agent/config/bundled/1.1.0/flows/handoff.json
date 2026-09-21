@@ -1,0 +1,12 @@
+{
+  "copy": {
+    "error_handoff": {
+      "ko": "처리 중 문제가 생겨 상담원을 연결해 드릴게요. 입력하신 내용은 저장돼 있습니다.",
+      "en": "Something went wrong on our side, so I'm connecting you with an agent. Everything you've entered is saved."
+    },
+    "closed_by_agent": {
+      "ko": "상담원이 상담을 종료했습니다.",
+      "en": "The agent has closed this session."
+    }
+  }
+}

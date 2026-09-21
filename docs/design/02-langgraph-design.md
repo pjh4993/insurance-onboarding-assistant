@@ -86,8 +86,8 @@ routing can be replayed from a checkpoint and tested without a database (`backen
 | `check_eligibility`, `quote_premium` | `eligible_count` | 0 → `human_handoff`; ≥ 1 → next node |
 | `await_decision` | `decision` | `ACCEPT` → `open_application`; `CHANGE` → `assess_needs`; `DECLINE` → end |
 | `collect_parties` | `parties_complete` | true → `collect_answers`; false → ask again |
-| `collect_answers` | `answers_complete`, `handoff_reason` | complete → `summarize_application`; `ANSWERS_INCOMPLETE` → `human_handoff`; otherwise ask again |
-| `confirm_summary` | `confirmed` | true → `submit_application`; false → `collect_answers` |
+| `collect_answers` | `answers_complete`, `handoff_reason` | complete → `summarize_application`; `ANSWERS_INCOMPLETE` or `NO_ELIGIBLE_PRODUCT` → `human_handoff`; otherwise ask again |
+| `confirm_summary` | `confirmed`, `correcting`, `handoff_reason` | true → `submit_application`; a rejection with a correction → `collect_parties` (then `collect_answers` with the same message); without one → `collect_answers`; `SUMMARY_REJECTED` → `human_handoff` |
 | `await_agent` | `handoff_resolution`, `handoff_reason`, `resume_node` | See [§5](#5-human-handoff) |
 | any node | `last_error` | set → `human_handoff` |
 
@@ -100,9 +100,19 @@ Identity routing uses **results, not counters**. The number of failed identity a
 shape decides what follows: `OTP_FAILED` always goes to the document check, `DOC_FAILED` always goes to an agent.
 That is how "two failures hand off" is enforced.
 
-The two question loops are the exception. `needs_rounds` and `answers_rounds` count answers that still left
-fields missing. After **3 rounds** the node sets `handoff_reason` (`NEEDS_INCOMPLETE` or `ANSWERS_INCOMPLETE`)
-and the session goes to an agent instead of asking forever.
+The question loops are the exception. `needs_rounds` and `answers_rounds` count answers that still left
+fields missing, and `confirm_rejections` counts summaries the customer rejected. After **3** the node sets
+`handoff_reason` (`NEEDS_INCOMPLETE`, `ANSWERS_INCOMPLETE` or `SUMMARY_REJECTED`) and the session goes to an
+agent instead of asking forever.
+
+Eligibility runs on assumptions when the customer has not said everything: a device is new, undamaged and
+bought (for a phone, activated) today. The assumptions are recorded in `assumed_fields` and never copied into
+the application, which asks for the real values. When the customer gives them, `collect_answers` writes them
+onto the insurable object and checks the product again; if the real values rule it out (a phone activated five
+months ago), the session goes to an agent with `NO_ELIGIBLE_PRODUCT` instead of submitting.
+
+"Today" is the market's calendar day (`Asia/Seoul` for KR, `America/New_York` for US), not the UTC date: a
+Korean customer who bought a TV at 08:00 in Seoul bought it today, though it is still yesterday in UTC.
 
 ### The loop back
 
@@ -151,17 +161,18 @@ It is reached for five reasons:
 | `NO_ELIGIBLE_PRODUCT` | No product passed eligibility (or pricing) | The customer is told why; ineligible recommendations keep their failure reasons |
 | `NEEDS_INCOMPLETE` | 3 needs answers still left fields missing | Seed customer D after an agent verified them |
 | `ANSWERS_INCOMPLETE` | 3 application answers still left fields missing | |
+| `SUMMARY_REJECTED` | The customer rejected 3 summaries | A correction the agent kept getting wrong |
 | `ERROR` | A node ran out of retries (`last_error` set) | Bedrock throttling, a timeout in an external system |
 
 The session's status becomes `HANDOFF` and it moves to the top of the agent's session list. The agent opens the
 session, sees the conversation, the current node, the entities and the error message, and resumes with an
 `AGENT` input `{resolution, note?}`:
 
-| Resolution | After `IDENTITY_FAILED` | After `NEEDS_INCOMPLETE` / `NO_ELIGIBLE_PRODUCT` | After `ANSWERS_INCOMPLETE` | After `ERROR` |
-|---|---|---|---|---|
-| `VERIFIED` | `verification_method = AGENT`; continues to profiling | Same as `CONTINUE` | Same as `CONTINUE` | Same as `CONTINUE` |
-| `CONTINUE` | Identity starts again; attempts reset | Asks for needs again; round counter reset | Asks for answers again; round counter reset | Re-runs the failed node with the input it had |
-| `END` | Session ends, `stage = WITHDRAWN` | Same | Same | Same |
+| Resolution | After `IDENTITY_FAILED` | After `NEEDS_INCOMPLETE` / `NO_ELIGIBLE_PRODUCT` | After `ANSWERS_INCOMPLETE` | After `SUMMARY_REJECTED` | After `ERROR` |
+|---|---|---|---|---|---|
+| `VERIFIED` | `verification_method = AGENT`; continues to profiling | Same as `CONTINUE` | Same as `CONTINUE` | Same as `CONTINUE` | Same as `CONTINUE` |
+| `CONTINUE` | Identity starts again; attempts reset | Asks for needs again; round counter reset | Asks for answers again; round counter reset | A fresh summary to confirm; rejection counter reset | Re-runs the failed node with the input it had |
+| `END` | Session ends, `stage = WITHDRAWN` | Same | Same | Same | Same |
 
 Taking over a session (`POST .../assign`) sets `assigned_agent_id` and `mode = ASSIST`. Assignment is recorded,
 not enforced: any signed-in agent can send input. Everything sent through the agent endpoints runs with
@@ -227,7 +238,7 @@ they still exist. A flat graph keeps them stable while the code is split. It als
 | `identity` | `verify_identity`, `check_otp`, `check_document` | inputs `IDENTITY_INFO`, `OTP_CODE` (with recorders that store them); handoff `IDENTITY_FAILED` |
 | `profiling` | `fetch_purchases`, `assess_needs` | input `NEEDS`; handoff `NEEDS_INCOMPLETE` |
 | `recommendation` | `check_eligibility`, `rank_products`, `quote_premium`, `explain_recommendation`, `await_decision` | handoff `NO_ELIGIBLE_PRODUCT` (back to profiling) |
-| `application` | `open_application`, `collect_parties`, `collect_answers`, `summarize_application`, `confirm_summary`, `submit_application` | inputs `PARTIES`, `ANSWERS`; handoff `ANSWERS_INCOMPLETE` |
+| `application` | `open_application`, `collect_parties`, `collect_answers`, `summarize_application`, `confirm_summary`, `submit_application` | inputs `PARTIES`, `ANSWERS`; handoffs `ANSWERS_INCOMPLETE`, `SUMMARY_REJECTED` |
 | `handoff` | `human_handoff`, `await_agent` | built from the stages' `handoffs`, plus `ERROR` |
 
 Each module exports a `DomainModule`:

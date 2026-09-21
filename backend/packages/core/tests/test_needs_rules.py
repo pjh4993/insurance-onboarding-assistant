@@ -61,6 +61,18 @@ def test_a_phone_is_assumed_activated_on_its_purchase_date():
     assert stated["activation_date"] == "2026-09-11" and "activation_date" not in stated["assumed_fields"]
 
 
+def test_a_device_the_customer_ruled_out_asks_nothing_and_is_not_insured():
+    # "휴대폰 분실" on a trip was once extracted as a device; the customer then wants travel cover only.
+    values = {
+        **BASE,
+        "objectives": ["TRAVEL_COVER"],
+        "device": {"device_category": "SMARTPHONE"},
+        "trip": {"departure_date": "2026-10-21", "return_date": "2026-10-26", "destination_countries": ["JP"]},
+    }
+    assert compute_needs_missing(values, market="KR") == []
+    assert [key for key, _, _ in described_objects(values, today=TODAY)] == ["trip"]
+
+
 def test_trip_cost_is_required_only_in_the_us():
     values = {
         **BASE,
@@ -136,6 +148,7 @@ def test_trip_destination_becomes_a_list_and_departs_from_home():
 def test_described_objects_skip_what_the_partner_supplied():
     values = {
         "residence_country": "KR",
+        "objectives": ["PROTECT_DEVICE", "TRAVEL_COVER"],
         "device": {"device_category": "PHONE"},
         "trip": {"destination_countries": ["JP"]},
     }
@@ -157,3 +170,14 @@ def test_every_need_a_line_may_ask_for_is_declared():
         for market in ("KR", "US"):
             for values in ({}, {"device_category": "SMARTPHONE"}, {"device_category": "NOTEBOOK"}):
                 assert set(line.required_needs(market, values)) <= set(line.needs_fields), (line.code, market, values)
+
+
+def test_today_is_the_markets_local_date():
+    from datetime import UTC, datetime
+
+    from onboarding_core.util import market_today
+
+    late_utc = datetime(2026, 9, 21, 15, 51, tzinfo=UTC)  # 00:51 on the 22nd in Seoul
+    assert market_today("KR", late_utc) == date(2026, 9, 22)
+    assert market_today("US", late_utc) == date(2026, 9, 21)
+    assert market_today("??", late_utc) == date(2026, 9, 21)

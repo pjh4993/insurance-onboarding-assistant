@@ -259,3 +259,113 @@ async def test_input_type_must_match_waiting_for(runtime):
     with pytest.raises(InputError) as err:
         await rt.submit_input(session, "NEEDS", {"text": "hi"}, "CUSTOMER")
     assert err.value.status == 409
+
+
+async def _to_parties(rt) -> str:
+    sid = await start(rt, "KR")
+    await send(rt, sid, "IDENTITY_INFO", identity_input("A", consent=True))
+    s = await send(rt, sid, "NEEDS", {"text": CUSTOMERS["A"]["needs_text"]})
+    rec = (await rt.session_view(s))["prompt"]["options"][0]["recommendation_id"]
+    s = await send(rt, sid, "DECISION", {"decision": "ACCEPT", "recommendation_id": rec})
+    assert s.waiting_for == "PARTIES"
+    return sid
+
+
+async def test_a_payer_without_a_real_birth_date_is_asked_again(runtime, llm):
+    rt = runtime
+    sid = await _to_parties(rt)
+    payer = {"role": "PAYER", "full_name": "김민수", "date_of_birth": "1900-01-01"}  # a model's placeholder
+    llm.overrides["PartiesExtraction"] = {"all_self": False, "parties": [payer]}
+    s = await send(rt, sid, "PARTIES", {"text": "보험료는 남편 김민수가 내요."})
+    assert s.waiting_for == "PARTIES"
+    llm.overrides["PartiesExtraction"] = {"all_self": False, "parties": [{**payer, "date_of_birth": "2005-11-20"}]}
+    s = await send(rt, sid, "PARTIES", {"text": "남편은 2005년 11월 20일생이에요."})
+    assert s.waiting_for == "CONFIRM"
+    parties = (await rt.session_detail(s))["entities"]["application_parties"]
+    assert {"role": "PAYER", "full_name": "김민수", "date_of_birth": "2005-11-20"} in parties
+
+
+async def test_a_summary_correction_reaches_the_parties(runtime, llm):
+    rt = runtime
+    sid = await _to_parties(rt)
+    s = await send(rt, sid, "PARTIES", {"text": "제가 피보험자이자 납입자예요."})
+    assert s.waiting_for == "CONFIRM"
+    payer = {"role": "PAYER", "full_name": "김민수", "date_of_birth": "2005-11-20"}
+    llm.overrides["PartiesExtraction"] = {"all_self": False, "parties": [payer]}
+    s = await send(rt, sid, "CONFIRM", {"confirmed": False, "text": "보험료는 남편 김민수(2005-11-20)가 내요."})
+    assert s.waiting_for == "CONFIRM"
+    parties = (await rt.session_detail(s))["entities"]["application_parties"]
+    assert payer in parties
+    assert [c[0] for c in llm.calls][-3:] == ["collect_parties", "collect_answers", "summarize_application"]
+    s = await send(rt, sid, "CONFIRM", {"confirmed": True})
+    assert s.status == "SUBMITTED"
+
+
+async def test_a_summary_rejected_three_times_hands_off(runtime):
+    rt = runtime
+    sid = await _to_parties(rt)
+    s = await send(rt, sid, "PARTIES", {"text": "제가 피보험자이자 납입자예요."})
+    for _ in range(2):
+        s = await send(rt, sid, "CONFIRM", {"confirmed": False, "text": "뭔가 틀렸어요."})
+        assert s.waiting_for == "CONFIRM" and s.status == "ACTIVE"
+    s = await send(rt, sid, "CONFIRM", {"confirmed": False, "text": "여전히 틀렸어요."})
+    assert s.status == "HANDOFF" and s.waiting_for == "AGENT"
+    assert (await rt.agent.snapshot(s.thread_id)).values["handoff_reason"] == "SUMMARY_REJECTED"
+    s = await send(rt, sid, "AGENT", {"resolution": "CONTINUE"}, actor="AGENT")
+    assert s.waiting_for == "CONFIRM" and s.status == "ACTIVE"
+
+
+async def test_an_assumed_activation_date_is_rechecked_when_the_customer_states_it(runtime, llm):
+    """No purchase date at profiling: eligibility assumes today. The application asks for the real
+    activation date; five months ago rules phone cover out, so the session goes to an agent."""
+    rt = runtime
+    sid = await start(rt, "KR")
+    await send(rt, sid, "IDENTITY_INFO", identity_input("B", consent=True))
+    await send(rt, sid, "OTP_CODE", {"code": CUSTOMERS["B"]["otp"]["valid_code"]})
+    llm.overrides["NeedsExtraction"] = {
+        "age_range": "AGE_40_49",
+        "residence_country": "KR",
+        "objectives": ["PROTECT_DEVICE"],
+        "device": {"device_category": "SMARTPHONE", "manufacturer": "Samsung", "purchase_price_minor": 1350000},
+    }
+    s = await send(rt, sid, "NEEDS", {"text": "갤럭시 폰 보장이요. 135만 원 줬어요."})
+    rec = (await rt.session_view(s))["prompt"]["options"][0]
+    assert rec["product_code"] == "KR-MOB-SWAP"
+    s = await send(rt, sid, "DECISION", {"decision": "ACCEPT", "recommendation_id": rec["recommendation_id"]})
+    s = await send(rt, sid, "PARTIES", {"text": "저 혼자요."})
+    assert s.waiting_for == "ANSWERS"
+    llm.overrides["AnswersExtraction"] = {
+        "answers": {"imei": "350000000000999", "activation_date": "2026-04-18"},
+        "missing_fields": [],
+    }
+    s = await send(rt, sid, "ANSWERS", {"text": "IMEI 350000000000999, 4월 18일에 개통했어요."})
+    assert s.status == "HANDOFF" and s.waiting_for == "AGENT"
+    values = (await rt.agent.snapshot(s.thread_id)).values
+    assert values["handoff_reason"] == "NO_ELIGIBLE_PRODUCT"
+    device = (await rt.session_detail(s))["entities"]["insurable_objects"][0]["attributes"]
+    assert device["activation_date"] == "2026-04-18" and "activation_date" not in device["assumed_fields"]
+
+
+async def test_the_applicant_listed_as_insured_is_not_asked_for_again(runtime, llm):
+    rt = runtime
+    sid = await _to_parties(rt)
+    me = {"role": "INSURED", "full_name": CUSTOMERS["A"]["full_name"], "date_of_birth": None}
+    payer = {"role": "PAYER", "full_name": "김민수", "date_of_birth": "2005-11-20"}
+    llm.overrides["PartiesExtraction"] = {"all_self": False, "parties": [me, payer]}
+    s = await send(rt, sid, "PARTIES", {"text": "피보험자는 저고, 보험료는 남편 김민수(2005-11-20)가 내요."})
+    assert s.waiting_for == "CONFIRM"
+    parties = (await rt.session_detail(s))["entities"]["application_parties"]
+    assert payer in parties
+
+
+async def test_a_birth_date_is_asked_for_once(runtime, llm):
+    rt = runtime
+    sid = await _to_parties(rt)
+    llm.overrides["PartiesExtraction"] = {
+        "all_self": False,
+        "parties": [{"role": "PAYER", "full_name": "김민수", "date_of_birth": None}],
+    }
+    s = await send(rt, sid, "PARTIES", {"text": "보험료는 남편 김민수가 내요."})
+    assert s.waiting_for == "PARTIES"
+    s = await send(rt, sid, "PARTIES", {"text": "생년월일은 잘 모르겠어요."})
+    assert s.waiting_for == "CONFIRM"

@@ -18,7 +18,7 @@ import json
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
@@ -29,6 +29,7 @@ from onboarding_agent.deps import AgentDeps
 from onboarding_agent.texts import locale_of
 from onboarding_core.party.models import Party
 from onboarding_core.ports import UnitOfWork
+from onboarding_core.util import market_today
 
 NodeFn = Callable[[dict[str, Any], RunnableConfig], Awaitable[dict[str, Any]]]
 Router = Callable[[dict[str, Any]], str]
@@ -65,6 +66,10 @@ class Flow:
     def now(self) -> datetime:
         return self.d.clock()
 
+    def today(self, state: dict[str, Any]) -> date:
+        """Today on the market's calendar, the day customers mean by "today" (not the UTC date)."""
+        return market_today(state["market"], self.now())
+
     async def _touch(self, state: dict[str, Any], entity_type: str, entity_id: Any) -> None:
         await self.d.on_entity(state["session_id"], entity_type, str(entity_id))
 
@@ -88,7 +93,7 @@ class Flow:
                 customer=party.full_name or "unknown",
                 market=state["market"],
                 language=self.d.bundle.language_name(locale_of(state)),
-                today=self.now().date().isoformat(),
+                today=self.today(state).isoformat(),
                 instructions=instructions,
             )
         )
