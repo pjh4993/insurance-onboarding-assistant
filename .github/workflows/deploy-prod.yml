@@ -80,11 +80,8 @@ jobs:
             echo "base_url=$(terraform output -raw base_url)"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Wait for ECS services to be stable
-        run: |
-          aws ecs wait services-stable \
-            --cluster "${{ steps.tf.outputs.cluster }}" \
-            --services ${{ steps.tf.outputs.services }}
+      - name: Wait for the new tasks to serve
+        run: .github/scripts/wait-for-rollout.sh "${{ steps.tf.outputs.cluster }}" ${{ steps.tf.outputs.services }}
 
       - name: Smoke test
         run: |

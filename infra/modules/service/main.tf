@@ -111,9 +111,10 @@ resource "aws_ecs_task_definition" "this" {
 
   container_definitions = jsonencode([
     {
-      name      = var.container_name
-      image     = var.image
-      essential = true
+      name        = var.container_name
+      image       = var.image
+      essential   = true
+      stopTimeout = var.stop_timeout_seconds
 
       portMappings = [
         {
