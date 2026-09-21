@@ -192,7 +192,8 @@ module "backend" {
 
   # BEDROCK_ENDPOINT_URL is deliberately unset: the SDK uses the regional
   # endpoint (reached through the bedrock-runtime VPC endpoint), even in develop.
-  environment = merge(local.external_urls, {
+  environment = merge(local.external_urls, local.otel_common_env, {
+    OTEL_SERVICE_NAME = "onboarding-backend"
     # No password in the URL: libpq reads PGPASSWORD (injected below).
     DATABASE_URL     = "postgresql+psycopg://${module.data.db_username}@${module.data.db_address}:${module.data.db_port}/${module.data.db_name}?sslmode=require"
     BEDROCK_MODEL_ID = var.bedrock_model_id
@@ -200,16 +201,16 @@ module "backend" {
     SSE_BROKER       = "postgres"
   })
 
-  secrets = {
+  secrets = merge(local.otel_secrets, {
     PGPASSWORD         = "${module.data.db_master_secret_arn}:password::"
     CHECKPOINT_AES_KEY = module.data.checkpoint_aes_key_secret_arn
     SESSION_HMAC_KEY   = module.data.session_hmac_key_secret_arn
-  }
-  secret_arns = [
+  })
+  secret_arns = concat(local.otel_secret_arns, [
     module.data.db_master_secret_arn,
     module.data.checkpoint_aes_key_secret_arn,
     module.data.session_hmac_key_secret_arn,
-  ]
+  ])
   kms_key_arns = [module.security.kms_key_arn]
 
   task_role_policy_json   = data.aws_iam_policy_document.backend_task.json
@@ -236,11 +237,15 @@ module "frontend" {
   service_connect_server        = false # client only: calls backend:8000
   target_group_arn              = module.edge.frontend_target_group_arn
 
-  environment = {
-    BACKEND_URL    = "http://backend:8000"
-    AGENT_DEV_AUTH = tostring(var.agent_dev_auth)
-    AWS_REGION     = var.region
-  }
+  environment = merge(local.otel_common_env, {
+    BACKEND_URL       = "http://backend:8000"
+    AGENT_DEV_AUTH    = tostring(var.agent_dev_auth)
+    AWS_REGION        = var.region
+    OTEL_SERVICE_NAME = "onboarding-frontend"
+  })
+  secrets      = local.otel_secrets
+  secret_arns  = local.otel_secret_arns
+  kms_key_arns = local.otel_enabled ? [module.security.kms_key_arn] : []
 
   depends_on = [module.edge]
 }

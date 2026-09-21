@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -21,9 +20,8 @@ from app.llm.provider import BedrockStructuredLLM, StructuredLLM
 from app.services.pg_broker import PostgresBroker
 from app.services.pubsub import Broker, InMemoryBroker
 from app.services.runtime import Runtime
+from app.telemetry import setup_logging, setup_otel
 from app.util import Clock, utcnow
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 @dataclass
@@ -38,6 +36,7 @@ class Overrides:
 def create_app(settings: Settings | None = None, overrides: Overrides | None = None) -> FastAPI:
     settings = settings or get_settings()
     overrides = overrides or Overrides()
+    setup_logging(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -88,6 +87,7 @@ def create_app(settings: Settings | None = None, overrides: Overrides | None = N
 
     app = FastAPI(title="Onboarding Assistant API", version="0.1.0", lifespan=lifespan)
     app.include_router(router)
+    setup_otel(app, settings)
     return app
 
 

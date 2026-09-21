@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     # memory: one process only. postgres: LISTEN/NOTIFY, needed once the backend runs more than one task.
     sse_broker: Literal["memory", "postgres"] = "memory"
 
+    log_level: str = "INFO"
+    # Cap on one log line (message, and separately its traceback tail) and on any span attribute value.
+    log_max_chars: int = 2000
+
     @field_validator("bedrock_endpoint_url", mode="before")
     @classmethod
     def _empty_to_none(cls, v: object) -> object:

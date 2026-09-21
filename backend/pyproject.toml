@@ -14,6 +14,11 @@ dependencies = [
     "pydantic-settings>=2.6",
     "httpx>=0.27",
     "pycryptodome>=3.21",
+    "opentelemetry-sdk>=1.44.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.44.0",
+    "opentelemetry-instrumentation-fastapi>=0.65b0",
+    "opentelemetry-instrumentation-httpx>=0.65b0",
+    "opentelemetry-instrumentation-botocore>=0.65b0",
 ]
 
 [dependency-groups]

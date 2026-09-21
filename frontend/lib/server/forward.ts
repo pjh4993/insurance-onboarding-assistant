@@ -1,5 +1,6 @@
 import "server-only";
 import { backendUrl } from "./config";
+import { log } from "./log";
 
 // Hop-by-hop and encoding headers that must not be copied from the upstream response.
 const DROP = new Set(["connection", "keep-alive", "transfer-encoding", "content-encoding", "content-length"]);
@@ -40,7 +41,7 @@ export async function forward(
     });
   } catch (err) {
     if (req.signal.aborted) return new Response(null, { status: 499 });
-    console.error(`[proxy] ${method} ${path} failed:`, err);
+    log("error", `[proxy] ${method} ${path} failed`, err);
     return jsonError(502, "Backend unavailable");
   }
 

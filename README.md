@@ -114,6 +114,7 @@ check and build clean. An end-to-end run through `docker compose` gave the outco
 | [Networking design](docs/networking.md) | VPC and subnets, endpoints and NAT, traffic flows, security groups, security boundaries, authentication |
 | [Terraform structure](docs/terraform.md) | Modules, environments, state backend, one-time setup |
 | [CI/CD design](docs/cicd.md) | GitHub Actions with OIDC, CI checks, develop deploy, prod promotion, smoke test, GitHub settings |
+| [Observability](docs/observability.md) | Traces and logs to Grafana Cloud over OTLP, log length caps, CloudWatch in Grafana |
 | [Assumptions](docs/assumptions.md) | How we read the open parts of the brief |
 | [Tradeoffs](docs/tradeoffs.md) | Infrastructure, LLM and checkpoint-store choices, with the evidence behind them |
 | [Future improvements](docs/future-improvements.md) | Known limits of what is built, and designed but deferred work |
