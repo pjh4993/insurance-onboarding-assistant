@@ -29,7 +29,7 @@ from onboarding_agent import (
     build_graph,
     open_checkpointer,
 )
-from onboarding_agent.config import Bundle, load_bundle
+from onboarding_agent.config import Bundle, ConfigError, load_bundle
 from onboarding_core.util import Clock, utcnow
 
 
@@ -62,12 +62,24 @@ def bedrock_llm(settings: Settings, bundle: Bundle) -> BedrockStructuredLLM:
 
 async def agent_bundle(settings: Settings) -> Bundle:
     """Read and validate the config bundle once, at startup: a bad one stops the service here."""
-    bundle = await asyncio.to_thread(
-        load_bundle,
-        settings.agent_config_uri,
-        settings.agent_config_version,
-        allowed_model_ids=settings.allowed_model_ids,
-    )
+    try:
+        bundle = await asyncio.to_thread(
+            load_bundle,
+            settings.agent_config_uri,
+            settings.agent_config_version,
+            allowed_model_ids=settings.allowed_model_ids,
+        )
+    except ConfigError as exc:
+        # Every problem, in its own field: the traceback's message is capped and would cut the list short.
+        log.error(
+            "agent config rejected",
+            extra={
+                "agent_config.uri": settings.agent_config_uri or "(bundled)",
+                "agent_config.version": settings.agent_config_version or "(newest)",
+                "agent_config.problems": "\n".join(exc.problems),
+            },
+        )
+        raise
     log.info(
         "agent config loaded",
         extra={"agent_config.version": bundle.version, "agent_config.source": bundle.source},

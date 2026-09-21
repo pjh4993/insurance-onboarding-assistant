@@ -172,6 +172,29 @@ def test_a_language_added_to_the_bundle_can_be_used(settings, external, llm, tmp
         assert view["messages"][0]["text"] == "こんにちは！保険の加入をお手伝いします。"
 
 
+def test_a_bad_config_bundle_stops_startup_and_says_why(settings, external, llm, tmp_path, caplog):
+    import json
+    import shutil
+    from pathlib import Path
+
+    from onboarding_agent.config import BUNDLED, ConfigError
+
+    bad = tmp_path / "1.0.1"
+    shutil.copytree(Path(str(BUNDLED)) / "1.0.0", bad)
+    config = json.loads((bad / "config.json").read_text())
+    config["version"] = "1.0.1"
+    config["models"]["default"]["model_id"] = "anthropic.claude-opus-9"
+    (bad / "config.json").write_text(json.dumps(config))
+    settings = settings.model_copy(
+        update={"agent_config_uri": str(tmp_path), "llm_allowed_model_ids": "global.anthropic.claude-sonnet-4-6"}
+    )
+    app = create_app(settings, Overrides(transport=external.transport(), llm=llm, clock=lambda: FIXED_NOW))
+    with pytest.raises(ConfigError), TestClient(app):
+        pass
+    rejected = [r for r in caplog.records if r.getMessage() == "agent config rejected"]
+    assert rejected and "anthropic.claude-opus-9 is not allowed here" in getattr(rejected[0], "agent_config.problems")
+
+
 def test_session_locale_can_be_chosen_at_creation(client):
     r = client.post("/api/sessions", json={"market": "US", "locale": "ko"})
     assert r.status_code == 201, r.text
