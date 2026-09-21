@@ -19,6 +19,7 @@ export function InputPanel({
   busy,
   onSubmit,
   showPromptMessage,
+  needsDraft,
 }: {
   actor: Actor;
   session: SessionSummary;
@@ -26,6 +27,8 @@ export function InputPanel({
   busy: boolean;
   onSubmit: (body: InputBody) => Promise<void>;
   showPromptMessage: boolean;
+  /** Pre-fills the first profiling answer, e.g. what the customer picked on the landing screen. */
+  needsDraft?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -70,6 +73,7 @@ export function InputPanel({
         <TextComposer
           disabled={disabled}
           placeholder={actor === "agent" ? `Answer as agent (${w.toLowerCase()})…` : TEXT_PLACEHOLDER[w]}
+          initialText={w === "NEEDS" ? needsDraft : undefined}
           onSend={(text) => safeSubmit({ type: w, data: { text } })}
         />
       );

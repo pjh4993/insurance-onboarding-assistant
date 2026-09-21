@@ -127,13 +127,15 @@ export function TextComposer({
   disabled,
   placeholder,
   cta = "Send",
+  initialText = "",
 }: {
   onSend: (text: string) => Promise<boolean>;
   disabled: boolean;
   placeholder: string;
   cta?: string;
+  initialText?: string;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   async function send() {
     const t = text.trim();
     if (!t) return;
