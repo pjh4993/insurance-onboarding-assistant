@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: onboarding
+      POSTGRES_PASSWORD: onboarding
+      POSTGRES_DB: onboarding
+    ports: ["15432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onboarding"]
+      interval: 3s
+      retries: 20
+
+  mock:
+    build: ./mock
+    ports: ["18080:8080"]
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres: {condition: service_healthy}
+      mock: {condition: service_started}
+    environment:
+      DATABASE_URL: postgresql+psycopg://onboarding:onboarding@postgres:5432/onboarding
+      PARTNER_API_URL: http://mock:8080/partner
+      IDENTITY_API_URL: http://mock:8080/identity
+      CONTRACT_API_URL: http://mock:8080/contract
+      BEDROCK_ENDPOINT_URL: http://mock:8080
+      BEDROCK_MODEL_ID: global.anthropic.claude-sonnet-4-6
+      AWS_REGION: ap-northeast-2
+      AWS_ACCESS_KEY_ID: mock
+      AWS_SECRET_ACCESS_KEY: mock
+      CHECKPOINT_AES_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
+      SESSION_HMAC_KEY: dev-session-hmac-key
+    ports: ["18000:8000"]
+
+  frontend:
+    build: ./frontend
+    depends_on: [backend]
+    environment:
+      BACKEND_URL: http://backend:8000
+      AGENT_DEV_AUTH: "true"
+    ports: ["13000:3000"]

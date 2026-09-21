@@ -1,0 +1,36 @@
+{
+  "customers": [
+    {
+      "key": "A", "market": "KR", "scenario": "partner match succeeds; purchases prefill the device",
+      "full_name": "김하늘", "email": "haneul.kim@example.com", "phone": "+821011112222",
+      "date_of_birth": "1991-03-14", "id_document_type": "NATIONAL_ID", "id_document_number": "910314-2000001",
+      "partner": {"partner_customer_ref": "P-000101", "purchases": [
+        {"order_id": "O-778812", "purchased_at": "2026-09-14T03:12:00Z",
+         "item": {"category": "SMARTPHONE", "manufacturer": "Samsung", "model": "Galaxy S26", "imei": "350000000000012",
+                  "release_date": "2026-02-25", "activation_date": "2026-09-14", "price_minor": 1350000, "currency": "KRW"}}]},
+      "otp": null, "document_valid": true,
+      "needs_text": "서른다섯 살 소프트웨어 엔지니어고 서울 살아요. 새로 산 갤럭시 폰이 깨질까 봐 걱정돼요."
+    },
+    {
+      "key": "B", "market": "KR", "scenario": "no partner record; OTP succeeds; customer describes the device",
+      "full_name": "이서준", "email": "seojun.lee@example.com", "phone": "+821033334444",
+      "date_of_birth": "1985-11-02", "id_document_type": "NATIONAL_ID", "id_document_number": "851102-1000002",
+      "partner": null, "otp": {"valid_code": "000000"}, "document_valid": true,
+      "needs_text": "마흔 살 회사원이에요. 다음 달 일본 여행 가는데 여행자보험이 필요해요. 10월 3일 출발, 10월 7일 귀국입니다."
+    },
+    {
+      "key": "C", "market": "US", "scenario": "OTP fails; identity document succeeds",
+      "full_name": "Jane Doe", "email": "jane.doe@example.com", "phone": "+12065550101",
+      "date_of_birth": "1990-06-01", "id_document_type": "PASSPORT", "id_document_number": "M12345678",
+      "partner": null, "otp": {"valid_code": null}, "document_valid": true,
+      "needs_text": "I'm 36, a nurse in Seattle. I just bought a $1,299 laptop and want accident cover."
+    },
+    {
+      "key": "D", "market": "US", "scenario": "OTP and document both fail; hands off to an agent",
+      "full_name": "John Roe", "email": "john.roe@example.com", "phone": "+12065550102",
+      "date_of_birth": "1978-01-20", "id_document_type": "DRIVER_LICENSE", "id_document_number": "WDL0000000",
+      "partner": null, "otp": {"valid_code": null}, "document_valid": false,
+      "needs_text": "I need phone insurance."
+    }
+  ]
+}
