@@ -304,8 +304,10 @@ class ProfilingFlow(Flow):
             if current is not None and current.completed_at is not None:
                 return self._ask(lang, self.text(lang, "profiling.ask_change"), None)
             topic = next_topic(before, interest)
-            key = "profiling.ask_missing" if current is not None else "profiling.ask_needs"
-            return self._ask(lang, self.text(lang, key, lead=self._lead(lang, topic)), topic)
+            lead = self._lead(lang, topic)
+            if current is not None:
+                return self._ask(lang, self.text(lang, "profiling.ask_missing", lead=lead), topic)
+            return self._ask(lang, self.text(lang, "profiling.ask_needs", lead=lead), topic)
 
         # The answer: a form's fields and/or free text (`needs_input`); a CHANGE decision's text has no input.
         pending = state.get("needs_input") or {}

@@ -21,6 +21,7 @@ def test_nodes_and_kinds():
     nodes = {n["id"]: n for n in agent_outline()["nodes"]}
     assert set(nodes) == set(ALL_NODES)
     assert {n for n, v in nodes.items() if v["kind"] == "llm"} == {
+        "understand_intake",
         "assess_needs",
         "explain_recommendation",
         "collect_parties",
@@ -43,7 +44,11 @@ def test_edges_follow_the_routers_and_registries():
     edges = {(e["source"], e["target"]) for e in agent_outline()["edges"]}
     for edge in [
         ("greet", "ask_customer"),
-        ("ask_customer", "verify_identity"),
+        ("ask_customer", "understand_intake"),
+        ("understand_intake", "collect_identity"),
+        ("collect_identity", "ask_customer"),
+        ("ask_customer", "collect_identity"),
+        ("collect_identity", "verify_identity"),
         ("verify_identity", "fetch_purchases"),
         ("check_otp", "check_document"),
         ("check_document", "human_handoff"),
@@ -54,7 +59,7 @@ def test_edges_follow_the_routers_and_registries():
         ("submit_application", END),
         ("human_handoff", "await_agent"),
         ("await_agent", "fetch_purchases"),
-        ("await_agent", "greet"),
+        ("await_agent", "collect_identity"),
         ("await_agent", "collect_answers"),
     ]:
         assert edge in edges, edge

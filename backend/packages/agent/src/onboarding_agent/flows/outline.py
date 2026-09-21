@@ -3,7 +3,9 @@
 Read from the flow code itself (its syntax tree), so it cannot drift from what runs:
 - a node reads `copy:<flow>.<key>` where it calls `.text(locale, "<flow>.<key>")`, `llm:<node>.<part>` where it
   calls `.prompt("<node>", "<part>")`, `system_prompt` through `._system(...)`, `labels` through
-  `.field_list(...)` and `billing_periods` through `price_label(...)`; including what the helper functions it
+  `.field_list(...)` and `billing_periods` through `price_label(...)`. Form copy is looked up by topic, so a
+  `.text(locale, f"<flow>.form.{topic}...")` reads every declared key under that prefix, and `form_spec(...)` /
+  `render(...)` for a flow read its `form.*`, `field.*` and `option.*` keys; including what the helper functions it
   calls read, and what a domain's input recorders (run by ask_customer) and handoff resolvers (run by
   await_agent) read.
 - a node's edges are the node names its router can return, plus the targets and resume points the domains
@@ -26,6 +28,7 @@ from onboarding_agent.flows import base as flow_base
 
 MODULES: tuple[ModuleType, ...] = (flow_base, conversation, identity, profiling, recommendation, application, handoff)
 END = "__end__"
+PREFIX = "copy-prefix:"  # an internal marker: every declared copy key under the prefix
 
 
 def _refs_in(fn: ast.AST) -> tuple[set[str], set[str], bool]:
@@ -41,6 +44,12 @@ def _refs_in(fn: ast.AST) -> tuple[set[str], set[str], bool]:
         consts = [a.value for a in node.args if isinstance(a, ast.Constant) and isinstance(a.value, str)]
         if name == "text" and consts:
             refs.add(f"copy:{consts[0]}")
+        elif name == "text" and len(node.args) > 1 and isinstance(node.args[1], ast.JoinedStr):
+            head = node.args[1].values[0] if node.args[1].values else None
+            if isinstance(head, ast.Constant) and isinstance(head.value, str) and "." in head.value:
+                refs.add(f"{PREFIX}{head.value}")  # a key built from a topic: expanded in agent_outline
+        elif name in ("form_spec", "render") and consts:
+            refs |= {f"{PREFIX}{consts[0]}.{part}." for part in ("form", "field", "option")}
         elif name == "prompt" and len(consts) >= 2:
             refs.add(f"llm:{consts[0]}.{consts[1]}")
         elif name == "_system":
@@ -115,11 +124,19 @@ def agent_outline() -> dict[str, Any]:
     resolvers = [k.resolve.__name__ for d in DOMAINS for k in d.handoffs.values() if k.resolve]
     resolvers += ["resolve_error"]
 
+    declared_copy = {f"copy:{d.name}.{key}" for d in DOMAINS for key in d.texts.copy}
+
+    def expand(refs: set[str]) -> set[str]:
+        prefixes = {r[len(PREFIX) :] for r in refs if r.startswith(PREFIX)}
+        found = {c for c in declared_copy for p in prefixes if c.startswith(f"copy:{p}")}
+        return {r for r in refs if not r.startswith(PREFIX)} | found
+
     out_nodes = []
     for d in DOMAINS:
         for name in d.edges:
             extra = recorders if name == "ask_customer" else resolvers if name == "await_agent" else []
             refs, interrupts = _reach([name, *extra])
+            refs = expand(refs)
             kind = "llm" if name in llm_nodes else "wait" if interrupts else "code"
             out_nodes.append({"id": name, "domain": d.name, "kind": kind, "reads": sorted(refs)})
 
