@@ -54,19 +54,23 @@ including SSE.
 All JSON. Money is integer minor units + ISO 4217 currency. Times are ISO 8601 UTC.
 
 ### Session links
-- `POST /api/sessions` body `{"market": "KR" | "US"}` → `201 {"session_id", "token", "customer_path": "/s/{token}"}`
+- `POST /api/sessions` body `{"market": "KR" | "US", "locale"?: Locale}` → `201 {"session_id", "token", "customer_path": "/s/{token}"}`.
+  `locale` defaults to the market's language (`KR` → `ko`, `US` → `en`)
 - `GET /healthz` → `{"status": "ok"}`
 
 ### Customer (header `X-Session-Token: <token>`)
 - `GET /api/customer/session` → `SessionView`
 - `POST /api/customer/session/input` body `InputBody` → `202 {"accepted": true}`
 - `GET /api/customer/session/stream` → SSE
+- `PUT /api/customer/session/locale` body `{"locale": Locale}` → `SessionSummary`. Fixed copy and LLM replies use the
+  new language from the next graph step on; messages already sent stay as they were. Publishes `session.updated`
 
 ### Agent (header `X-Agent-Id: <id>`; Cognito later)
 - `GET /api/agent/sessions` → `{"sessions": SessionSummary[]}` sorted: `waiting_for == "AGENT"` first, then oldest `last_activity_at`
 - `GET /api/agent/sessions/{session_id}` → `SessionDetail`
 - `POST /api/agent/sessions/{session_id}/assign` → `SessionSummary` (sets `assigned_agent_id`, `mode = "ASSIST"`)
 - `POST /api/agent/sessions/{session_id}/input` body `InputBody` → `202` (actor = AGENT)
+- `PUT /api/agent/sessions/{session_id}/locale` body `{"locale": Locale}` → `SessionSummary` (same as the customer's)
 - `GET /api/agent/stream` → SSE for all sessions; `GET /api/agent/sessions/{session_id}/stream` → SSE for one
 
 ### Types
@@ -74,9 +78,11 @@ All JSON. Money is integer minor units + ISO 4217 currency. Times are ISO 8601 U
 type Stage = "IDENTITY" | "PROFILING" | "RECOMMENDATION" | "APPLICATION" | "SUBMITTED" | "HANDOFF" | "DECLINED" | "WITHDRAWN";
 type WaitingFor = "IDENTITY_INFO" | "OTP_CODE" | "NEEDS" | "DECISION" | "PARTIES" | "ANSWERS" | "CONFIRM" | "AGENT" | null;
 
+type Locale = "ko" | "en";                            // the session's language: the customer UI, fixed copy and LLM replies
+
 type SessionSummary = {
   session_id: string; display_name: string;          // "Unverified #1a2b" until identity is verified
-  market: "KR" | "US"; status: "ACTIVE" | "SUBMITTED" | "DECLINED" | "WITHDRAWN" | "HANDOFF" | "EXPIRED";
+  market: "KR" | "US"; locale: Locale; status: "ACTIVE" | "SUBMITTED" | "DECLINED" | "WITHDRAWN" | "HANDOFF" | "EXPIRED";
   stage: Stage; waiting_for: WaitingFor; mode: "AUTO" | "ASSIST";
   assigned_agent_id: string | null; last_activity_at: string;
 };
