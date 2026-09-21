@@ -24,8 +24,9 @@ class ProductLine:
     answer_aliases: Mapping[str, tuple[str, ...]] = {}  # required answer -> keys the LLM may use instead
     field_labels: Mapping[str, tuple[str, str]] = {}  # field -> (Korean, English) label for questions
 
-    def required_needs(self, market: str) -> tuple[str, ...]:
-        """Keys of `needs_key` profiling must know before eligibility can run."""
+    def required_needs(self, market: str, values: Mapping[str, Any]) -> tuple[str, ...]:
+        """Keys of `needs_key` profiling must know before eligibility can run, given what is known of it
+        so far (`values`, the merged `needs_key` dict)."""
         raise NotImplementedError
 
     def normalize_needs(self, values: dict[str, Any]) -> dict[str, Any]:

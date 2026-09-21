@@ -121,12 +121,12 @@
     ],
     [
      "assistant",
-     "Thanks! To recommend cover I also need your age, the device purchase price."
+     "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Thanks! To recommend cover I also need your age, the device purchase price."
+    "message": "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
    }
   },
   {
@@ -146,12 +146,12 @@
     ],
     [
      "assistant",
-     "Thanks! To recommend cover I also need your age, the device purchase price."
+     "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Thanks! To recommend cover I also need your age, the device purchase price."
+    "message": "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
    }
   },
   {
@@ -196,12 +196,12 @@
     ],
     [
      "assistant",
-     "To recommend cover, please tell me your age, the device purchase price."
+     "To recommend cover, please tell me your age, the device purchase price, the device manufacturer."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "To recommend cover, please tell me your age, the device purchase price."
+    "message": "To recommend cover, please tell me your age, the device purchase price, the device manufacturer."
    }
   },
   {
@@ -221,12 +221,12 @@
     ],
     [
      "assistant",
-     "Thanks! To recommend cover I also need your age, the device purchase price."
+     "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Thanks! To recommend cover I also need your age, the device purchase price."
+    "message": "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
    }
   },
   {
@@ -246,12 +246,12 @@
     ],
     [
      "assistant",
-     "Thanks! To recommend cover I also need your age, the device purchase price."
+     "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Thanks! To recommend cover I also need your age, the device purchase price."
+    "message": "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
    }
   },
   {
@@ -366,7 +366,8 @@
    "captured_by": "CUSTOMER",
    "missing_fields": [
     "age_range",
-    "device.purchase_price_minor"
+    "device.purchase_price_minor",
+    "device.manufacturer"
    ],
    "completed_at": null,
    "created_at": "2026-09-21T03:00:00Z"

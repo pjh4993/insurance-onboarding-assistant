@@ -25,12 +25,14 @@ class NeedsExtraction(BaseModel):
         None,
         description="Device to insure: {device_category, manufacturer, model, purchase_date, "
         "purchase_price_minor}. device_category is one of SMARTPHONE, TABLET, NOTEBOOK, TV, "
-        "APPLIANCE, WEARABLE. Dates ISO 8601, money in minor units.",
+        "APPLIANCE, WEARABLE. Dates ISO 8601. Money in minor units: whole won for KRW "
+        "(299만 원 = 2990000), cents for USD ($1,299 = 129900).",
     )
     trip: dict | None = Field(
         None,
         description="Trip to insure: {destination_countries, departure_date, return_date, "
-        "trip_cost_minor}. Countries ISO alpha-2, dates ISO 8601, money in minor units.",
+        "trip_cost_minor}. Countries ISO alpha-2, dates ISO 8601. Money in minor units: whole won for "
+        "KRW, cents for USD.",
     )
     missing_fields: list[str] = Field(
         default_factory=list, description="Names of the fields above that are still unknown"

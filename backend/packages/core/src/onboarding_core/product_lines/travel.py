@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
@@ -40,7 +41,7 @@ class TravelLine(ProductLine):
         "trip_cost": ("여행 경비 총액", "the total trip cost"),
     }
 
-    def required_needs(self, market: str) -> tuple[str, ...]:
+    def required_needs(self, market: str, values: Mapping[str, Any]) -> tuple[str, ...]:
         keys = ("departure_date", "return_date", "destination_countries")
         # US trip-cancellation cover is rated on the trip cost.
         return (*keys, "trip_cost_minor") if market == "US" else keys

@@ -81,7 +81,8 @@ class Flow:
                 "You are the onboarding assistant of an insurance company.\n"
                 f"Customer: {party.full_name or 'unknown'}\n"
                 f"Market: {market}. Reply in {language}. Today is {self.now().date().isoformat()}.\n"
-                "Money is in integer minor units (KRW won, USD cents).\n\n"
+                "Money is in integer minor units. KRW has no subunit, so the minor unit is one won: "
+                "299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\n"
                 f"{instructions}"
             )
         )

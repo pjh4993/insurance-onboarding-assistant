@@ -49,7 +49,8 @@ def compute_needs_missing(
         described = values.get(line.needs_key) or {}
         if not (objectives & line.objectives or described) or line.object_type in partner_object_types:
             continue
-        missing += [f"{line.needs_key}.{key}" for key in line.required_needs(market) if described.get(key) in BLANK]
+        required = line.required_needs(market, described)
+        missing += [f"{line.needs_key}.{key}" for key in required if described.get(key) in BLANK]
     return missing
 
 

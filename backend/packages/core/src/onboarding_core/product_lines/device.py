@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date
 from typing import Any
 
@@ -27,6 +28,30 @@ CATEGORY_ALIASES = {
 }
 
 
+# Makers as customers name them (Korean, product lines) -> the catalog's names (eligibility compares exactly).
+MANUFACTURER_ALIASES = {
+    "삼성": "Samsung",
+    "삼성전자": "Samsung",
+    "갤럭시": "Samsung",
+    "GALAXY": "Samsung",
+    "SAMSUNG": "Samsung",
+    "애플": "Apple",
+    "아이폰": "Apple",
+    "IPHONE": "Apple",
+    "APPLE": "Apple",
+    "LG": "LG",
+    "엘지": "LG",
+    "LG전자": "LG",
+}
+
+
+def normalize_manufacturer(value: Any) -> str | None:
+    if not value:
+        return None
+    name = str(value).strip()
+    return MANUFACTURER_ALIASES.get(name.upper().replace(" ", ""), name)
+
+
 def normalize_device_category(value: Any) -> str | None:
     if not value:
         return None
@@ -50,6 +75,7 @@ class DeviceLine(ProductLine):
         "device.device_category": ("기기 종류", "the device type"),
         "device.purchase_date": ("기기 구매일", "the device purchase date"),
         "device.purchase_price_minor": ("기기 구매 가격", "the device purchase price"),
+        "device.manufacturer": ("기기 제조사", "the device manufacturer"),
         "imei": ("IMEI 번호", "the IMEI number"),
         "device_model": ("기기 모델명", "the device model"),
         "msrp": ("기기 출고가", "the device list price (MSRP)"),
@@ -61,20 +87,28 @@ class DeviceLine(ProductLine):
         "order_number": ("주문 번호", "the order number"),
     }
 
-    def required_needs(self, market: str) -> tuple[str, ...]:
+    def required_needs(self, market: str, values: Mapping[str, Any]) -> tuple[str, ...]:
         # purchase_date is not required here: when unknown, eligibility assumes "bought today" and
         # the application step asks for the real date (see object_attributes / prefill).
-        return ("device_category", "purchase_price_minor")
+        keys = ("device_category", "purchase_price_minor")
+        # Phone cover is limited to some makers, so a phone's maker decides eligibility: ask, never assume.
+        if normalize_device_category(values.get("device_category")) == "SMARTPHONE":
+            return (*keys, "manufacturer")
+        return keys
 
     def normalize_needs(self, values: dict[str, Any]) -> dict[str, Any]:
         if values.get("device_category"):
             values["device_category"] = normalize_device_category(values["device_category"])
+        if values.get("manufacturer"):
+            values["manufacturer"] = normalize_manufacturer(values["manufacturer"])
         return values
 
     def object_attributes(self, values: dict[str, Any], *, residence_country: str | None, today: date) -> dict:
         attrs = {k: v for k, v in values.items() if v is not None}
         if attrs.get("device_category"):
             attrs["device_category"] = normalize_device_category(attrs["device_category"])
+        if attrs.get("manufacturer"):
+            attrs["manufacturer"] = normalize_manufacturer(attrs["manufacturer"])
         # Assumptions, recorded in `assumed_fields` so they are never copied into the application:
         # a device the customer is insuring now is new, undamaged and was bought today unless stated.
         assumed = []
@@ -86,6 +120,10 @@ class DeviceLine(ProductLine):
             if key not in attrs:
                 attrs[key] = default
                 assumed.append(key)
+        # A new phone is activated the day it is bought (phone cover's eligibility window runs from activation).
+        if attrs.get("device_category") == "SMARTPHONE" and "activation_date" not in attrs:
+            attrs["activation_date"] = attrs["purchase_date"]
+            assumed.append("activation_date")
         if assumed:
             attrs["assumed_fields"] = assumed
         return attrs

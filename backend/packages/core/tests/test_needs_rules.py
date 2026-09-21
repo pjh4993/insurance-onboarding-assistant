@@ -6,7 +6,7 @@ from datetime import date
 
 from onboarding_core.needs.rules import compute_needs_missing, described_objects, merge_needs
 from onboarding_core.product_lines import LINES, line_for_object_type
-from onboarding_core.product_lines.device import DEVICE, normalize_device_category
+from onboarding_core.product_lines.device import DEVICE, normalize_device_category, normalize_manufacturer
 from onboarding_core.product_lines.travel import TRAVEL
 
 TODAY = date(2026, 9, 21)
@@ -27,6 +27,38 @@ def test_device_needs_require_category_and_price_unless_the_partner_knows_the_de
         "device.purchase_price_minor",
     ]
     assert compute_needs_missing(BASE, market="KR", partner_object_types={"DEVICE"}) == []
+
+
+def test_a_phone_needs_its_manufacturer_because_phone_cover_depends_on_it():
+    phone = {**BASE, "device": {"device_category": "phone", "purchase_price_minor": 1694000}}
+    assert compute_needs_missing(merge_needs({}, phone, "KR"), market="KR") == ["device.manufacturer"]
+    phone["device"]["manufacturer"] = "Samsung"
+    assert compute_needs_missing(merge_needs({}, phone, "KR"), market="KR") == []
+    laptop = {**BASE, "device": {"device_category": "NOTEBOOK", "purchase_price_minor": 1}}
+    assert compute_needs_missing(laptop, market="KR") == []
+
+
+def test_manufacturers_are_normalized_to_catalog_names():
+    assert normalize_manufacturer("삼성") == "Samsung" and normalize_manufacturer("아이폰") == "Apple"
+    assert normalize_manufacturer("samsung") == "Samsung" and normalize_manufacturer("Xiaomi") == "Xiaomi"
+    merged = merge_needs({}, {"device": {"device_category": "phone", "manufacturer": "삼성 "}}, "KR")
+    assert merged["device"]["manufacturer"] == "Samsung"
+
+
+def test_a_phone_is_assumed_activated_on_its_purchase_date():
+    attrs = DEVICE.object_attributes(
+        {"device_category": "SMARTPHONE", "manufacturer": "Samsung", "purchase_price_minor": 1694000},
+        residence_country="KR",
+        today=TODAY,
+    )
+    assert attrs["activation_date"] == attrs["purchase_date"] == "2026-09-21"
+    assert attrs["assumed_fields"] == ["condition", "has_existing_damage", "purchase_date", "activation_date"]
+    stated = DEVICE.object_attributes(
+        {"device_category": "SMARTPHONE", "purchase_date": "2026-09-10", "activation_date": "2026-09-11"},
+        residence_country="KR",
+        today=TODAY,
+    )
+    assert stated["activation_date"] == "2026-09-11" and "activation_date" not in stated["assumed_fields"]
 
 
 def test_trip_cost_is_required_only_in_the_us():
