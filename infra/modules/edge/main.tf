@@ -201,6 +201,13 @@ resource "aws_lb_listener_rule" "agent_cognito" {
     }
   }
 
+  # Only on the app host: the docs host shares the listener and has no Cognito callback.
+  condition {
+    host_header {
+      values = [var.domain_name]
+    }
+  }
+
   lifecycle {
     precondition {
       condition     = var.cognito != null
