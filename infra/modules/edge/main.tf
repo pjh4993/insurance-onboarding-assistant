@@ -235,7 +235,7 @@ resource "aws_lb_listener_rule" "docs" {
 # rather than recreate it.
 moved {
   from = aws_lb_listener_rule.docs_cognito[0]
-  to   = aws_lb_listener_rule.docs[0]
+  to   = aws_lb_listener_rule.docs
 }
 
 moved {
