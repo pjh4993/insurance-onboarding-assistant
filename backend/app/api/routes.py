@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from app.api.schemas import CreateSessionBody, InputBody, LocaleBody, validate_data
 from app.db.models import OnboardingSession
 from app.services.pubsub import Broker, sse_frame
-from app.services.runtime import InputError, Runtime
+from app.services.runtime import SELF_SERVE, InputError, RateLimited, Runtime
 
 router = APIRouter()
 
@@ -84,10 +84,34 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _link(session: OnboardingSession, token: str) -> dict[str, Any]:
+    return {"session_id": str(session.session_id), "token": token, "customer_path": f"/s/{token}"}
+
+
 @router.post("/api/sessions", status_code=201)
 async def create_session(body: CreateSessionBody, rt: RuntimeDep) -> dict[str, Any]:
     session, token = await rt.create_session(body.market, body.locale)
-    return {"session_id": str(session.session_id), "token": token, "customer_path": f"/s/{token}"}
+    return _link(session, token)
+
+
+@router.post("/api/public/sessions", status_code=201, response_model=None)
+async def create_public_session(
+    body: CreateSessionBody, rt: RuntimeDep, x_client_ip: Annotated[str | None, Header()] = None
+) -> dict[str, Any] | JSONResponse:
+    """A customer starting from the public page. The frontend sets X-Client-IP; without it, every such request
+    shares the one "unknown" bucket. Only an HMAC of the IP is stored."""
+    client_ip = (x_client_ip or "").strip() or "unknown"
+    try:
+        session, token = await rt.create_session(
+            body.market, body.locale, origin=SELF_SERVE, client_ip_hash=rt.client_ip_hash(client_ip)
+        )
+    except RateLimited as exc:
+        return JSONResponse(
+            {"detail": "rate_limited", "retry_after": exc.retry_after},
+            status_code=429,
+            headers={"Retry-After": str(exc.retry_after)},
+        )
+    return _link(session, token)
 
 
 # ------------------------------------------------------------------------------------ customer

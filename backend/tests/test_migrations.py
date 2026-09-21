@@ -74,6 +74,8 @@ async def test_a_pre_migration_database_is_stamped_and_upgraded(fresh_url):
     await engine.dispose()
 
     with sync.connect() as conn:
-        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0003"
         assert conn.scalar(text("SELECT locale FROM domain.onboarding_session")) == "ko"
+        assert conn.scalar(text("SELECT origin FROM domain.onboarding_session")) == "AGENT_LINK"
+        assert conn.scalar(text("SELECT client_ip_hash FROM domain.onboarding_session")) is None
     sync.dispose()

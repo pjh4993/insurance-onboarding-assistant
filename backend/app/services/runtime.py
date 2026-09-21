@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import secrets
 import uuid
 from collections.abc import Awaitable, Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
@@ -36,6 +37,11 @@ log = logging.getLogger(__name__)
 
 TERMINAL_STATUS = {"SUBMITTED": "SUBMITTED", "DECLINED": "DECLINED", "WITHDRAWN": "WITHDRAWN"}
 
+AGENT_LINK, SELF_SERVE = "AGENT_LINK", "SELF_SERVE"
+SELF_SERVE_WINDOW = timedelta(hours=1)
+# Transaction-scoped advisory lock around the self-serve count-and-insert (init_db uses 724001).
+SELF_SERVE_LOCK = 724002
+
 
 def entity_listener(broker: Broker) -> EntityListener:
     """The agent's `on_entity` hook: tell SSE subscribers a domain entity changed."""
@@ -57,6 +63,15 @@ class InputError(Exception):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+
+
+class RateLimited(Exception):
+    """A self-serve start over a limit. `scope` is "ip" or "global"; `retry_after` is in whole seconds."""
+
+    def __init__(self, scope: str, retry_after: int) -> None:
+        super().__init__(f"self-serve {scope} limit reached")
+        self.scope = scope
+        self.retry_after = retry_after
 
 
 class Runtime:
@@ -96,12 +111,26 @@ class Runtime:
 
     # ------------------------------------------------------------------------------- sessions
 
-    async def create_session(self, market: str, locale: str | None = None) -> tuple[OnboardingSession, str]:
+    def client_ip_hash(self, client_ip: str) -> str:
+        return hmac_hex(self.settings.session_hmac_key, client_ip)
+
+    async def create_session(
+        self,
+        market: str,
+        locale: str | None = None,
+        *,
+        origin: str = AGENT_LINK,
+        client_ip_hash: str | None = None,
+    ) -> tuple[OnboardingSession, str]:
+        """Create a session and run the graph's first turn. A SELF_SERVE start is checked against the
+        rate limits in the same transaction as the insert, and raises RateLimited when over one."""
         now = self.clock()
         locale = locale or default_locale(market)
         token = secrets.token_urlsafe(32)
         session_id, party_id = uuid.uuid4(), uuid.uuid4()
         async with self.sessionmaker() as s, s.begin():
+            if origin == SELF_SERVE:
+                await self._check_self_serve_limits(s, client_ip_hash, now)
             s.add(
                 Party(party_id=party_id, party_type="PERSON", verification_status="UNVERIFIED", verification_attempts=0)
             )
@@ -119,9 +148,14 @@ class Runtime:
                 mode="AUTO",
                 started_at=now,
                 last_activity_at=now,
+                origin=origin,
+                client_ip_hash=client_ip_hash,
             )
             s.add(session)
-        log.info("session created", extra={"session_id": str(session_id), "market": market, "locale": locale})
+        log.info(
+            "session created",
+            extra={"session_id": str(session_id), "market": market, "locale": locale, "origin": origin},
+        )
         await self._run(
             session,
             lambda sink, extra: self.agent.start(
@@ -135,6 +169,36 @@ class Runtime:
             ),
         )
         return await self.get_session(str(session_id)), token
+
+    async def _check_self_serve_limits(self, s: AsyncSession, client_ip_hash: str | None, now: datetime) -> None:
+        """Count SELF_SERVE sessions started in the last hour, per IP and overall, from the DB so the limits
+        hold across replicas. The advisory lock is held until the transaction commits the new row, so two
+        concurrent requests cannot both take the last slot."""
+        await s.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": SELF_SERVE_LOCK})
+        since = now - SELF_SERVE_WINDOW
+        recent = (OnboardingSession.origin == SELF_SERVE, OnboardingSession.started_at > since)
+        same_ip = OnboardingSession.client_ip_hash == client_ip_hash
+        checks = (
+            ("ip", self.settings.self_serve_per_ip_per_hour, (*recent, same_ip)),
+            ("global", self.settings.self_serve_per_hour, recent),
+        )
+        for scope, limit, where in checks:
+            count = await s.scalar(select(func.count()).select_from(OnboardingSession).where(*where))
+            if count < limit:
+                continue
+            # The slot frees when enough of the counted sessions leave the window to drop below the limit;
+            # with count == limit, that is the oldest one.
+            freed_at = await s.scalar(
+                select(OnboardingSession.started_at)
+                .where(*where)
+                .order_by(OnboardingSession.started_at)
+                .offset(count - limit)
+                .limit(1)
+            )
+            wait = (freed_at + SELF_SERVE_WINDOW - now) if freed_at else SELF_SERVE_WINDOW  # None: a limit of 0
+            retry_after = max(1, math.ceil(wait.total_seconds()))
+            log.warning("self-serve rate limited", extra={"scope": scope, "retry_after": retry_after})
+            raise RateLimited(scope, retry_after)
 
     def is_busy(self, session_id: str) -> bool:
         lock = self._locks.get(session_id)

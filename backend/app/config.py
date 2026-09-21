@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     checkpoint_aes_key: str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
     session_hmac_key: str = "dev-session-hmac-key"
     session_link_ttl_hours: int = 48
+    # Public self-serve starts (POST /api/public/sessions), counted from the DB over the last hour.
+    self_serve_per_ip_per_hour: int = 5
+    self_serve_per_hour: int = 200
 
     retry_max_attempts: int = 3
     retry_initial_interval: float = 0.5

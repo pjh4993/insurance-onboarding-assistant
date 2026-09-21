@@ -35,6 +35,7 @@ def summary_view(session: OnboardingSession, party: Party | None) -> dict[str, A
         "display_name": display_name(session, party),
         "market": session.market,
         "locale": session.locale,
+        "origin": session.origin,
         "status": session.status,
         "stage": session.last_stage,
         "waiting_for": session.waiting_for,

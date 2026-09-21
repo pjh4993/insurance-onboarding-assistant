@@ -43,7 +43,9 @@ Environment variables (backend):
 | `BEDROCK_MODEL_ID` | `global.anthropic.claude-sonnet-4-6` | |
 | `AWS_REGION` | `ap-northeast-2` | |
 | `CHECKPOINT_AES_KEY` | 64 hex chars (dev value in compose) | checkpoint encryption |
-| `SESSION_HMAC_KEY` | dev value | session-link token HMAC |
+| `SESSION_HMAC_KEY` | dev value | session-link token HMAC; also keys the client-IP hash of self-serve sessions |
+| `SELF_SERVE_PER_IP_PER_HOUR` | `5` | self-serve starts one client IP may make in any 3600 s |
+| `SELF_SERVE_PER_HOUR` | `200` | self-serve starts across all clients in any 3600 s |
 
 Frontend: `BACKEND_URL=http://backend:8000`, `AGENT_DEV_AUTH=true` (sends `X-Agent-Id: agent-demo`).
 The browser never calls the backend directly; Next.js route handlers under `frontend/app/api/*` proxy to `BACKEND_URL`,
@@ -55,7 +57,14 @@ All JSON. Money is integer minor units + ISO 4217 currency. Times are ISO 8601 U
 
 ### Session links
 - `POST /api/sessions` body `{"market": "KR" | "US", "locale"?: Locale}` → `201 {"session_id", "token", "customer_path": "/s/{token}"}`.
-  `locale` defaults to the market's language (`KR` → `ko`, `US` → `en`)
+  `locale` defaults to the market's language (`KR` → `ko`, `US` → `en`). The session's `origin` is `"AGENT_LINK"`.
+- `POST /api/public/sessions` (public landing page, no agent auth) body as `POST /api/sessions`, header
+  `X-Client-IP: <ip>` set by the frontend → `201` with the same body as `POST /api/sessions`; the session's `origin` is
+  `"SELF_SERVE"`. Rate-limited, counted in the DB over the last 3600 s across all replicas: `SELF_SERVE_PER_IP_PER_HOUR`
+  per client IP and `SELF_SERVE_PER_HOUR` overall; agent-link sessions do not count. A missing or blank `X-Client-IP`
+  is treated as `"unknown"`, one shared bucket. Over a limit → `429 {"detail": "rate_limited", "retry_after": <int s>}`
+  with a `Retry-After: <int s>` header (seconds until the oldest counted session leaves the window, at least 1).
+  Only an HMAC-SHA256 of the IP (keyed with `SESSION_HMAC_KEY`) is stored, never the IP itself
 - `GET /healthz` → `{"status": "ok"}`
 
 ### Customer (header `X-Session-Token: <token>`)
@@ -82,7 +91,7 @@ type Locale = "ko" | "en";                            // the session's language:
 
 type SessionSummary = {
   session_id: string; display_name: string;          // "Unverified #1a2b" until identity is verified
-  market: "KR" | "US"; locale: Locale; status: "ACTIVE" | "SUBMITTED" | "DECLINED" | "WITHDRAWN" | "HANDOFF" | "EXPIRED";
+  market: "KR" | "US"; locale: Locale; origin: "AGENT_LINK" | "SELF_SERVE"; status: "ACTIVE" | "SUBMITTED" | "DECLINED" | "WITHDRAWN" | "HANDOFF" | "EXPIRED";
   stage: Stage; waiting_for: WaitingFor; mode: "AUTO" | "ASSIST";
   assigned_agent_id: string | null; last_activity_at: string;
 };

@@ -20,6 +20,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -139,7 +140,12 @@ party = Table(
 
 class OnboardingSession(Base):
     __tablename__ = "onboarding_session"
-    __table_args__ = {"schema": "domain"}
+    __table_args__ = (
+        # The self-serve rate limits count recent sessions globally and per client IP.
+        Index("ix_domain_onboarding_session_origin_started_at", "origin", "started_at"),
+        Index("ix_domain_onboarding_session_client_ip_hash_started_at", "client_ip_hash", "started_at"),
+        {"schema": "domain"},
+    )
 
     session_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
     thread_id: Mapped[str] = mapped_column(String(64), unique=True)
@@ -157,6 +163,10 @@ class OnboardingSession(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # AGENT_LINK: an agent created the link. SELF_SERVE: the customer started it from the public page.
+    origin: Mapped[str] = mapped_column(String(16), default="AGENT_LINK", server_default="AGENT_LINK")
+    # HMAC of the client IP for self-serve sessions (keyed with SESSION_HMAC_KEY); the raw IP is never stored.
+    client_ip_hash: Mapped[str | None] = mapped_column(String(64))
 
 
 needs_assessment = Table(
