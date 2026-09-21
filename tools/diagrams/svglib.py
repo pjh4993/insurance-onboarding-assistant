@@ -7,8 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 STANDALONE_STYLE = (
-    "<style>svg{color:#1f2328;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}"
-    "@media (prefers-color-scheme:dark){svg{color:#e6edf3}}</style>"
+    "<style>svg{color:#1f2328;background:#ffffff;"
+    "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}</style>"
 )
 
 BLUE, PURPLE, ORANGE, GREEN = "#2563eb", "#7c3aed", "#d97706", "#059669"
@@ -88,9 +88,9 @@ class Svg:
                           f'fill="currentColor" fill-opacity="0.8">{esc(lab)}</text>')
 
     def render(self):
-        # The <style> only matters when the file is shown as an <img> (GitHub): it gives currentColor a value
-        # and follows the viewer's color scheme. The docs site inlines the SVG and strips it (see .mkdocs/hooks.py),
-        # so the diagram takes the page's own colors and font instead.
+        # The <style> only matters when the file is shown on its own or as an <img> (GitHub): dark lines on a white
+        # background, whatever the viewer's theme. The docs site inlines the SVG and strips it (see .mkdocs/hooks.py),
+        # so there the diagram takes the page's own colors, light or dark, and font.
         return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {self.w} {self.h}" role="img" '
                 f'aria-label="{esc(self.label)}" '
                 f'style="width:100%;height:auto;max-width:{self.w}px;display:block;margin:0 auto" '
