@@ -132,6 +132,6 @@ same; only `terraform.tfvars` differs.
 
 Scope for this submission: `envs/develop` is the environment the deploy workflow targets; `envs/prod` uses the
 same code with different variables, and applying it is deferred. Two things must change before prod: the
-backend's in-process SSE broker and session locks assume one backend task (prod asks for two), and the frontend
+backend's in-process session lock assumes one backend task (prod asks for two; SSE events already cross tasks over Postgres `LISTEN/NOTIFY`), and the frontend
 must verify the ALB's signed agent header before `AGENT_DEV_AUTH` can be turned off. See
 [future-improvements.md](future-improvements.md).

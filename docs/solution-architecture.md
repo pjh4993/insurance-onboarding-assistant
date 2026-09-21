@@ -171,7 +171,8 @@ flowchart LR
 ```
 
 The left column is why sessions can be resumed: the API receives input, finds the thread for the session,
-and the checkpointer loads the paused state. The per-session lock and the SSE broker live in the backend
+and the checkpointer loads the paused state. SSE events reach every backend replica through Postgres `LISTEN/NOTIFY`
+(`SSE_BROKER=postgres`; local runs keep the in-memory broker). The per-session lock still lives in the backend
 process, so the backend runs as a single replica for now (see [tradeoffs.md](tradeoffs.md#4-application-design)).
 
 Eligibility, ranking and pricing are plain code, not LLM calls. An agent must be able to see **why** a product

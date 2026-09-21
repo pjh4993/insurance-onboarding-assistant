@@ -1,6 +1,6 @@
-"""SSE pub/sub. `Broker` is the seam; `InMemoryBroker` serves one process only, and a multi-replica
-deployment swaps in a Postgres LISTEN/NOTIFY or Redis implementation without changing the event
-shapes (CONTRACTS.md §3 SSE)."""
+"""SSE pub/sub. `Broker` is the seam; `InMemoryBroker` serves one process only, and
+`PostgresBroker` (pg_broker.py) relays through LISTEN/NOTIFY for several replicas, with the same
+event shapes (CONTRACTS.md §3 SSE)."""
 
 from __future__ import annotations
 
@@ -38,6 +38,7 @@ class Broker(Protocol):
         ...
 
 
+_CLOSE = Event("", "__close", {})
 _Subscription = tuple[str | None, asyncio.Queue[Event]]
 
 
@@ -46,12 +47,22 @@ class InMemoryBroker:
         self._queue_size = queue_size
         self._subs: set[_Subscription] = set()
 
+    def _matching(self, session_id: str | None) -> list[_Subscription]:
+        return [s for s in list(self._subs) if session_id is None or s[0] is None or s[0] == session_id]
+
     async def publish(self, event: Event) -> None:
-        for session_filter, queue in list(self._subs):
-            if session_filter is None or session_filter == event.session_id:
-                # A slow consumer drops events; clients refetch on reconnect.
-                with contextlib.suppress(asyncio.QueueFull):
-                    queue.put_nowait(event)
+        for _, queue in self._matching(event.session_id):
+            # A slow consumer drops events; clients refetch on reconnect.
+            with contextlib.suppress(asyncio.QueueFull):
+                queue.put_nowait(event)
+
+    def close_streams(self, session_id: str | None = None) -> None:
+        """End the streams that see `session_id` (all when None); EventSource reconnects and refetches."""
+        for _, queue in self._matching(session_id):
+            # Clear room for the sentinel: the dropped events are covered by the refetch.
+            while queue.full():
+                queue.get_nowait()
+            queue.put_nowait(_CLOSE)
 
     async def stream(
         self, session_id: str | None, ping_seconds: float, initial: list[str] | None = None
@@ -67,6 +78,8 @@ class InMemoryBroker:
                 except TimeoutError:
                     yield PING_FRAME
                     continue
+                if event is _CLOSE:
+                    return
                 yield sse_frame(event.type, event.data)
         finally:
             self._subs.discard(sub)

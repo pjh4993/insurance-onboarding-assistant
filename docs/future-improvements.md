@@ -10,7 +10,7 @@ be closed before real use.
 
 | Limit | Today | Fix |
 |---|---|---|
-| SSE and session locks are in-process | The SSE broker and the per-session lock live in one backend process. Run a single backend replica, or keep each session on one replica end to end. Prod's composition asks for two tasks | Move pub/sub to Postgres `LISTEN/NOTIFY` or Redis and the lock to a Postgres advisory lock. The event shapes stay the same |
+| Session locks are in-process | SSE events already cross replicas (`SSE_BROKER=postgres`, Postgres `LISTEN/NOTIFY`), but the per-session lock that serialises graph runs lives in one backend process. Run a single backend replica, or keep each session on one replica end to end. Prod's composition asks for two tasks | Move the lock to a Postgres advisory lock keyed by session |
 | Session links do not expire | `token_expires_at` (48 hours) is stored but not checked; the browser cookie lasts 24 hours | Reject expired tokens in the backend's token lookup |
 | Agent header is not verified | The frontend's agent auth is a development switch (`AGENT_DEV_AUTH=true`, every agent is `agent-demo`). The hook for the ALB's Cognito headers exists, but verifying the signed `x-amzn-oidc-data` JWT is a `TODO` | Verify the JWT with the ALB public key (fetched through NAT), use its `sub` as the agent ID, then turn `AGENT_DEV_AUTH` off |
 | One customer session per browser | The session cookie holds one token; opening a second link replaces it | Scope the cookie per session, or keep the token in the page URL path for API calls |
@@ -42,7 +42,7 @@ be closed before real use.
 | Item | What it would do | Notes |
 |---|---|---|
 | Prod domain | Give prod a hostname (for example `app.onboardassist.click` with `route53_zone_name = "onboardassist.click"`) so it gets HTTPS and Cognito like develop | develop already has `onboardassist.click`. Terraform is switched by `domain_name` |
-| Prod apply | Apply `envs/prod` (Multi-AZ RDS, two tasks per service, endpoints in both AZs, NAT per AZ) | Needs the shared SSE broker first (two backend tasks). Real partner, identity and contract admin endpoints do not exist yet |
+| Prod apply | Apply `envs/prod` (Multi-AZ RDS, two tasks per service, endpoints in both AZs, NAT per AZ) | Needs the per-session lock in Postgres first (two backend tasks). Real partner, identity and contract admin endpoints do not exist yet |
 | Prod promotion run | Run `deploy-prod.yml`, which deploys the develop-verified image SHA after approval | The workflow is built |
 | Full smoke test | After each develop deploy, run seed customer A end to end through the ALB | Today: `/healthz` through the frontend to the backend |
 | Plan on pull requests | Run `terraform plan` for develop in CI and post it on the PR | Today CI runs `fmt` and `validate` only |

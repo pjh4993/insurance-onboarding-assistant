@@ -136,7 +136,7 @@ Built for this submission:
 
 Known limits (details in [docs/future-improvements.md](docs/future-improvements.md#1-known-limits-of-what-is-built)):
 
-- SSE pub/sub and per-session locks are in-process: run one backend replica (or keep sessions sticky).
+- The per-session lock is in-process: run one backend replica (or keep sessions sticky). SSE events already cross replicas over Postgres `LISTEN/NOTIFY` (`SSE_BROKER=postgres` in AWS).
 - Session links store `token_expires_at` but do not enforce it.
 - Agent auth in the frontend is a development switch (`AGENT_DEV_AUTH`); the hook for the ALB's Cognito headers
   exists, but verifying `x-amzn-oidc-data` is a TODO.

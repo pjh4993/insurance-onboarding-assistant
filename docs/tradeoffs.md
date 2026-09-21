@@ -105,7 +105,8 @@ ratio still needs measuring.
 | Handoff split into `human_handoff` (writes) and `await_agent` (interrupt) | One node | An interrupted node re-runs from the top on resume. Doing the writes in a node before the pause saves them once, and the agent sees the handoff state while the session waits |
 | 3-round cap on the needs and answers loops | Asking until the customer gets it right | A customer (or a fixed mock answer) that never fills a field would loop forever. After 3 rounds an agent takes over |
 | Input returns `202` and the graph runs in a background task | A synchronous response with the next question | LLM calls take seconds; the UI already listens on SSE, so the request returns at once and the result streams in |
-| SSE broker and per-session locks in the backend process | Several backend replicas | No Redis or `LISTEN/NOTIFY` to run. It means one backend replica (or session affinity end to end); prod's two tasks need a shared broker first |
+| SSE fan-out over Postgres `LISTEN/NOTIFY` | Redis pub/sub; a hosted hub (Centrifugo, AppSync Events) | No new infrastructure: the RDS instance is already there. Payloads are capped at 8000 bytes, so a larger event closes the session's streams and the browser refetches. Delivery is at most once, covered by the refetch every reconnect already does |
+| Per-session lock in the backend process | A Postgres advisory lock | Simplest correct lock for one replica. Prod's two tasks need it moved to Postgres first |
 | Keep ineligible recommendations as rows | Smaller tables | The agent can see why a product is missing |
 | Needs assessments versioned, never edited | Simpler updates | Each recommendation keeps the exact assessment it was based on |
 | One mock with fault injection | Testing against real partners | Deterministic tests and a repeatable demo of retries and handoff |

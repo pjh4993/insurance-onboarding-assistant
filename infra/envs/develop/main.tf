@@ -197,6 +197,7 @@ module "backend" {
     DATABASE_URL     = "postgresql+psycopg://${module.data.db_username}@${module.data.db_address}:${module.data.db_port}/${module.data.db_name}?sslmode=require"
     BEDROCK_MODEL_ID = var.bedrock_model_id
     AWS_REGION       = var.region
+    SSE_BROKER       = "postgres"
   })
 
   secrets = {

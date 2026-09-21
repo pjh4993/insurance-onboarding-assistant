@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -41,6 +42,8 @@ class Settings(BaseSettings):
     retry_initial_interval: float = 0.5
 
     sse_ping_seconds: float = 15.0
+    # memory: one process only. postgres: LISTEN/NOTIFY, needed once the backend runs more than one task.
+    sse_broker: Literal["memory", "postgres"] = "memory"
 
     @field_validator("bedrock_endpoint_url", mode="before")
     @classmethod
