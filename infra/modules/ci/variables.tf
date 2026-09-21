@@ -20,7 +20,13 @@ variable "oidc_subjects" {
 }
 
 variable "create_shared_resources" {
-  description = "Create the account-wide GitHub OIDC provider and the ECR repositories. true in exactly one env (develop); the other looks them up."
+  description = "Create the ECR repositories. true in exactly one env (develop); the other looks them up."
+  type        = bool
+  default     = false
+}
+
+variable "create_github_oidc_provider" {
+  description = "Create the account-wide GitHub OIDC provider. false when the account already has one (only one per URL is allowed); it is then looked up."
   type        = bool
   default     = false
 }

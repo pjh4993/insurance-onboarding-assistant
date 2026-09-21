@@ -135,6 +135,12 @@ variable "route53_zone_name" {
 
 # --- ci ---------------------------------------------------------------------
 
+variable "create_github_oidc_provider" {
+  description = "Create the GitHub OIDC provider. false when the AWS account already has one."
+  type        = bool
+  default     = false
+}
+
 variable "create_shared_ci_resources" {
   description = "Create the GitHub OIDC provider and ECR repositories. true in develop only."
   type        = bool

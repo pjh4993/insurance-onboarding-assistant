@@ -104,12 +104,13 @@ module "edge" {
 module "ci" {
   source = "../../modules/ci"
 
-  name                    = local.name
-  project                 = var.project
-  oidc_subjects           = var.github_oidc_subjects
-  create_shared_resources = var.create_shared_ci_resources
-  state_bucket_name       = var.state_bucket_name
-  lock_table_name         = var.lock_table_name
+  name                        = local.name
+  project                     = var.project
+  oidc_subjects               = var.github_oidc_subjects
+  create_shared_resources     = var.create_shared_ci_resources
+  create_github_oidc_provider = var.create_github_oidc_provider
+  state_bucket_name           = var.state_bucket_name
+  lock_table_name             = var.lock_table_name
 }
 
 # ---------------------------------------------------------------------------

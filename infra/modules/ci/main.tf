@@ -5,18 +5,19 @@ locals {
   account_id  = data.aws_caller_identity.current.account_id
   partition   = data.aws_partition.current.partition
   oidc_host   = "token.actions.githubusercontent.com"
-  oidc_arn    = var.create_shared_resources ? aws_iam_openid_connect_provider.github[0].arn : data.aws_iam_openid_connect_provider.github[0].arn
+  oidc_arn    = var.create_github_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : data.aws_iam_openid_connect_provider.github[0].arn
   repo_urls   = var.create_shared_resources ? { for k, r in aws_ecr_repository.this : k => r.repository_url } : { for k, r in data.aws_ecr_repository.this : k => r.repository_url }
   repo_arns   = var.create_shared_resources ? [for r in aws_ecr_repository.this : r.arn] : [for r in data.aws_ecr_repository.this : r.arn]
   subject_ids = [for s in var.oidc_subjects : "repo:${var.github_repository}:${s}"]
 }
 
 # ---------------------------------------------------------------------------
-# GitHub OIDC provider (account-wide, created once)
+# GitHub OIDC provider (account-wide, created once; an account holds only one
+# provider per URL, so reuse it when another project already created it)
 # ---------------------------------------------------------------------------
 
 resource "aws_iam_openid_connect_provider" "github" {
-  count = var.create_shared_resources ? 1 : 0
+  count = var.create_github_oidc_provider ? 1 : 0
 
   url            = "https://${local.oidc_host}"
   client_id_list = ["sts.amazonaws.com"]
@@ -26,7 +27,7 @@ resource "aws_iam_openid_connect_provider" "github" {
 }
 
 data "aws_iam_openid_connect_provider" "github" {
-  count = var.create_shared_resources ? 0 : 1
+  count = var.create_github_oidc_provider ? 0 : 1
   url   = "https://${local.oidc_host}"
 }
 
