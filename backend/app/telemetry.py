@@ -104,6 +104,9 @@ def setup_otel(app: FastAPI, settings: Settings) -> None:
         otlp = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
         otlp.addFilter(CapLength(settings.log_max_chars))
         logging.getLogger().addHandler(otlp)
+        # uvicorn's loggers do not propagate to root: one access line per request, health checks already dropped.
+        for name in ("uvicorn.access", "uvicorn.error"):
+            logging.getLogger(name).addHandler(otlp)
 
         HTTPXClientInstrumentor().instrument()
         BotocoreInstrumentor().instrument()
