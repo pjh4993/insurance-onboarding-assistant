@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -87,16 +87,53 @@ class Flow:
         )
 
 
+# Stores a free-form answer of one kind: (flow, state, value, now) -> (transcript text, state updates).
+InputRecorder = Callable[["Flow", dict[str, Any], dict[str, Any], datetime], Awaitable[tuple[str, dict[str, Any]]]]
+# Applies an agent's resolution of one handoff reason: (flow, state, resolution, now) -> (messages, updates).
+HandoffResolver = Callable[
+    ["Flow", dict[str, Any], str | None, datetime], Awaitable[tuple[list[BaseMessage], dict[str, Any]]]
+]
+
+
+@dataclass(frozen=True)
+class InputKind:
+    """A kind of free-form answer (`waiting_for`) a domain asks `ask_customer` to collect."""
+
+    target: str  # the node that handles the answer
+    record: InputRecorder | None = None  # stores it; without one the answer is kept as a message only
+
+
+@dataclass(frozen=True)
+class HandoffKind:
+    """A `handoff_reason` a domain raises, and what an agent's resolution of it does."""
+
+    resume: Router  # where the session continues when the agent does not END it
+    resolve: HandoffResolver | None = None
+
+
 @dataclass(frozen=True)
 class DomainModule:
     """One domain's part of the graph. Every node has a router; node names are checkpointed, so they are
     stable across releases (see `test_node_names_are_stable`)."""
 
     name: str
-    flow: type[Flow]  # its methods named after `edges` keys are the nodes
+    flow: Callable[[AgentDeps], Flow]  # its methods named after `edges` keys are the nodes
     edges: Mapping[str, Router]  # node name -> the router of its outgoing conditional edge
     retrying: frozenset[str] = field(default_factory=frozenset)  # nodes that call the LLM or an external system
+    inputs: Mapping[str, InputKind] = field(default_factory=dict)  # waiting_for -> how to take the answer
+    handoffs: Mapping[str, HandoffKind] = field(default_factory=dict)  # handoff_reason -> its resolution
 
     def nodes(self, deps: AgentDeps) -> dict[str, NodeFn]:
         flow = self.flow(deps)
         return {name: getattr(flow, name) for name in self.edges}
+
+
+def collect(domains: Sequence[DomainModule], attr: str) -> dict[str, Any]:
+    """Merge one registry (`inputs`, `handoffs`, `edges`) across domains; a key may be claimed only once."""
+    merged: dict[str, Any] = {}
+    for d in domains:
+        for key, value in getattr(d, attr).items():
+            if key in merged:
+                raise ValueError(f"{attr} {key!r} is declared twice (again by {d.name})")
+            merged[key] = value
+    return merged

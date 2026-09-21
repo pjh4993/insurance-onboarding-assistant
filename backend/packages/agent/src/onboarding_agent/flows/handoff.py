@@ -1,8 +1,11 @@
 """Handing a session to a person: `human_handoff` records why and where to resume, `await_agent` applies
-the agent's resolution."""
+the agent's resolution. What a resolution does, and where the session goes next, is declared by the domain
+that raised the reason (`DomainModule.handoffs`)."""
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 from typing import Any
 
 from langchain_core.messages import BaseMessage
@@ -10,11 +13,27 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END
 from langgraph.types import interrupt
 
-from onboarding_agent.flows.base import DomainModule, Flow
+from onboarding_agent.deps import AgentDeps
+from onboarding_agent.flows.base import DomainModule, Flow, HandoffKind, collect
 from onboarding_agent.texts import human, locale_of, note, say, t
 
 
+async def resolve_error(
+    flow: Flow, state: dict[str, Any], resolution: str | None, now: datetime
+) -> tuple[list[BaseMessage], dict[str, Any]]:
+    return [], {"stage": state.get("resume_stage") or "IDENTITY"}
+
+
+def resume_error(state: dict[str, Any]) -> str:
+    """An ERROR handoff re-runs the node that failed, with the input it had."""
+    return state.get("resume_node") or END
+
+
 class HandoffFlow(Flow):
+    def __init__(self, deps: AgentDeps, handoffs: Mapping[str, HandoffKind]) -> None:
+        super().__init__(deps)
+        self.handoffs = handoffs
+
     async def human_handoff(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         err = state.get("last_error")
         reason = "ERROR" if err else state.get("handoff_reason") or "ERROR"
@@ -62,27 +81,10 @@ class HandoffFlow(Flow):
         if resolution == "END":
             out["stage"] = "WITHDRAWN"
             msgs.append(say(t(lang, "상담원이 상담을 종료했습니다.", "The agent has closed this session."), now))
-        elif reason == "IDENTITY_FAILED":
-            async with self.d.uow() as uow:
-                party = await self._party(uow, state)
-                if resolution == "VERIFIED":
-                    party.verification_status = "VERIFIED"
-                    party.verification_method = "AGENT"
-                    party.verified_at = now
-                else:
-                    party.verification_status = "UNVERIFIED"
-                    party.verification_attempts = 0
-            await self._touch(state, "party", state["party_id"])
-            if resolution == "VERIFIED":
-                msgs.append(
-                    say(t(lang, "상담원이 본인 확인을 마쳤습니다.", "An agent has verified your identity."), now)
-                )
-        elif reason in ("NO_ELIGIBLE_PRODUCT", "NEEDS_INCOMPLETE"):
-            out.update(stage="PROFILING", needs_complete=False, needs_rounds=0)
-        elif reason == "ANSWERS_INCOMPLETE":
-            out.update(stage="APPLICATION", answers_complete=False, answers_rounds=0)
-        elif reason == "ERROR":
-            out["stage"] = state.get("resume_stage") or "IDENTITY"
+        elif (kind := self.handoffs.get(reason or "")) is not None and kind.resolve is not None:
+            extra, updates = await kind.resolve(self, state, resolution, now)
+            msgs += extra
+            out.update(updates)
         out["messages"] = msgs
         return out
 
@@ -91,29 +93,22 @@ def after_human_handoff(state: dict[str, Any]) -> str:
     return "await_agent"
 
 
-def after_await_agent(state: dict[str, Any]) -> str:
-    """Where an agent's resolution sends the session."""
-    resolution = state.get("handoff_resolution")
-    reason = state.get("handoff_reason")
-    if resolution == "END":
-        return END
-    if reason == "IDENTITY_FAILED":
-        return "fetch_purchases" if resolution == "VERIFIED" else "greet"
-    if reason in ("NO_ELIGIBLE_PRODUCT", "NEEDS_INCOMPLETE"):
-        return "assess_needs"
-    if reason == "ANSWERS_INCOMPLETE":
-        return "collect_answers"
-    if reason == "ERROR" and state.get("resume_node"):
-        return state["resume_node"]
-    return END
+def module(domains: Sequence[DomainModule]) -> DomainModule:
+    """The handoff nodes, resolving the reasons `domains` raise plus ERROR (a node that ran out of retries)."""
+    handoffs: dict[str, HandoffKind] = {
+        "ERROR": HandoffKind(resume_error, resolve_error),
+        **collect(domains, "handoffs"),
+    }
 
+    def after_await_agent(state: dict[str, Any]) -> str:
+        """Where an agent's resolution sends the session."""
+        if state.get("handoff_resolution") == "END":
+            return END
+        kind = handoffs.get(state.get("handoff_reason") or "")
+        return kind.resume(state) if kind is not None else END
 
-MODULE = DomainModule(
-    name="handoff",
-    flow=HandoffFlow,
-    edges={
-        "human_handoff": after_human_handoff,
-        "await_agent": after_await_agent,
-    },
-    retrying=frozenset(),
-)
+    return DomainModule(
+        name="handoff",
+        flow=lambda deps: HandoffFlow(deps, handoffs),
+        edges={"human_handoff": after_human_handoff, "await_agent": after_await_agent},
+    )

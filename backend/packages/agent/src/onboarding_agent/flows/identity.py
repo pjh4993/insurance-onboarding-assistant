@@ -2,15 +2,84 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
+from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 
-from onboarding_agent.flows.base import DomainModule, Flow
+from onboarding_agent.flows.base import DomainModule, Flow, HandoffKind, InputKind
 from onboarding_agent.routing import HANDOFF, has_error
 from onboarding_agent.texts import locale_of, mask_phone, say, t
-from onboarding_core.crypto import decrypt_field
+from onboarding_core.crypto import decrypt_field, encrypt_field, hmac_hex
 from onboarding_core.util import iso, parse_date
+
+
+async def record_identity_info(
+    flow: Flow, state: dict[str, Any], value: dict[str, Any], now: datetime
+) -> tuple[str, dict[str, Any]]:
+    """The customer's contact details, ID document (encrypted, plus an HMAC) and partner consent."""
+    lang = locale_of(state)
+    async with flow.d.uow() as uow:
+        party = await flow._party(uow, state)
+        party.full_name = str(value.get("full_name") or "").strip() or None
+        party.email = str(value.get("email") or "").strip() or None
+        party.phone = str(value.get("phone") or "").strip() or None
+        party.id_document_type = value.get("id_document_type")
+        number = str(value.get("id_document_number") or "").strip()
+        if number:
+            party.id_document_number_enc = encrypt_field(flow.d.config.aes_key, number)
+            party.id_document_hmac = hmac_hex(flow.d.config.hmac_key, number)
+        if value.get("date_of_birth"):
+            party.date_of_birth = parse_date(value["date_of_birth"])
+        party.third_party_consent_at = now if value.get("third_party_consent") else None
+        party.verification_status = "PENDING"
+    await flow._touch(state, "party", state["party_id"])
+    consent = t(
+        lang,
+        "동의" if value.get("third_party_consent") else "동의 안 함",
+        "yes" if value.get("third_party_consent") else "no",
+    )
+    text = t(
+        lang,
+        f"본인 정보를 입력했습니다 — {party.full_name} (파트너 조회 {consent})",
+        f"Identity details submitted — {party.full_name} (partner lookup consent: {consent})",
+    )
+    return text, {"identity_result": None}
+
+
+async def record_otp_code(
+    flow: Flow, state: dict[str, Any], value: dict[str, Any], now: datetime
+) -> tuple[str, dict[str, Any]]:
+    """The OTP the customer typed, kept only until check_otp uses it."""
+    # Wrapped in a dict so it lands in an encrypted blob: the saver stores primitive
+    # channel values inline in the plaintext `checkpoints.checkpoint` JSONB.
+    text = t(locale_of(state), "인증번호를 입력했습니다.", "Entered the verification code.")
+    return text, {"otp_code": {"code": str(value.get("code", "")).strip()}}
+
+
+async def resolve_identity_failure(
+    flow: Flow, state: dict[str, Any], resolution: str | None, now: datetime
+) -> tuple[list[BaseMessage], dict[str, Any]]:
+    """An agent verified the customer, or sends them back to start identity over."""
+    lang, msgs = locale_of(state), []
+    async with flow.d.uow() as uow:
+        party = await flow._party(uow, state)
+        if resolution == "VERIFIED":
+            party.verification_status = "VERIFIED"
+            party.verification_method = "AGENT"
+            party.verified_at = now
+        else:
+            party.verification_status = "UNVERIFIED"
+            party.verification_attempts = 0
+    await flow._touch(state, "party", state["party_id"])
+    if resolution == "VERIFIED":
+        msgs.append(say(t(lang, "상담원이 본인 확인을 마쳤습니다.", "An agent has verified your identity."), now))
+    return msgs, {}
+
+
+def resume_after_identity_failure(state: dict[str, Any]) -> str:
+    return "fetch_purchases" if state.get("handoff_resolution") == "VERIFIED" else "greet"
 
 
 class IdentityFlow(Flow):
@@ -147,4 +216,9 @@ MODULE = DomainModule(
         "check_document": after_check_document,
     },
     retrying=frozenset({"check_document", "check_otp", "verify_identity"}),
+    inputs={
+        "IDENTITY_INFO": InputKind("verify_identity", record_identity_info),
+        "OTP_CODE": InputKind("check_otp", record_otp_code),
+    },
+    handoffs={"IDENTITY_FAILED": HandoffKind(resume_after_identity_failure, resolve_identity_failure)},
 )

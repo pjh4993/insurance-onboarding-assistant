@@ -5,14 +5,25 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime
 from typing import Any
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END
 from langgraph.types import interrupt
 
-from onboarding_agent.flows.base import DomainModule, Flow, as_uuid, jsonable, latest_texts, step_of, thread_of
+from onboarding_agent.flows.base import (
+    DomainModule,
+    Flow,
+    HandoffKind,
+    InputKind,
+    as_uuid,
+    jsonable,
+    latest_texts,
+    step_of,
+    thread_of,
+)
 from onboarding_agent.flows.recommendation import price_quote, session_recommendations
 from onboarding_agent.ids import node_uuid
 from onboarding_agent.llm.schemas import (
@@ -31,6 +42,17 @@ from onboarding_core.util import iso, parse_date
 
 # ANSWERS replies that leave fields missing before an agent takes over.
 MAX_ANSWERS_ROUNDS = 3
+
+
+async def restart_answers(
+    flow: Flow, state: dict[str, Any], resolution: str | None, now: datetime
+) -> tuple[list[BaseMessage], dict[str, Any]]:
+    """Back to the application questions with a fresh round count, after an agent helped out."""
+    return [], {"stage": "APPLICATION", "answers_complete": False, "answers_rounds": 0}
+
+
+def resume_answers(state: dict[str, Any]) -> str:
+    return "collect_answers"
 
 
 class ApplicationFlow(Flow):
@@ -383,4 +405,6 @@ MODULE = DomainModule(
         "submit_application": after_submit_application,
     },
     retrying=frozenset({"collect_answers", "collect_parties", "submit_application", "summarize_application"}),
+    inputs={"PARTIES": InputKind("collect_parties"), "ANSWERS": InputKind("collect_answers")},
+    handoffs={"ANSWERS_INCOMPLETE": HandoffKind(resume_answers, restart_answers)},
 )

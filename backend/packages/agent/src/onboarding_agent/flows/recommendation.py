@@ -12,7 +12,8 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END
 from langgraph.types import interrupt
 
-from onboarding_agent.flows.base import DomainModule, Flow, as_uuid, jsonable, step_of, thread_of
+from onboarding_agent.flows.base import DomainModule, Flow, HandoffKind, as_uuid, jsonable, step_of, thread_of
+from onboarding_agent.flows.profiling import restart_profiling, resume_profiling
 from onboarding_agent.ids import node_uuid
 from onboarding_agent.llm.schemas import RecommendationRationale
 from onboarding_agent.routing import HANDOFF, has_error
@@ -385,4 +386,6 @@ MODULE = DomainModule(
         "await_decision": after_await_decision,
     },
     retrying=frozenset({"explain_recommendation"}),
+    # No product fits what the customer said: an agent helps them change it.
+    handoffs={"NO_ELIGIBLE_PRODUCT": HandoffKind(resume_profiling, restart_profiling)},
 )

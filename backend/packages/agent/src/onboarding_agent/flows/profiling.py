@@ -4,12 +4,23 @@ and code checks for completeness."""
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 
-from onboarding_agent.flows.base import DomainModule, Flow, as_uuid, jsonable, latest_texts, step_of, thread_of
+from onboarding_agent.flows.base import (
+    DomainModule,
+    Flow,
+    HandoffKind,
+    InputKind,
+    as_uuid,
+    jsonable,
+    latest_texts,
+    step_of,
+    thread_of,
+)
 from onboarding_agent.ids import node_uuid
 from onboarding_agent.llm.schemas import NeedsExtraction
 from onboarding_agent.routing import HANDOFF, has_error
@@ -19,6 +30,17 @@ from onboarding_core.needs.rules import compute_needs_missing, described_objects
 
 # NEEDS answers that leave fields missing before an agent takes over.
 MAX_NEEDS_ROUNDS = 3
+
+
+async def restart_profiling(
+    flow: Flow, state: dict[str, Any], resolution: str | None, now: datetime
+) -> tuple[list[BaseMessage], dict[str, Any]]:
+    """Back to the needs assessment with a fresh round count, after an agent helped out."""
+    return [], {"stage": "PROFILING", "needs_complete": False, "needs_rounds": 0}
+
+
+def resume_profiling(state: dict[str, Any]) -> str:
+    return "assess_needs"
 
 
 class ProfilingFlow(Flow):
@@ -255,4 +277,6 @@ MODULE = DomainModule(
         "assess_needs": after_assess_needs,
     },
     retrying=frozenset({"assess_needs", "fetch_purchases"}),
+    inputs={"NEEDS": InputKind("assess_needs")},
+    handoffs={"NEEDS_INCOMPLETE": HandoffKind(resume_profiling, restart_profiling)},
 )

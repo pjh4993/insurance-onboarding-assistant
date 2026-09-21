@@ -141,3 +141,25 @@ def test_nodes_calling_the_llm_or_an_external_system_retry():
         "summarize_application",
         "submit_application",
     }
+
+
+def test_domain_registries_cover_the_state_vocabulary():
+    from typing import get_args
+
+    from onboarding_agent.flows import DOMAINS
+    from onboarding_agent.flows.base import collect
+    from onboarding_agent.state import HandoffReason, WaitingFor
+
+    inputs, handoffs = collect(DOMAINS, "inputs"), collect(DOMAINS, "handoffs")
+    # every free-form kind reaches a real node; the structured waits have their own nodes
+    assert set(inputs) == set(get_args(WaitingFor)) - {"DECISION", "CONFIRM", "AGENT"}
+    assert {kind.target for kind in inputs.values()} <= set(ALL_NODES)
+    # every reason a node can raise has a resolution (ERROR is built into the handoff module)
+    assert set(handoffs) | {"ERROR"} == set(get_args(HandoffReason))
+    for reason, kind in handoffs.items():
+        for resolution in ("VERIFIED", "CONTINUE"):
+            assert kind.resume({"handoff_reason": reason, "handoff_resolution": resolution}) in ALL_NODES
+
+
+def test_ask_customer_hands_off_an_unknown_kind_of_answer():
+    assert EDGES["ask_customer"]({"last_input": "SOMETHING_ELSE"}) == "human_handoff"
