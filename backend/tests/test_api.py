@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import Overrides, create_app
-from app.services.pubsub import PING_FRAME, Broker, Event, sse_frame
+from app.services.pubsub import PING_FRAME, Event, InMemoryBroker, sse_frame
 from tests.conftest import FIXED_NOW
 from tests.fakes import CUSTOMERS, identity_input
 
@@ -168,13 +168,13 @@ def test_agent_list_assign_and_resolve_handoff(client):
 
 
 async def test_broker_stream_filters_and_pings():
-    broker = Broker()
+    broker = InMemoryBroker()
     agen = broker.stream("s1", ping_seconds=0.05, initial=[sse_frame("session.updated", {"session": {"x": 1}})])
     assert (await agen.__anext__()).startswith("event: session.updated\ndata: ")
     nxt = asyncio.ensure_future(agen.__anext__())
     await asyncio.sleep(0)
-    broker.publish(Event("other", "message.appended", {"session_id": "other"}))
-    broker.publish(Event("s1", "prompt.updated", {"session_id": "s1", "prompt": None}))
+    await broker.publish(Event("other", "message.appended", {"session_id": "other"}))
+    await broker.publish(Event("s1", "prompt.updated", {"session_id": "s1", "prompt": None}))
     frame = await nxt
     assert frame == 'event: prompt.updated\ndata: {"session_id": "s1", "prompt": null}\n\n'
     assert await agen.__anext__() == PING_FRAME

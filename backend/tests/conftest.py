@@ -76,7 +76,7 @@ async def runtime(settings, external, llm, clock):
     from app.graph.build import build_graph
     from app.graph.checkpointer import open_checkpointer
     from app.graph.deps import Deps
-    from app.services.pubsub import Broker
+    from app.services.pubsub import InMemoryBroker
     from app.services.runtime import Runtime
 
     engine = make_engine(settings.database_url)
@@ -88,7 +88,7 @@ async def runtime(settings, external, llm, clock):
         for u in (settings.partner_api_url, settings.identity_api_url, settings.contract_api_url)
     ]
     async with open_checkpointer(settings.psycopg_conninfo, settings.aes_key_bytes) as saver:
-        broker = Broker()
+        broker = InMemoryBroker()
         holder = {}
 
         async def on_entity(sid, etype, eid):

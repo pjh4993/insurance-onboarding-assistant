@@ -18,7 +18,7 @@ from app.graph.build import build_graph
 from app.graph.checkpointer import open_checkpointer
 from app.graph.deps import Deps
 from app.llm.provider import BedrockStructuredLLM, StructuredLLM
-from app.services.pubsub import Broker
+from app.services.pubsub import InMemoryBroker
 from app.services.runtime import Runtime
 from app.util import Clock, utcnow
 
@@ -57,7 +57,7 @@ def create_app(settings: Settings | None = None, overrides: Overrides | None = N
             checkpointer = await stack.enter_async_context(
                 open_checkpointer(settings.psycopg_conninfo, settings.aes_key_bytes)
             )
-            broker = Broker()
+            broker = InMemoryBroker()
             clock = overrides.clock or utcnow
             holder: dict[str, Any] = {}
 

@@ -1,5 +1,6 @@
-"""In-process pub/sub for SSE. One process only; a multi-replica deployment would swap this for
-Postgres LISTEN/NOTIFY or Redis without changing the event shapes (CONTRACTS.md §3 SSE)."""
+"""SSE pub/sub. `Broker` is the seam; `InMemoryBroker` serves one process only, and a multi-replica
+deployment swaps in a Postgres LISTEN/NOTIFY or Redis implementation without changing the event
+shapes (CONTRACTS.md §3 SSE)."""
 
 from __future__ import annotations
 
@@ -8,7 +9,7 @@ import contextlib
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
@@ -25,34 +26,38 @@ def sse_frame(event_type: str, data: dict[str, Any]) -> str:
 PING_FRAME = ": ping\n\n"
 
 
-class Broker:
-    def __init__(self) -> None:
-        self._subs: set[tuple[str | None, asyncio.Queue[Event]]] = set()
+class Broker(Protocol):
+    async def publish(self, event: Event) -> None:
+        """Deliver `event` to every stream subscribed to its session, or to all sessions."""
+        ...
 
-    def publish(self, event: Event) -> None:
+    def stream(
+        self, session_id: str | None, ping_seconds: float, initial: list[str] | None = None
+    ) -> AsyncIterator[str]:
+        """SSE frames for one session (or all when None), with a `: ping` comment when idle."""
+        ...
+
+
+_Subscription = tuple[str | None, asyncio.Queue[Event]]
+
+
+class InMemoryBroker:
+    def __init__(self, queue_size: int = 1000) -> None:
+        self._queue_size = queue_size
+        self._subs: set[_Subscription] = set()
+
+    async def publish(self, event: Event) -> None:
         for session_filter, queue in list(self._subs):
             if session_filter is None or session_filter == event.session_id:
                 # A slow consumer drops events; clients refetch on reconnect.
                 with contextlib.suppress(asyncio.QueueFull):
                     queue.put_nowait(event)
 
-    def subscribe(self, session_id: str | None) -> tuple[str | None, asyncio.Queue[Event]]:
-        sub = (session_id, asyncio.Queue(maxsize=1000))
-        self._subs.add(sub)
-        return sub
-
-    def unsubscribe(self, sub: tuple[str | None, asyncio.Queue[Event]]) -> None:
-        self._subs.discard(sub)
-
-    @property
-    def subscriber_count(self) -> int:
-        return len(self._subs)
-
     async def stream(
         self, session_id: str | None, ping_seconds: float, initial: list[str] | None = None
     ) -> AsyncIterator[str]:
-        """SSE frames for one session (or all when None), with a `: ping` comment when idle."""
-        sub = self.subscribe(session_id)
+        sub: _Subscription = (session_id, asyncio.Queue(maxsize=self._queue_size))
+        self._subs.add(sub)
         try:
             for frame in initial or []:
                 yield frame
@@ -64,4 +69,8 @@ class Broker:
                     continue
                 yield sse_frame(event.type, event.data)
         finally:
-            self.unsubscribe(sub)
+            self._subs.discard(sub)
+
+    @property
+    def subscriber_count(self) -> int:
+        return len(self._subs)

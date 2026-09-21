@@ -166,7 +166,7 @@ class Runtime:
                 if node.startswith("__") or not isinstance(update, dict):
                     continue
                 for message in update.get("messages") or []:
-                    self.broker.publish(
+                    await self.broker.publish(
                         Event(sid, "message.appended", {"session_id": sid, "message": views.message_view(message)})
                     )
 
@@ -214,7 +214,7 @@ class Runtime:
             party = await s.get(Party, row.party_id)
         await self._publish_summary(row, party)
         prompt = await self.prompt(row, values)
-        self.broker.publish(
+        await self.broker.publish(
             Event(str(row.session_id), "prompt.updated", {"session_id": str(row.session_id), "prompt": prompt})
         )
 
@@ -222,12 +222,12 @@ class Runtime:
         if party is None:
             async with self.sessionmaker() as s:
                 party = await s.get(Party, session.party_id)
-        self.broker.publish(
+        await self.broker.publish(
             Event(str(session.session_id), "session.updated", {"session": views.summary_view(session, party)})
         )
 
     async def publish_entity(self, session_id: str, entity_type: str, entity_id: str) -> None:
-        self.broker.publish(
+        await self.broker.publish(
             Event(
                 session_id,
                 "entity.updated",
