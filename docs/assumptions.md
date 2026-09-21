@@ -26,21 +26,24 @@ is intentionally not prescribed"). These are the calls we made and why.
 | 12 | Product types | The four examples in the brief: Device Protection, Travel Protection, Extended Warranty, Mobile Insurance. Eight seed products = 2 markets × 4 types |
 | 13 | Catalog values | Seed prices, coverages and eligibility rules are modelled on public products and are **not** bolttech's real rates or rules. Generic names are used, except bolttech's own products |
 | 14 | Eligibility, ranking, pricing | Done by code from catalog data, never by the LLM. Ineligible products are still recorded with their failure reasons so the agent can see why |
-| 15 | Quotes | A `Quote` is a separate entity. It is valid for 24 hours but never past 00:00 of the coverage start date. An expired quote is recalculated |
-| 16 | Coverage term | A rule per product: travel covers departure to return, extended warranty starts when the manufacturer warranty ends, most products start on the purchase date |
+| 15 | Quotes | A `Quote` is a separate entity. It is valid for 24 hours, and never past 00:00 UTC of the coverage start date when that date is still ahead. An accepted quote that has expired is re-priced when the application is opened |
+| 16 | Coverage term | A rule per product: travel covers departure to return, the KR extended warranty starts when the manufacturer warranty ends (assumed one year after purchase when unknown), the other device products start on the day the policy is bought |
 | 17 | Billing period | A property of the product: monthly, one-time or per trip. `premium_minor` is the amount per period |
-| 18 | Needs changes | A `NeedsAssessment` is never edited. A change creates a new version, and recommendations based on the old version expire |
+| 18 | Needs changes | A completed `NeedsAssessment` is never edited. A change creates a new version, and recommendations based on the old version expire |
 | 19 | Returning customers | Designed but deferred: a new session could be linked to an existing `Party` only **after** identity is verified, using a verified key (partner reference, ID number HMAC, or OTP-verified phone + date of birth). Matching on email before verification would leak someone else's data |
 | 20 | `Policy` | Named but has no fields. The contract admin system owns it |
 | 21 | Money and time | Money is an integer in minor units plus an ISO 4217 currency. Times are ISO 8601 UTC |
+| 22 | Missing profile details | A customer onboarding in a market lives there unless they say otherwise. A device the customer describes is new, undamaged and bought today unless they say otherwise. These defaults let eligibility run; they are recorded as assumed and never copied into the application, which asks for the real values |
+| 23 | Date of birth | Identity input may include a date of birth (optional; the UI form does not ask). The partner record supplies it when matched, and the document check uses it when present |
+| 24 | Unfinished answers | If three answers in a row still leave needs or application fields missing, an agent takes over (`NEEDS_INCOMPLETE`, `ANSWERS_INCOMPLETE`) |
 
 ## 3. Technical assumptions
 
 | # | Topic | Assumption |
 |---|---|---|
-| 22 | Two services | "Two separate services" = two separately deployed ECS services: frontend and backend. The customer app and the agent console are two apps inside the frontend service |
-| 23 | LLM | Amazon Bedrock, Claude Sonnet 4.6 via global cross-region inference from Seoul. Tests never call the real model; they use the mock |
-| 24 | Region | One region, ap-northeast-2 (Seoul) |
-| 25 | Environments | One AWS account with develop and prod, each with its own VPC and Terraform state |
-| 26 | Agent login | Cognito in AWS once a domain exists. Until then a development header identifies the agent |
-| 27 | Customer login | No account. A per-session link with a random token |
+| 25 | Two services | "Two separate services" = two separately deployed ECS services: frontend and backend. The customer app and the agent console are two apps inside the frontend service |
+| 26 | LLM | Amazon Bedrock, Claude Sonnet 4.6 via global cross-region inference from Seoul. Tests and local runs never call the real model: backend tests use a fake LLM, local runs use the mock. Develop calls the real model |
+| 27 | Region | One region, ap-northeast-2 (Seoul) |
+| 28 | Environments | One AWS account with develop and prod, each with its own VPC and Terraform state |
+| 29 | Agent login | Cognito at the ALB once an environment has a domain (develop does). The frontend still identifies every agent as `agent-demo` until it verifies the ALB's signed header |
+| 30 | Customer login | No account. A per-session link with a random token, kept in a browser cookie. One customer session per browser at a time |

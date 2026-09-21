@@ -9,14 +9,16 @@ Each row names what we chose, what we gave up, and why.
 | Bedrock global cross-region inference | A guarantee that conversations are processed only in Korea | There is no other way to call this model from Seoul. Logs, quota and billing stay in Seoul |
 | Plain HTTP inside the VPC | Encryption between services | Service Connect TLS needs a private CA, which is expensive. Security groups and private subnets restrict who can connect |
 | VPC endpoints for AWS services, NAT for the rest | Full isolation with no NAT | Agent-auth signing keys and prod's real external systems are on the internet |
-| Login checked only at the frontend | A second check in the backend | The backend is reachable only from the frontend's security group. Keeping the check in one place keeps it simple |
-| Checkpoints in RDS | TTL-based expiry and key-value scalability (DynamoDB) | The encrypting serializer plugs in through a public argument, and there is one store instead of two. Old checkpoints are removed by a daily cleanup job instead of TTL |
+| Agent identity resolved only at the frontend | A second check in the backend | The backend is reachable only from the frontend's security group, so it trusts `X-Agent-Id`. Customer tokens are still checked by the backend (HMAC lookup) |
+| Checkpoints in RDS | TTL-based expiry and key-value scalability (DynamoDB) | The encrypting serializer plugs in through a public argument, and there is one store instead of two. Old checkpoints are to be removed by a daily cleanup job instead of TTL (designed, not built) |
 | One mock service for four systems | Four services that look like production | Lower develop cost and one deployment |
+| Real Bedrock in develop, mock only locally | A free, fully repeatable develop | Develop exercises the real model, the IAM policy and the `bedrock-runtime` VPC endpoint. Local runs and CI stay offline and deterministic |
 | Develop interface endpoints in one AZ | Develop's AWS API access if 2a fails; cross-AZ transfer cost | Halves the largest item in the develop bill. Prod has both AZs |
 | One RDS instance, three schemas | Independent scaling and failure isolation per store | Cheapest option; the data sizes in scope are small |
 | Frontend relays all backend calls | A little latency and one more hop for SSE | The backend is never public; one place handles auth |
 | One frontend service with two apps (`/s`, `/agent`) | Deploying the agent console on its own | The brief asks for two services. Separate layouts and routes still keep them apart for users |
-| Fixed AES key for checkpoints, no rotation | Key rotation | Simple, no extra calls. Checkpoints expire after 30 days, so rotation can be added later with a reader that accepts the old key for 30 days |
+| Fixed AES key for checkpoints, no rotation | Key rotation | Simple, no extra calls. Checkpoints are meant to expire after 30 days, so rotation can be added later with a reader that accepts the old key for 30 days |
+| Tables created at startup (`create_all` + idempotent seed) | Versioned migrations (Alembic) | No migration step to run or order in the deploy. It only adds missing tables; changing an existing table will need migrations |
 
 ## 2. LLM: Claude Sonnet 4.6 on Bedrock
 
@@ -50,7 +52,7 @@ Both extracted the age range (30s), occupation, country (`KR`) and objective (`P
 |---|---|---|
 | Sonnet 4.6 for every node | Lower cost and latency of Haiku 4.5 | Recommendation reasons and application summaries are visible in the demo; writing quality matters. Extraction nodes can move to Haiku through a per-node setting later |
 | `function_calling` | `json_schema` strictness | Default, works on both models, and was 2–3× faster in one-off measurements (to be re-measured) |
-| Low temperature | Varied wording | Stable extraction output |
+| Temperature 0 | Varied wording | Stable extraction output |
 
 Found in the test and fed into the design: Sonnet put objective **values** into `missing_fields` instead of
 field **names**, because the schema description was ambiguous. The field description now says explicitly that it
@@ -78,7 +80,7 @@ Reading with a different key fails, as it should. Three findings:
    compresses ciphertext, which does not shrink, and large checkpoints get offloaded to S3 more often. So the
    serializer must compress first and encrypt second.
 3. **`EncryptedSerializer` joins type names with `+`.** An inner serializer whose type name contains `+` breaks
-   on read.
+   on read. The gzip layer therefore marks its type with a `gz_` prefix (`gz_msgpack+aes`).
 
 Finding 1 decided it: it works, but only by touching non-public internals. `PostgresSaver`
 (`langgraph-checkpoint-postgres` 3.1.2) takes `serde` as a constructor argument. We moved checkpoints to RDS and kept
@@ -98,8 +100,12 @@ ratio still needs measuring.
 |---|---|---|
 | Eligibility, ranking and pricing in code | Letting the LLM reason about fit | Every exclusion and price must be traceable (`failure_reason_code`, `rating_inputs`). The LLM explains, grounded in catalog `rationale` text |
 | IDs in state, values in the DB | Self-contained checkpoints | One source of truth; no personal values duplicated into state |
-| Routing signals as results, not counters | Flexible retry counts in the graph | The graph shape encodes the policy (OTP fail → document → agent); counts live in the DB |
-| Node writes and checkpoint save in separate transactions | Atomicity | LangGraph saves checkpoints on its own connection. Idempotent writes (deterministic IDs, idempotency key) make re-runs safe |
+| Identity routing on results, not counters | Flexible retry counts in the graph | The graph shape encodes the policy (OTP fail → document → agent); the attempt count lives in the DB. The only counters in state are the two 3-round loop guards |
+| Node writes and checkpoint save in separate transactions | Atomicity | LangGraph saves checkpoints on its own connection. Idempotent writes (deterministic IDs, upserts, idempotency key) make re-runs safe |
+| Handoff split into `human_handoff` (writes) and `await_agent` (interrupt) | One node | An interrupted node re-runs from the top on resume. Doing the writes in a node before the pause saves them once, and the agent sees the handoff state while the session waits |
+| 3-round cap on the needs and answers loops | Asking until the customer gets it right | A customer (or a fixed mock answer) that never fills a field would loop forever. After 3 rounds an agent takes over |
+| Input returns `202` and the graph runs in a background task | A synchronous response with the next question | LLM calls take seconds; the UI already listens on SSE, so the request returns at once and the result streams in |
+| SSE broker and per-session locks in the backend process | Several backend replicas | No Redis or `LISTEN/NOTIFY` to run. It means one backend replica (or session affinity end to end); prod's two tasks need a shared broker first |
 | Keep ineligible recommendations as rows | Smaller tables | The agent can see why a product is missing |
 | Needs assessments versioned, never edited | Simpler updates | Each recommendation keeps the exact assessment it was based on |
 | One mock with fault injection | Testing against real partners | Deterministic tests and a repeatable demo of retries and handoff |

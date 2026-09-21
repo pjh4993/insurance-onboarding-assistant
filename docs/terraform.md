@@ -1,36 +1,43 @@
 # Terraform structure
 
 All AWS resources are defined in `infra/`. Reusable modules hold the resources; each environment is a thin
-composition of those modules with its own variables and its own state.
+composition of those modules with its own variables and its own state. Terraform >= 1.5 (CI and deploys pin
+1.5.7) with the AWS provider `>= 5.70, < 7.0`.
 
 ## 1. Layout
 
 ```
 infra/
+  bootstrap/    one-time: S3 state bucket + DynamoDB lock table (local state, applied once by the owner)
   modules/
-    network/    VPC, subnets, route tables, NAT, VPC endpoints (AZ placement is a variable)
-    security/   security groups, KMS key
-    data/       RDS PostgreSQL (three schemas), checkpoint cleanup schedule (EventBridge Scheduler)
-    auth/       Cognito user pool, app client
-    edge/       ALB, listeners, certificate, /agent/* Cognito auth rule
+    network/    VPC, subnets, route tables, NAT, S3 gateway endpoint, interface endpoints (AZs are a variable)
+    security/   security groups and their rules, KMS key
+    data/       RDS PostgreSQL 16, parameter group (TLS forced), application secrets
+    auth/       Cognito user pool, domain, app client for the ALB
+    edge/       ALB, target group, listeners, ACM certificate + Route 53 records, Cognito rule on agent paths
     service/    one ECS service: task definition, Service Connect, task + execution roles, log group
-    ci/         GitHub OIDC provider, deploy roles, ECR repositories
+    ci/         GitHub OIDC provider and ECR repositories (shared), one deploy role per environment
   envs/
-    develop/    module composition, enable_mocks = true, interface endpoints in 2a only
-    prod/       module composition, enable_mocks = false, endpoints in both AZs
+    develop/    main.tf composes the modules + ECS cluster and Service Connect namespace; terraform.tfvars
+    prod/       identical main.tf; different terraform.tfvars and state key
 ```
 
 ```mermaid
 flowchart TB
+    boot["bootstrap<br/>state bucket + lock table"]
     subgraph env["envs/develop or envs/prod"]
-        main["main.tf<br/>composes modules"]
+        main["main.tf<br/>composes modules,<br/>ECS cluster, namespace"]
     end
-    main --> network & security & data & auth & edge & ci
+    boot -. "remote state" .-> env
+    main --> network & security & data & edge & ci
+    main --> auth["auth<br/>(only if domain_name set)"]
     main --> svc_fe["service<br/>(frontend)"]
     main --> svc_be["service<br/>(backend)"]
     main --> svc_mock["service<br/>(mock, only if enable_mocks)"]
+    network --> security
     security --> data
     network --> edge
+    auth --> edge
     edge --> svc_fe
 ```
 
@@ -38,49 +45,86 @@ flowchart TB
 
 | Module | Main resources | Key inputs | Key outputs |
 |---|---|---|---|
-| `network` | VPC `10.0.0.0/16`, 3 subnet tiers × 2 AZs, NAT, gateway and interface endpoints | CIDRs, number of NATs, AZs for interface endpoints | VPC ID, subnet IDs |
-| `security` | `sg-alb`, `sg-frontend`, `sg-backend`, `sg-mock`, `sg-rds`, `sg-endpoints`; KMS key | VPC ID | SG IDs, KMS key ARN |
-| `data` | RDS instance and subnet group, managed master secret, cleanup schedule | Instance size, Multi-AZ flag, KMS key | Endpoint, secret ARN |
-| `auth` | Cognito user pool and app client for agents | Domain (optional) | Pool ARN, client ID |
-| `edge` | ALB, HTTP→HTTPS redirect, HTTPS listener, ACM certificate, Cognito rule on `/agent/*`, idle timeout 300 s | Domain (optional), subnets, SG | Target group ARN, DNS name |
-| `service` | ECS service, task definition, Service Connect config, IAM roles, CloudWatch log group | Image, port, env vars, secrets, desired count, SG | Service name |
-| `ci` | GitHub OIDC identity provider, one deploy role per environment, ECR repositories | GitHub repo, branch/environment conditions | Role ARNs, repo URLs |
+| `network` | VPC `10.0.0.0/16`, 3 subnet tiers × 2 AZs, NAT (one or one per AZ), S3 gateway endpoint, interface endpoints for `bedrock-runtime`, `secretsmanager`, `ecr.api`, `ecr.dkr`, `logs` | AZs, single NAT flag, AZs for interface endpoints | VPC and subnet IDs, endpoint SG, NAT IPs |
+| `security` | ALB, frontend, backend, mock and RDS security groups and the rules between them; endpoint SG rules; KMS key | VPC ID, `enable_mocks` | SG IDs, KMS key ARN |
+| `data` | RDS instance, subnet group, parameter group (`rds.force_ssl`), RDS-managed master secret, generated checkpoint AES key and session HMAC key in Secrets Manager | Instance class, Multi-AZ, deletion protection, KMS key | Address, DB name/user, secret ARNs |
+| `auth` | Cognito user pool (admin-created users, optional TOTP MFA), hosted UI domain, app client for the ALB | Domain | Pool ARN, client ID, pool domain |
+| `edge` | ALB (idle timeout 300 s), frontend target group (health check `/`), HTTP listener, and with a domain: ACM certificate validated in Route 53, alias record, HTTPS listener, Cognito rule on `/agent`, `/agent/*`, `/api/agent/*` | Domain, Route 53 zone, subnets, SG, Cognito settings | Target group ARN, DNS name, `base_url` |
+| `service` | ECS service (circuit breaker with rollback), task definition, Service Connect (server or client only), task and execution roles, log group (30 days) | Image, port, CPU/memory, env vars, secrets, desired count, SG, optional target group | Service name |
+| `ci` | GitHub OIDC provider and ECR repositories (created or looked up), deploy role trusted for the listed OIDC subjects | Repository, OIDC subjects, `create_shared_resources`, state bucket and lock table | Deploy role ARN, ECR URLs |
 
 The `service` module is used three times: frontend, backend and mock. The mock instance is created only when
 `enable_mocks = true`.
 
-HTTPS and Cognito depend on a domain. The certificate, HTTPS listener and Cognito rule are enabled by a domain
-variable, so the stack can be planned and applied without one.
+HTTPS and Cognito depend on a domain. The certificate, HTTPS listener, alias record and Cognito rule are
+created only when `domain_name` is set, and the `auth` module only exists then. Without a domain the ALB serves
+plain HTTP on port 80, so the stack can be planned and applied without one.
 
 ## 3. Environments
 
 | Variable | develop | prod |
 |---|---|---|
 | `enable_mocks` | `true` | `false` |
-| Interface endpoint AZs | `2a` | `2a`, `2c` |
-| NAT gateways | 1 | 2 |
-| Desired tasks per service | 1 | 2 |
-| RDS Multi-AZ | no | yes |
-| `PARTNER_API_URL`, `IDENTITY_API_URL`, `CONTRACT_API_URL` | `http://mock:8080/partner` etc. (Service Connect) | Real addresses (empty until they exist) |
-| `BEDROCK_ENDPOINT_URL` | `http://mock:8080` | unset (AWS default endpoint) |
+| `domain_name` | `onboardassist.click` | `""` (none yet) |
+| `interface_endpoint_azs` | `2a` | `2a`, `2c` |
+| `single_nat_gateway` | `true` (1 NAT) | `false` (1 per AZ) |
+| `desired_count` | 1 | 2 |
+| `db_instance_class`, `db_multi_az`, `db_deletion_protection` | `db.t4g.micro`, no, no | `db.t4g.small`, yes, yes |
+| `PARTNER_API_URL`, `IDENTITY_API_URL`, `CONTRACT_API_URL` | `http://mock:8080/partner` etc. (Service Connect) | `https://partner.invalid` etc. (placeholders until the real systems exist) |
+| `BEDROCK_ENDPOINT_URL` | unset (real Bedrock) | unset (real Bedrock) |
+| `agent_dev_auth` | `true` (default) | `true` (default) |
+| `create_shared_ci_resources` | `true`: creates the OIDC provider and ECR repositories | `false`: looks them up |
+| `github_oidc_subjects` | `ref:refs/heads/main` | `environment:prod` |
 
-External-system addresses are set only in `envs/`. The backend image is identical in both.
+External-system addresses are set only in `envs/`. The backend image is identical in both. `image_tag` (the
+commit SHA) and `state_bucket_name` are passed by the deploy workflows with `-var`.
 
 ## 4. State backend
 
-- Remote state in **S3**, one state key per environment, so develop and prod never share state.
-- State locking is enabled, so two runs cannot change one environment at the same time.
-- The state bucket itself is created once outside these environments (bootstrap), since a stack cannot store
-  its state in a bucket it creates.
+- `infra/bootstrap` creates the state bucket `onboarding-tfstate-<account id>` (versioned, KMS-encrypted,
+  TLS-only policy, public access blocked) and the DynamoDB lock table `onboarding-terraform-locks`. Terraform 1.5
+  locks S3 state through DynamoDB (`use_lockfile` needs 1.10). The owner has applied it once; its own state is
+  local and git-ignored, since a stack cannot store its state in a bucket it creates.
+- Each environment uses a partial S3 backend: the key (`envs/develop/terraform.tfstate`,
+  `envs/prod/terraform.tfstate`), region, lock table and encryption are in `versions.tf`; the bucket name contains
+  the account ID and is passed at init: `terraform init -backend-config="bucket=<state bucket>"`.
+- Develop and prod never share state.
 - Local `.terraform/` and `*.tfstate*` files are ignored by git.
 
 ## 5. How it is run
 
 | Where | Command |
 |---|---|
-| PR (CI) | `terraform fmt -check`, `terraform validate`, `terraform plan` for develop; the plan is posted on the PR |
-| Merge to `develop` (CI) | `terraform apply` for `envs/develop` |
-| Prod | `terraform apply` for `envs/prod` behind approval (deferred for this submission) |
-| Locally | `cd infra/envs/develop && terraform init && terraform plan` |
+| PR and push to `main` (CI) | `terraform fmt -recursive -check`, then `terraform init -backend=false` and `terraform validate` for `envs/develop`, `envs/prod` and `bootstrap`. No plan is run in CI |
+| Push to `main` (deploy) | `terraform apply` for `envs/develop` with the new `image_tag`. Skipped until the deploy role variable is set |
+| Prod | `terraform apply` for `envs/prod` from `deploy-prod.yml`, behind approval (not run for this submission) |
+| Locally | `cd infra/envs/develop && terraform init -backend-config="bucket=<state bucket>" && terraform plan -var image_tag=<sha> -var state_bucket_name=<state bucket>` |
 
-Terraform >= 1.5 with the AWS provider.
+### One-time setup
+
+These steps come from the comments in `infra/` and `.github/workflows/`. They are done once per AWS account by
+someone with admin credentials; after that, deploys run from GitHub Actions.
+
+1. **Bootstrap state** (done): `cd infra/bootstrap && terraform init && terraform apply`. Note the outputs
+   `state_bucket_name` and `lock_table_name`.
+2. **Domain** (done for develop): register the domain in Route 53, which creates the public hosted zone. Set
+   `domain_name` in `envs/develop/terraform.tfvars`.
+3. **State bucket name**: replace `<ACCOUNT_ID>` in `state_bucket_name` in both `terraform.tfvars` files, or pass
+   `-var state_bucket_name=...` as the workflows do.
+4. **First develop apply, by an admin**: the deploy role that GitHub assumes is created by `envs/develop` itself,
+   so the first apply cannot come from the workflow. Run `terraform init -backend-config="bucket=<state bucket>"`
+   in `infra/envs/develop`. The ECS services need images that do not exist yet, so one way is to create the CI
+   resources first: `terraform apply -target=module.ci -var image_tag=<any> -var state_bucket_name=<state bucket>`.
+   This creates the GitHub OIDC provider, the ECR repositories and the deploy role. Read `terraform output
+   deploy_role_arn`.
+5. **GitHub repository variables** (Settings → Secrets and variables → Actions → Variables):
+   `AWS_DEPLOY_ROLE_ARN_DEVELOP` = the develop `deploy_role_arn`, `TF_STATE_BUCKET` = the bootstrap
+   `state_bucket_name`. Until `AWS_DEPLOY_ROLE_ARN_DEVELOP` is set, `deploy-develop.yml` skips its jobs.
+6. **First deploy**: push to `main` (or run `deploy-develop` by hand). It builds and pushes the images, applies
+   the full develop stack, waits for the services, and smoke-tests `<base_url>/healthz`.
+7. **Agent accounts**: the Cognito pool only allows admin-created users. Create each agent in the console or with
+   `aws cognito-idp admin-create-user`.
+8. **Prod, when it is time**: create the GitHub Environment `prod` with required reviewers and the variables
+   `AWS_DEPLOY_ROLE_ARN_PROD` and `TF_STATE_BUCKET`. The prod deploy role comes from the first `envs/prod` apply,
+   again by an admin. Prod looks up the OIDC provider and ECR repositories that develop created, so develop must
+   exist first.

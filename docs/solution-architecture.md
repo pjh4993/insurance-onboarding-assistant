@@ -33,7 +33,7 @@ Two kinds of people use the system.
 | Person | How they get in | What they do |
 |---|---|---|
 | Customer | A session link `/s/{token}`. No account | Goes through the four onboarding stages in a chat |
-| Support agent | Agent console `/agent`. Staff login (Cognito in AWS, a dev header locally) | Sees all sessions, opens a new session link, takes over a stuck session, answers on the customer's behalf |
+| Support agent | Agent console `/agent`. Staff login: Cognito at the ALB in develop; a development identity (`agent-demo`) locally, and behind Cognito until the frontend verifies the ALB's signed header | Sees all sessions, opens a new session link, takes over a stuck session, answers on the customer's behalf |
 
 The brief says the assistant "helps support agents guide customers" and also asks for a "customer onboarding
 interface". We support both: the customer drives the chat, and an agent can step in at any point. See
@@ -44,16 +44,23 @@ There are four external systems.
 | System | Used for | Called by node |
 |---|---|---|
 | Partner | Match the customer to a partner record; read device purchases | `verify_identity`, `fetch_purchases` |
-| Identity | Send and verify an OTP; verify an ID document number | `verify_identity`, `check_otp`, `check_document` |
+| Identity | Send an OTP (`verify_identity`); verify the OTP; verify an ID document number | `verify_identity`, `check_otp`, `check_document` |
 | Contract admin | Receive the finished application and return a submission reference | `submit_application` |
 | Amazon Bedrock | LLM calls through the Converse API | the five LLM nodes |
 
-**Mock in develop, real endpoints in prod.** In develop (and locally) all four are served by **one mock
-service** that has the same API shapes as the real systems. In prod the mock is not deployed and the backend
-points at real endpoints. The backend code is the same in both; only four environment variables change
-(`PARTNER_API_URL`, `IDENTITY_API_URL`, `CONTRACT_API_URL`, `BEDROCK_ENDPOINT_URL`). There is no
-"am I talking to a mock?" branch in the code. Real partner, identity and contract endpoints do not exist yet, so
-prod leaves those values empty.
+**One mock service, with the same API shapes as the real systems.** It serves partner, identity, contract admin
+and the Bedrock Converse API.
+
+| Where | Partner, identity, contract admin | Bedrock |
+|---|---|---|
+| Local (`docker compose`) | Mock | Mock (`BEDROCK_ENDPOINT_URL=http://mock:8080`) |
+| Backend tests | In-process fakes built from the same seed file | In-process fake LLM |
+| develop (AWS) | Mock, as its own ECS service | Real Bedrock through the VPC endpoint (`BEDROCK_ENDPOINT_URL` unset) |
+| prod (AWS) | Real endpoints. They do not exist yet, so Terraform sets `https://*.invalid` placeholders | Real Bedrock |
+
+The backend code is the same everywhere; only environment variables change (`PARTNER_API_URL`,
+`IDENTITY_API_URL`, `CONTRACT_API_URL`, `BEDROCK_ENDPOINT_URL`). There is no "am I talking to a mock?" branch in
+the code.
 
 ## 2. Containers
 
@@ -90,15 +97,15 @@ flowchart LR
     lg --> cp
     lg & api --> dm
     domain --> cat
-    lg -- "develop: mock<br/>prod: real endpoints" --> mock
+    lg -- "local and develop: mock<br/>prod: real endpoints" --> mock
 ```
 
 | Container | Technology | Responsibility |
 |---|---|---|
-| Frontend | Next.js (App Router, TypeScript, pnpm) | Two apps in one service: the customer app (`/s/*`) and the agent console (`/agent/*`). Route handlers under `/api/*` relay every call, including SSE, to the backend. The browser never calls the backend directly |
-| Backend | FastAPI + LangGraph, Python 3.13, uv | HTTP API, the onboarding graph, eligibility, ranking and pricing, persistence, calls to external systems |
+| Frontend | Next.js 16 (App Router, TypeScript, pnpm), standalone Node server | Two apps in one service: the customer app (`/s/*`) and the agent console (`/agent`). `proxy.ts` (Next.js 16's middleware) turns the `/s/{token}` link into a session cookie. Route handlers under `/api/*` relay every call, including SSE, to the backend; the browser never calls the backend directly. `/healthz` proxies to the backend's health check, `/api/healthz` checks only the frontend, and `/api/agent/me` returns the signed-in agent's ID |
+| Backend | FastAPI + LangGraph, Python 3.13, uv | HTTP API, the onboarding graph, eligibility, ranking and pricing, persistence, calls to external systems. Creates its tables and seeds the catalog at startup |
 | PostgreSQL | PostgreSQL 16 (RDS in AWS) | Three schemas: `checkpoint` (graph state), `domain` (customer and transaction entities), `catalog` (products, rules) |
-| Mock | FastAPI | One app for all four external systems plus fault injection (`/_mock/faults`). Develop and local only |
+| Mock | FastAPI | One app for partner, identity, contract admin and Bedrock Converse, plus fault injection (`/_mock/faults`). Local and develop only |
 
 Why the three schemas share one instance: they differ in lifetime and access, but not enough to justify
 three databases for this scope. Checkpoints are only useful while a session is alive (30-day inactivity limit),
@@ -114,17 +121,23 @@ deployment stays at two units.
 - The frontend's route handlers call the backend at `BACKEND_URL` (`http://backend:8000`: Docker Compose
   locally, ECS Service Connect in AWS).
 - Chat updates are streamed with **server-sent events**. The backend emits SSE, and the frontend passes the
-  stream through unchanged.
-- Agent identity is checked once at the frontend and passed to the backend as `X-Agent-Id`. The customer's
-  session token is passed as `X-Session-Token`.
+  stream through unchanged. Events: `session.updated`, `message.appended`, `prompt.updated`, `entity.updated`,
+  and a `: ping` comment every 15 s.
+- Agent identity is resolved once at the frontend and passed to the backend as `X-Agent-Id`. Locally (and in
+  develop for now) `AGENT_DEV_AUTH=true` makes every agent `agent-demo`. The customer's session token is read from
+  the httpOnly cookie and passed as `X-Session-Token`. The backend checks the token against its stored HMAC and
+  trusts `X-Agent-Id` because only the frontend can reach it. See [networking.md](networking.md#5-authentication).
+- Sending input returns `202 Accepted`. The graph runs in the background and the result arrives over SSE.
 
 The API contract is in [`CONTRACTS.md`](../CONTRACTS.md) §3. Main endpoints:
 
 | Caller | Endpoint | Purpose |
 |---|---|---|
-| Agent console | `POST /api/sessions` | Create a session and return the customer link `/s/{token}` |
+| Agent console | `POST /api/sessions` | Create a session and return the customer link `/s/{token}`. The frontend requires an agent identity for it |
 | Customer app | `GET /api/customer/session`, `POST .../input`, `GET .../stream` | Read the session, send input, stream updates |
-| Agent console | `GET /api/agent/sessions`, `GET /api/agent/sessions/{id}`, `POST .../assign`, `POST .../input`, `GET /api/agent/stream` | Session list, session detail with entities, take over, answer as agent, stream |
+| Agent console | `GET /api/agent/sessions`, `GET /api/agent/sessions/{id}`, `POST .../assign`, `POST .../input`, `GET /api/agent/sessions/{id}/stream`, `GET /api/agent/stream` | Session list, session detail with entities, take over, answer as agent, stream one session or all |
+| Agent console | `GET /api/agent/me` (frontend only) | Who the signed-in agent is, for "Assign to me" |
+| Deploy smoke test | `GET /healthz` | Frontend relays to the backend's `/healthz` |
 
 ## 3. Inside the backend
 
@@ -132,8 +145,8 @@ The API contract is in [`CONTRACTS.md`](../CONTRACTS.md) §3. Main endpoints:
 flowchart LR
     subgraph edge["Edge"]
         http["HTTP API"]
-        threads["Session / thread lookup"]
-        saver["Checkpointer<br/>(PostgresSaver + encrypted serde)"]
+        threads["Runtime: session lookup,<br/>per-session lock, SSE broker"]
+        saver["Checkpointer<br/>(AsyncPostgresSaver, gzip + AES serde)"]
     end
     subgraph g["Graph"]
         code["Code nodes"]
@@ -146,8 +159,8 @@ flowchart LR
         price["Pricing"]
     end
     subgraph adapters["Adapters"]
-        repo["Repositories (domain, catalog)"]
-        clients["Partner / Identity / Contract clients"]
+        repo["SQLAlchemy models (domain, catalog)"]
+        clients["Partner / Identity / Contract clients (httpx)"]
         bedrock["ChatBedrockConverse"]
     end
     http --> threads --> saver --> g
@@ -158,7 +171,8 @@ flowchart LR
 ```
 
 The left column is why sessions can be resumed: the API receives input, finds the thread for the session,
-and the checkpointer loads the paused state.
+and the checkpointer loads the paused state. The per-session lock and the SSE broker live in the backend
+process, so the backend runs as a single replica for now (see [tradeoffs.md](tradeoffs.md#4-application-design)).
 
 Eligibility, ranking and pricing are plain code, not LLM calls. An agent must be able to see **why** a product
 was excluded (`EligibilityRule.failure_reason_code`) and **why** a price is what it is (`Quote.rating_inputs`).
