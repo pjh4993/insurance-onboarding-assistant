@@ -20,6 +20,21 @@ docs_domain_name     = "dev.docs.onboardassist.click"
 operator_domain_name = "dev.operator.onboardassist.click"
 route53_zone_name    = "onboardassist.click"
 
+# Predefined logins for demos and tests; passwords in the secret onboarding-develop/demo-accounts
+# (docs/infra/03-terraform.md). Prod has none: its staff are created by hand.
+cognito_accounts = {
+  "demo-agent-1@onboardassist.click" = {
+    description = "Support agent: takes handed-off sessions on the agent host"
+  }
+  "demo-agent-2@onboardassist.click" = {
+    description = "Second support agent, for claiming and reassigning handoffs"
+  }
+  "demo-operator@onboardassist.click" = {
+    groups      = ["operators"]
+    description = "Operator: publishes agent config versions on the operator host (and can log in as an agent)"
+  }
+}
+
 create_shared_ci_resources = true
 github_oidc_subjects       = ["ref:refs/heads/develop"]
 

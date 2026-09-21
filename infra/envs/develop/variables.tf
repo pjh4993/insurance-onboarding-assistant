@@ -184,3 +184,12 @@ variable "operator_domain_name" {
   type        = string
   default     = ""
 }
+
+variable "cognito_accounts" {
+  description = "Predefined Cognito accounts by email (develop only; passwords go to the secret <name>/demo-accounts). See docs/infra/03-terraform.md."
+  type = map(object({
+    groups      = optional(list(string), [])
+    description = optional(string, "")
+  }))
+  default = {}
+}

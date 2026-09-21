@@ -47,3 +47,8 @@ output "agent_config_operator_role_arn" {
   description = "The operator role: publishes agent config bundles and restarts the backend"
   value       = module.agent_config.operator_role_arn
 }
+
+output "cognito_accounts_secret" {
+  description = "Secret with the predefined Cognito accounts' passwords; empty where there are none."
+  value       = length(module.auth) == 0 ? "" : module.auth[0].accounts_secret_name
+}

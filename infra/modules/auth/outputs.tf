@@ -22,3 +22,8 @@ output "operator_client_id" {
 output "operators_group" {
   value = aws_cognito_user_group.operators.name
 }
+
+output "accounts_secret_name" {
+  description = "The secret holding the predefined accounts' passwords; empty without any."
+  value       = one(aws_secretsmanager_secret.accounts[*].name) == null ? "" : one(aws_secretsmanager_secret.accounts[*].name)
+}

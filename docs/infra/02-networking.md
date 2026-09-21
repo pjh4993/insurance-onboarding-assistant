@@ -124,8 +124,9 @@ Task egress is open (to reach the endpoints and NAT); ingress is what limits eac
    client of the same pool, and the operator API (`/api/operator/*`) answers 404 on the app and agent hosts, ahead
    of the agent host's rule. Operators are staff in the pool's `operators` group: the frontend verifies the Cognito
    access token the ALB forwards (`x-amzn-oidc-accesstoken`) against the pool's keys, and accepts it only when it
-   was issued to the operator client and carries that group. An admin adds an operator with
-   `aws cognito-idp admin-add-user-to-group --group-name operators`.
+   was issued to the operator client and carries that group. Develop has a predefined operator; elsewhere an admin
+   adds one with `aws cognito-idp admin-add-user-to-group --group-name operators` (see
+   [Accounts](03-terraform.md#6-accounts)).
 2. The Cognito user pool accepts only accounts an admin creates (email as username, optional TOTP MFA).
 3. After login, the ALB adds `x-amzn-oidc-identity` (the user's `sub`) and a signed JWT, `x-amzn-oidc-data`, to
    each request it forwards.

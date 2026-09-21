@@ -31,7 +31,7 @@ infra/
 | `network` | VPC `10.0.0.0/16`, 3 subnet tiers × 2 AZs, NAT (one or one per AZ), S3 gateway endpoint, interface endpoints for `bedrock-runtime`, `secretsmanager`, `ecr.api`, `ecr.dkr`, `logs` | AZs, single NAT flag, AZs for interface endpoints | VPC and subnet IDs, endpoint SG, NAT IPs |
 | `security` | ALB, frontend, backend, mock and RDS security groups and the rules between them; endpoint SG rules; KMS key | VPC ID, `enable_mocks` | SG IDs, KMS key ARN |
 | `data` | RDS instance, subnet group, parameter group (`rds.force_ssl`), RDS-managed master secret, generated checkpoint AES key and session HMAC key in Secrets Manager | Instance class, Multi-AZ, deletion protection, KMS key | Address, DB name/user, secret ARNs |
-| `auth` | Cognito user pool (admin-created users, optional TOTP MFA), hosted UI domain, app client for the ALB | Domain | Pool ARN, client ID, pool domain |
+| `auth` | Cognito user pool (admin-created users, optional TOTP MFA), hosted UI domain, app clients for the ALB (agent and operator hosts), the `operators` group, predefined accounts with their passwords in Secrets Manager | Domains, `accounts` | Pool ARN, client IDs, pool domain, accounts secret name |
 | `edge` | ALB (idle timeout 300 s), frontend target group (health check `/api/healthz`), docs target group (`/`) and, with a docs host, its public host-header rule, HTTP listener, and with a domain: ACM certificate validated in Route 53, alias records for the app and docs hosts, HTTPS listener, Cognito rule on `/agent`, `/agent/*`, `/api/agent/*` | Domain, Route 53 zone, subnets, SG, Cognito settings | Target group ARN, DNS name, `base_url` |
 | `service` | ECS service (circuit breaker with rollback), task definition, Service Connect (server or client only), task and execution roles, log group (30 days) | Image, port, CPU/memory, env vars, secrets, desired count, SG, optional target group | Service name |
 | `ci` | GitHub OIDC provider and ECR repositories (created or looked up), deploy role trusted for the listed OIDC subjects | Repository, OIDC subjects, `create_shared_resources`, state bucket and lock table | Deploy role ARN, ECR URLs |
@@ -59,7 +59,8 @@ plain HTTP on port 80, so the stack can be planned and applied without one.
 | `BEDROCK_ENDPOINT_URL` | unset (real Bedrock) | unset (real Bedrock) |
 | `agent_dev_auth` | `true` (default) | `true` (default) |
 | `create_shared_ci_resources` | `true`: creates the OIDC provider and ECR repositories | `false`: looks them up |
-| `github_oidc_subjects` | `ref:refs/heads/main` | `environment:prod` |
+| `cognito_accounts` | three demo logins (see [Accounts](#6-accounts)) | none |
+| `github_oidc_subjects` | `ref:refs/heads/develop` | `environment:prod` |
 
 External-system addresses are set only in `envs/`. The backend image is identical in both. `image_tag` (the
 commit SHA) and `state_bucket_name` are passed by the deploy workflows with `-var`.
@@ -107,10 +108,49 @@ someone with admin credentials; after that, deploys run from GitHub Actions.
    `state_bucket_name`. Until `AWS_DEPLOY_ROLE_ARN_DEVELOP` is set, `deploy-develop.yml` skips its jobs.
 6. **First deploy**: push to `develop` (or run `deploy-develop` by hand on `develop`). It builds and pushes the images, applies
    the full develop stack, waits for the services, and smoke-tests `<base_url>/healthz`.
-7. **Agent accounts**: the Cognito pool only allows admin-created users. Create each agent in the console or with
-   `aws cognito-idp admin-create-user`.
+7. **Agent accounts**: the Cognito pool only allows admin-created users. Develop gets its predefined accounts
+   from terraform (see [Accounts](#6-accounts)); anyone else, and every prod account, is created by hand.
 8. **Prod, when it is time**: create the GitHub Environment `prod` with required reviewers and the variable
    `TF_STATE_BUCKET`, and set the repository variable `AWS_DEPLOY_ROLE_ARN_PROD` (a repository variable, since
    the workflow checks it before entering the environment; until it is set, pushes to `main` skip the deploy). The prod deploy role comes from the first `envs/prod` apply,
    again by an admin. Prod looks up the OIDC provider and ECR repositories that develop created, so develop must
    exist first.
+
+## 6. Accounts
+
+Agents and operators log in through the one Cognito pool; operators are the accounts in its `operators` group.
+Customers have no accounts.
+
+**Develop** has predefined accounts, declared in `cognito_accounts` in `envs/develop/terraform.tfvars` and
+created by the deploy:
+
+| Account | Group | For |
+|---|---|---|
+| `demo-agent-1@onboardassist.click` | — | Support agent: takes handed-off sessions on `dev.agent.onboardassist.click` |
+| `demo-agent-2@onboardassist.click` | — | A second agent, for claiming and reassigning handoffs |
+| `demo-operator@onboardassist.click` | `operators` | Publishes agent config versions on `dev.operator.onboardassist.click`; can also log in as an agent |
+
+Each has a random password, set as permanent (no first-login change, no invitation mail: the addresses have no
+mailboxes). The passwords are only in Secrets Manager and the terraform state, never in git:
+
+```bash
+aws secretsmanager get-secret-value --secret-id onboarding-develop/demo-accounts \
+  --query SecretString --output text | jq
+# {"demo-operator@onboardassist.click": {"password": "...", "groups": ["operators"], "description": "..."}, ...}
+```
+
+Add or remove an account by editing `cognito_accounts` and landing it; the deploy applies it. To change a
+password, replace it (`terraform apply -replace='module.auth[0].random_password.account["<email>"]'`). Anyone
+may set up TOTP MFA on their account after logging in.
+
+**Prod** has none (`cognito_accounts` is empty). An admin creates each staff account and, for operators, adds
+the group:
+
+```bash
+aws cognito-idp admin-create-user --user-pool-id <pool> --username <email> \
+  --user-attributes Name=email,Value=<email> Name=email_verified,Value=true
+aws cognito-idp admin-add-user-to-group --user-pool-id <pool> --username <email> --group-name operators
+```
+
+Accounts made by hand (such as develop's `agent@onboardassist.click`) are not in terraform; terraform neither
+changes nor removes them.

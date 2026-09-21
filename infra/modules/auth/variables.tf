@@ -22,3 +22,17 @@ variable "operator_domain_name" {
   type        = string
   default     = ""
 }
+
+variable "accounts" {
+  description = "Predefined accounts by email: their groups (e.g. [\"operators\"]; none: a support agent) and what they are for."
+  type = map(object({
+    groups      = optional(list(string), [])
+    description = optional(string, "")
+  }))
+  default = {}
+
+  validation {
+    condition     = alltrue([for a in values(var.accounts) : alltrue([for g in a.groups : contains(["operators"], g)])])
+    error_message = "The pool has one group, \"operators\"."
+  }
+}

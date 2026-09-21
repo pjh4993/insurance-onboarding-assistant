@@ -94,6 +94,7 @@ module "auth" {
   domain_name           = local.agent_host # the ALB's Cognito callback runs on the host agents log in on
   operator_domain_name  = var.operator_domain_name
   cognito_domain_prefix = "${local.name}-${local.account_id}"
+  accounts              = var.cognito_accounts
 }
 
 module "edge" {
