@@ -308,7 +308,14 @@ edit:
 4. `publish` it.
 5. Restart the backend service.
 
-Publishing to S3 directly needs write access to the bucket and `kms:GenerateDataKey` on the environment's key.
+The **operator** does this, as the environment's agent config operator role (Terraform output
+`agent_config_operator_role_arn`). That role can publish, but it cannot replace or delete: every write carries
+`If-None-Match: *` and the role is denied any other kind. Its only other permission is restarting the backend
+service:
+
+```bash
+aws ecs update-service --cluster <cluster> --service <name>-backend --force-new-deployment
+```
 
 **Languages are data.** A bundle declares its languages. The API accepts a session locale only if the loaded
 bundle has it (`GET /api/languages`). A session in a language the bundle lacks falls back to the bundle's default

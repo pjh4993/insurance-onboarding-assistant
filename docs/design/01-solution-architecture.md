@@ -8,12 +8,13 @@ is in [langgraph-design.md](02-langgraph-design.md). The AWS mapping is in [aws-
 
 ![System context](assets/solution-architecture-context.svg)
 
-Two kinds of people use the system.
+Three kinds of people use the system.
 
 | Person | How they get in | What they do |
 |---|---|---|
 | Customer | The landing page (start on their own, rate-limited per address) or a session link `/s/{token}` from an agent. No account | Goes through the four onboarding stages in a chat |
 | Support agent | Agent console `/agent`. Staff login: Cognito at the ALB in develop; a development identity (`agent-demo`) locally, and behind Cognito until the frontend verifies the ALB's signed header | Sees all sessions, opens a new session link, takes over a stuck session, answers on the customer's behalf |
+| Operator | AWS, by assuming the environment's agent config operator role (listed principals, or any account principal signed in with MFA). No UI | Maintains what the agent says and which models it uses: publishes new versions of the agent config bundle and restarts the backend to load them. See [langgraph-design.md](02-langgraph-design.md#10-models-prompts-and-copy-the-config-bundle) |
 
 The brief says the assistant "helps support agents guide customers" and also asks for a "customer onboarding
 interface". We support both: the customer drives the chat, and an agent can step in at any point. See

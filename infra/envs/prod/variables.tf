@@ -72,6 +72,12 @@ variable "agent_dev_auth" {
   default     = true
 }
 
+variable "agent_config_operator_arns" {
+  description = "Principals allowed to act as the operator (publish agent config bundles, restart the backend). Empty: any principal of the account signed in with MFA."
+  type        = list(string)
+  default     = []
+}
+
 variable "agent_config_version" {
   description = "Agent config bundle to load: exact (1.2.0) or a prefix (1, 1.2) meaning the highest published match. Takes effect when backend tasks restart."
   type        = string

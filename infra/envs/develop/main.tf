@@ -60,8 +60,13 @@ module "agent_config" {
   source = "../../modules/agent_config"
 
   name         = local.name
+  region       = var.region
   kms_key_arn  = module.security.kms_key_arn
   baseline_dir = "${path.root}/../../../backend/packages/agent/src/onboarding_agent/config/bundled"
+
+  operator_principal_arns = var.agent_config_operator_arns
+  backend_service_arn     = module.backend.service_arn
+  backend_cluster_arn     = aws_ecs_cluster.this.arn
 }
 
 module "data" {

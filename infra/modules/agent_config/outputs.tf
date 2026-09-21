@@ -15,3 +15,8 @@ output "uri" {
   value      = "s3://${aws_s3_bucket.this.id}/${var.prefix}"
   depends_on = [aws_s3_object.baseline_config]
 }
+
+output "operator_role_arn" {
+  description = "Assume this to publish agent config bundles and restart the backend."
+  value       = aws_iam_role.operator.arn
+}

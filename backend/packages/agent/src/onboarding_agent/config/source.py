@@ -29,7 +29,9 @@ class Source(Protocol):
     def children(self) -> list[str]: ...
     def sub(self, name: str) -> Source: ...
     def files(self) -> list[str]: ...
-    def write(self, path: str, data: bytes) -> None: ...
+    def write(self, path: str, data: bytes) -> None:
+        """Create `path`. Raises FileExistsError if it exists: published files are never overwritten."""
+        ...
 
 
 class LocalSource:
@@ -55,7 +57,8 @@ class LocalSource:
     def write(self, path: str, data: bytes) -> None:
         target = self.path / path
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(data)
+        with target.open("xb") as f:
+            f.write(data)
 
 
 class S3Source:
@@ -102,8 +105,19 @@ class S3Source:
         return sorted(keys)
 
     def write(self, path: str, data: bytes) -> None:
+        """A conditional write (If-None-Match: *): S3 itself refuses to replace an existing object, and the
+        operator role may not write any other way."""
+        from botocore.exceptions import ClientError
+
         content_type = "application/json" if path.endswith(".json") else "application/octet-stream"
-        self.client.put_object(Bucket=self.bucket, Key=self._key(path), Body=data, ContentType=content_type)
+        try:
+            self.client.put_object(
+                Bucket=self.bucket, Key=self._key(path), Body=data, ContentType=content_type, IfNoneMatch="*"
+            )
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("PreconditionFailed", "ConditionalRequestConflict"):
+                raise FileExistsError(f"{self.location}/{path}") from None
+            raise
 
 
 def open_source(uri: str, s3_client: Any = None) -> Source:
@@ -155,8 +169,11 @@ def copy_bundle(bundle_dir: Source, base: Source) -> str:
     if target.files():
         raise ConfigError(f"{target.location} already exists; published versions are immutable, bump the version")
     files = bundle_dir.files()
-    for path in [f for f in files if f != "config.json"] + ["config.json"]:
-        target.write(path, bundle_dir.read(path))
+    try:
+        for path in [f for f in files if f != "config.json"] + ["config.json"]:
+            target.write(path, bundle_dir.read(path))
+    except FileExistsError as exc:
+        raise ConfigError(f"{exc}: already published; published versions are immutable, bump the version") from None
     return version
 
 

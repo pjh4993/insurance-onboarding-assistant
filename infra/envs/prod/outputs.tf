@@ -42,3 +42,8 @@ output "agent_config_uri" {
   description = "Where agent config bundles are published: python -m onboarding_agent.config publish <bundle-dir> <this>"
   value       = module.agent_config.uri
 }
+
+output "agent_config_operator_role_arn" {
+  description = "The operator role: publishes agent config bundles and restarts the backend"
+  value       = module.agent_config.operator_role_arn
+}

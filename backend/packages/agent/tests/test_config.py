@@ -198,8 +198,14 @@ class FakeS3:
 
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
+        self.puts: list[tuple[str, str | None]] = []
 
-    def put_object(self, Bucket, Key, Body, ContentType=None):  # noqa: N803
+    def put_object(self, Bucket, Key, Body, ContentType=None, IfNoneMatch=None):  # noqa: N803
+        from botocore.exceptions import ClientError
+
+        self.puts.append((Key, IfNoneMatch))
+        if IfNoneMatch == "*" and Key in self.objects:
+            raise ClientError({"Error": {"Code": "PreconditionFailed"}}, "PutObject")
         self.objects[Key] = Body
 
     def get_object(self, Bucket, Key):  # noqa: N803
@@ -236,6 +242,12 @@ def test_bundles_publish_to_and_load_from_s3(tmp_path):
     assert publish(str(variant(tmp_path, "1.0.0")), uri, s3_client=s3) == "1.0.0"
     assert publish(str(variant(tmp_path, "1.1.0", with_japanese)), uri, s3_client=s3) == "1.1.0"
     assert "agent-config/1.1.0/config.json" in s3.objects
+
+    # every write is conditional, so S3 refuses to replace an object even if the listing raced another publish
+    assert s3.puts and all(if_none_match == "*" for _, if_none_match in s3.puts)
+    source = S3Source("agent-config-bucket", "agent-config/1.0.0", s3)
+    with pytest.raises(FileExistsError):
+        source.write("config.json", b"{}")
 
     bundle = load_bundle(uri, s3_client=s3)
     assert (bundle.version, bundle.source) == ("1.1.0", f"{uri}/1.1.0")

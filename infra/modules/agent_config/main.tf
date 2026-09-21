@@ -95,3 +95,104 @@ resource "aws_s3_object" "baseline_config" {
 
   depends_on = [aws_s3_object.baseline]
 }
+
+# ------------------------------------------------------------------------------------------ operator role
+# The operator maintains the agent's prompts, copy and models: pulls a bundle, edits it, publishes it as a new
+# version and restarts the backend. That is all this role can do. Publishing is create-only: the role may
+# write an object only with If-None-Match: *, so S3 refuses to replace one, and it may not delete.
+
+locals {
+  operator_trust_account = length(var.operator_principal_arns) == 0
+}
+
+data "aws_iam_policy_document" "operator_trust" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "AWS"
+      identifiers = local.operator_trust_account ? ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"] : var.operator_principal_arns
+    }
+    dynamic "condition" {
+      for_each = local.operator_trust_account ? [1] : []
+      content {
+        test     = "Bool"
+        variable = "aws:MultiFactorAuthPresent"
+        values   = ["true"]
+      }
+    }
+  }
+}
+
+resource "aws_iam_role" "operator" {
+  name                 = "${var.name}-agent-config-operator"
+  description          = "Publishes agent config bundle versions (prompts, copy, models) and restarts the backend to load them"
+  assume_role_policy   = data.aws_iam_policy_document.operator_trust.json
+  max_session_duration = 3600
+}
+
+data "aws_iam_policy_document" "operator" {
+  statement {
+    sid       = "ListBundleVersions"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.this.arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["${var.prefix}/", "${var.prefix}/*"]
+    }
+  }
+
+  statement {
+    sid       = "ReadAndPublishBundles"
+    actions   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"]
+    resources = ["${aws_s3_bucket.this.arn}/${var.prefix}/*"]
+  }
+
+  # A published version is immutable: refuse any write that could replace an existing object.
+  statement {
+    sid       = "CreateOnly"
+    effect    = "Deny"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.this.arn}/*"]
+    condition {
+      test     = "StringNotEquals"
+      variable = "s3:if-none-match"
+      values   = ["*"]
+    }
+  }
+
+  statement {
+    sid       = "EncryptThroughS3Only"
+    actions   = ["kms:GenerateDataKey", "kms:Decrypt"]
+    resources = [var.kms_key_arn]
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["s3.${var.region}.amazonaws.com"]
+    }
+  }
+
+  # The backend reads the bundle once, at startup: a new version takes effect when its tasks restart.
+  statement {
+    sid       = "RestartBackend"
+    actions   = ["ecs:UpdateService", "ecs:DescribeServices"]
+    resources = [var.backend_service_arn]
+  }
+
+  statement {
+    sid       = "WatchRestart"
+    actions   = ["ecs:ListTasks", "ecs:DescribeTasks"]
+    resources = ["*"]
+    condition {
+      test     = "ArnEquals"
+      variable = "ecs:cluster"
+      values   = [var.backend_cluster_arn]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "operator" {
+  name   = "agent-config-operator"
+  role   = aws_iam_role.operator.id
+  policy = data.aws_iam_policy_document.operator.json
+}
