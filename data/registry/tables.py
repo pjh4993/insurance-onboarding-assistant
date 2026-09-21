@@ -5,12 +5,10 @@ stays stable while the agent's shapes evolve."""
 
 from __future__ import annotations
 
-import contextlib
 from dataclasses import dataclass
 
 import pyarrow as pa
 from pyiceberg.catalog import Catalog
-from pyiceberg.exceptions import NamespaceAlreadyExistsError
 from pyiceberg.table import Table
 
 TS = pa.timestamp("us", tz="UTC")
@@ -35,7 +33,7 @@ class TableDef:
 
 
 NEMOTRON_KO = TableDef(
-    "personas.nemotron_ko",
+    "onboarding_personas.nemotron_ko",
     pa.schema(
         [pa.field("uuid", pa.string(), nullable=False)]
         + [pa.field(f, pa.string()) for f in PERSONA_TEXT_FIELDS]
@@ -47,7 +45,7 @@ NEMOTRON_KO = TableDef(
 )
 
 SAMPLES = TableDef(
-    "personas.samples",
+    "onboarding_personas.samples",
     pa.schema(
         [
             pa.field("sample_id", pa.string(), nullable=False),
@@ -64,7 +62,7 @@ SAMPLES = TableDef(
 )
 
 CONVERSATIONS = TableDef(
-    "traces.conversations",
+    "onboarding_traces.conversations",
     pa.schema(
         [
             pa.field("trace_id", pa.string(), nullable=False),
@@ -102,7 +100,7 @@ CONVERSATIONS = TableDef(
 )
 
 TURNS = TableDef(
-    "traces.turns",
+    "onboarding_traces.turns",
     pa.schema(
         [
             pa.field("trace_id", pa.string(), nullable=False),
@@ -123,7 +121,7 @@ TURNS = TableDef(
 )
 
 LLM_CALLS = TableDef(
-    "traces.llm_calls",
+    "onboarding_traces.llm_calls",
     pa.schema(
         [
             pa.field("trace_id", pa.string(), nullable=False),
@@ -148,10 +146,8 @@ TABLES = [NEMOTRON_KO, SAMPLES, CONVERSATIONS, TURNS, LLM_CALLS]
 
 
 def ensure(cat: Catalog, t: TableDef) -> Table:
-    """Load the table, creating its namespace and the table (with its partition spec) if missing."""
-    namespace = t.identifier.split(".")[0]
-    with contextlib.suppress(NamespaceAlreadyExistsError):
-        cat.create_namespace(namespace)
+    """Load the table, creating it (with its partition spec) if missing. Namespaces are Glue databases
+    managed by infra/bootstrap, so a missing one is an error here rather than created."""
     if cat.table_exists(t.identifier):
         return cat.load_table(t.identifier)
     table = cat.create_table(t.identifier, schema=t.schema, properties={"comment": t.doc} if t.doc else {})

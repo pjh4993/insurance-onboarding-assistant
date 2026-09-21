@@ -1,4 +1,4 @@
-"""Load nvidia/Nemotron-Personas-Korea parquet shards into `personas.nemotron_ko`.
+"""Load nvidia/Nemotron-Personas-Korea parquet shards into `onboarding_personas.nemotron_ko`.
 
 Shards are downloaded once to $GWT_ROOT/.data/nemotron-personas-korea/; a shard already in the
 table is skipped.

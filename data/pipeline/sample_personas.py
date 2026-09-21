@@ -1,4 +1,4 @@
-"""Draw a named, stratified persona sample from `personas.nemotron_ko` into `personas.samples`.
+"""Draw a named, stratified persona sample from `onboarding_personas.nemotron_ko` into `onboarding_personas.samples`.
 
 Strata are age band x employed (occupation != 무직), so a small sample still spans young and old,
 working and not. Rows are ordered by stratum; generate_traces assigns situations by that order.

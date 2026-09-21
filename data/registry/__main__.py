@@ -13,7 +13,7 @@ def main() -> None:
         table = ensure(cat, t)
         snap = table.current_snapshot()
         rows = snap.summary["total-records"] if snap and snap.summary else "0"
-        print(f"  {t.identifier:24} {rows:>9} rows  {table.location()}")
+        print(f"  {t.identifier:34} {rows:>9} rows  {table.location()}")
 
 
 if __name__ == "__main__":

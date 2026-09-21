@@ -1,5 +1,6 @@
 # One-time stack that creates the Terraform state bucket and lock table used by
-# envs/develop and envs/prod, and the Iceberg warehouse bucket of the data lakehouse (data/). It keeps its own state locally (run once by an
+# envs/develop and envs/prod, and the data lakehouse (data/): the Iceberg warehouse bucket and the
+# Glue databases that catalog its tables. It keeps its own state locally (run once by an
 # admin, then commit nothing: *.tfstate is git-ignored).
 #
 #   cd infra/bootstrap && terraform init && terraform apply
@@ -18,6 +19,12 @@ terraform {
 variable "region" {
   type    = string
   default = "ap-northeast-2"
+}
+
+variable "lakehouse_namespaces" {
+  description = "Iceberg namespaces of data/registry; each is a Glue database onboarding_<namespace>."
+  type        = list(string)
+  default     = ["personas", "traces"]
 }
 
 variable "lock_table_name" {
@@ -201,6 +208,15 @@ resource "aws_s3_bucket_policy" "lakehouse" {
   depends_on = [aws_s3_bucket_public_access_block.lakehouse]
 }
 
+# The lakehouse catalog. pyiceberg's GlueCatalog stores each Iceberg table as a Glue table in these.
+resource "aws_glue_catalog_database" "lakehouse" {
+  for_each = toset(var.lakehouse_namespaces)
+
+  name         = "onboarding_${each.key}"
+  description  = "Iceberg tables of data/registry (${each.key})"
+  location_uri = "s3://${aws_s3_bucket.lakehouse.bucket}/warehouse/${each.key}"
+}
+
 output "state_bucket_name" {
   value = aws_s3_bucket.state.bucket
 }
@@ -211,4 +227,8 @@ output "lock_table_name" {
 
 output "lakehouse_bucket_name" {
   value = aws_s3_bucket.lakehouse.bucket
+}
+
+output "lakehouse_glue_databases" {
+  value = [for db in aws_glue_catalog_database.lakehouse : db.name]
 }

@@ -1,5 +1,5 @@
 """Run a persona sample through the real onboarding graph and register one conversation trace per
-persona in the lakehouse (`traces.conversations`, `traces.turns`, `traces.llm_calls`).
+persona in the lakehouse (`onboarding_traces.conversations`, `.turns`, `.llm_calls`).
 
 Each persona gets a situation (identity path x need x decision) by its position in the sample.
 OpenAI writes the persona's customer record and brief, plays the customer turn by turn, and stands

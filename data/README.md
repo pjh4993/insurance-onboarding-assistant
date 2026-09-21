@@ -6,12 +6,13 @@ conversations simulated from them against the real agent graph.
 ```
 data/
 ├── registry/          # the lakehouse: catalog + table definitions
-│   ├── catalog.py     # Iceberg SqlCatalog; data and metadata in S3, catalog DB in $GWT_ROOT/.data/lakehouse/
+│   ├── catalog.py     # Iceberg GlueCatalog; data and metadata in S3
 │   └── tables.py      # every table's schema and partitioning
 └── pipeline/
-    ├── ingest_personas.py   # nvidia/Nemotron-Personas-Korea shards -> personas.nemotron_ko
-    ├── sample_personas.py   # stratified named sample -> personas.samples
-    └── generate_traces.py   # sample -> simulated conversations -> traces.*
+    ├── ingest_personas.py   # nvidia/Nemotron-Personas-Korea shards -> onboarding_personas.nemotron_ko
+    ├── sample_personas.py   # stratified named sample -> onboarding_personas.samples
+    ├── generate_traces.py   # sample -> simulated conversations -> onboarding_traces.*
+    └── models.yaml          # OpenAI models per role and Chat Completions kwargs per model
 ```
 
 ## Setup
@@ -21,8 +22,10 @@ cd data && uv sync
 docker compose up -d postgres   # generate_traces runs the agent on the compose Postgres
 ```
 
-- **Warehouse:** `s3://onboarding-lakehouse-<account>/warehouse`. The bucket comes from `infra/bootstrap`, and S3 is reached with the AWS profile `aws-jhpark`.
-- **Catalog:** a SQLite file that exists only on this machine. Another machine needs the same catalog DB, or a shared catalog such as Glue or an Iceberg REST server.
+- **Warehouse:** `s3://onboarding-lakehouse-<account>/warehouse`.
+- **Catalog:** AWS Glue. There is one database per namespace, `onboarding_personas` and `onboarding_traces`, so the tables can also be queried from Athena.
+- **Where they come from:** the bucket and the Glue databases are both created in `infra/bootstrap`. Adding a namespace means adding it to `lakehouse_namespaces` there.
+- **AWS access:** Glue and S3 are reached with the AWS profile `aws-jhpark`.
 - **Env overrides:** see `registry/catalog.py` for `LAKEHOUSE_*`, and `pipeline/generate_traces.py` for `SIM_*`.
 - **OpenAI:** `OPENAI_API_KEY` comes from the root `.envrc`.
 
@@ -39,11 +42,11 @@ uv run python -m pipeline.generate_traces --sample-id strat10-s42 --json-dir $GW
 
 | table | grain | partition |
 |---|---|---|
-| `personas.nemotron_ko` | one persona (Nemotron-Personas-Korea row, CC BY 4.0) | — |
-| `personas.samples` | one persona in a named sample, with its `position` | `sample_id` |
-| `traces.conversations` | one simulated session: situation, expected vs final status, brief, messages, entities | `run_id` |
-| `traces.turns` | one customer input the graph waited for, with the agent prompt it answered | `run_id` |
-| `traces.llm_calls` | one structured-output call of the agent (node, input, output, tokens) | `run_id` |
+| `onboarding_personas.nemotron_ko` | one persona (Nemotron-Personas-Korea row, CC BY 4.0) | — |
+| `onboarding_personas.samples` | one persona in a named sample, with its `position` | `sample_id` |
+| `onboarding_traces.conversations` | one simulated session: situation, expected vs final status, brief, messages, entities | `run_id` |
+| `onboarding_traces.turns` | one customer input the graph waited for, with the agent prompt it answered | `run_id` |
+| `onboarding_traces.llm_calls` | one structured-output call of the agent (node, input, output, tokens) | `run_id` |
 
 ## How a trace is made
 
