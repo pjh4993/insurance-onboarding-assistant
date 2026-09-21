@@ -90,7 +90,7 @@ def test_self_serve_start_records_origin_and_only_an_ip_hash(make_client, db, se
     # the customer link works exactly like an agent's, and the graph has started
     view = client.get("/api/customer/session", headers={"X-Session-Token": body["token"]}).json()
     assert view["session"]["origin"] == "SELF_SERVE" and view["session"]["locale"] == "ko"
-    assert view["session"]["waiting_for"] == "IDENTITY_INFO"
+    assert view["session"]["waiting_for"] == "INTAKE"
     assert view["messages"][0]["role"] == "assistant"
 
     agent_made = client.post("/api/sessions", json={"market": "KR"}, headers=AGENT).json()

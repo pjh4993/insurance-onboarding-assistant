@@ -18,7 +18,9 @@ from langgraph.graph.message import add_messages
 Stage = Literal[
     "IDENTITY", "PROFILING", "RECOMMENDATION", "APPLICATION", "SUBMITTED", "HANDOFF", "DECLINED", "WITHDRAWN"
 ]
-WaitingFor = Literal["IDENTITY_INFO", "OTP_CODE", "NEEDS", "DECISION", "PARTIES", "ANSWERS", "CONFIRM", "AGENT"]
+WaitingFor = Literal[
+    "INTAKE", "IDENTITY_INFO", "OTP_CODE", "NEEDS", "DECISION", "PARTIES", "ANSWERS", "CONFIRM", "AGENT"
+]
 IdentityResult = Literal["MATCHED", "NOT_MATCHED", "OTP_OK", "OTP_FAILED", "DOC_OK", "DOC_FAILED"]
 HandoffReason = Literal[
     "IDENTITY_FAILED", "NO_ELIGIBLE_PRODUCT", "NEEDS_INCOMPLETE", "ANSWERS_INCOMPLETE", "SUMMARY_REJECTED", "ERROR"
@@ -44,19 +46,25 @@ class ConversationState(TypedDict, total=False):
     stage: Stage
     waiting_for: WaitingFor | None
     last_input: WaitingFor | None  # which input ask_customer just received (routing signal)
+    form_topic: str | None  # the small form the pending IDENTITY_INFO / NEEDS wait asks (prompt `form.topic`)
+    # intake: the customer's first message, kept for the needs extraction ({"text"}: a dict, so it is encrypted)
+    intake: dict[str, str] | None
+    product_interest: str | None  # a catalog product_type the intake points to, or None when unknown
 
 
 class IdentityState(TypedDict, total=False):
     identity_result: IdentityResult | None
     otp_request_id: str | None
     otp_code: dict[str, str] | None  # {"code"}: transient, set by ask_customer, cleared by check_otp
+    identity_topics: list[str]  # identity forms answered so far ("contact", "id_document", "consent")
 
 
 class ProfilingState(TypedDict, total=False):
     needs_assessment_id: str | None
     insurable_object_ids: list[str]
     needs_complete: bool
-    needs_rounds: int  # NEEDS answers since the last completed assessment (loop guard)
+    needs_rounds: int  # NEEDS answers that filled no missing field, since the last completed assessment
+    needs_input: dict[str, Any] | None  # {"topic", "fields", "text"}: transient, set by ask_customer
 
 
 class RecommendationState(TypedDict, total=False):
@@ -103,15 +111,20 @@ def initial_state(*, session_id: str, party_id: str, market: str, locale: str) -
         "stage": "IDENTITY",
         "waiting_for": None,
         "last_input": None,
+        "form_topic": None,
+        "intake": None,
+        "product_interest": None,
         # identity
         "identity_result": None,
         "otp_request_id": None,
         "otp_code": None,
+        "identity_topics": [],
         # profiling
         "needs_assessment_id": None,
         "insurable_object_ids": [],
         "needs_complete": False,
         "needs_rounds": 0,
+        "needs_input": None,
         # recommendation
         "recommendation_ids": [],
         "quote_ids": {},

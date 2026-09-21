@@ -34,6 +34,16 @@ def wait_for(client: TestClient, headers: dict, waiting_for, status: str | None 
     raise AssertionError(f"timed out waiting for {waiting_for}/{status}; last: {view['session']}")
 
 
+def wait_for_form(client: TestClient, headers: dict, topic: str, timeout: float = 15.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        view = client.get("/api/customer/session", headers=headers).json()
+        if ((view["prompt"] or {}).get("form") or {}).get("topic") == topic:
+            return view
+        time.sleep(0.05)
+    raise AssertionError(f"timed out waiting for the {topic} form; last prompt: {view['prompt']}")
+
+
 def post_input(client, headers, input_type, data, path="/api/customer/session/input"):
     r = client.post(path, headers=headers, json={"type": input_type, "data": data})
     assert r.status_code == 202, r.text
@@ -48,6 +58,12 @@ def new_session(client, market="KR", headers=None):
     return body, {"X-Session-Token": body["token"]}
 
 
+def past_intake(client, headers, text=""):
+    """Answer the intake turn and wait for the first identity form."""
+    post_input(client, headers, "INTAKE", {"text": text})
+    return wait_for(client, headers, "IDENTITY_INFO")
+
+
 def test_healthz(client):
     assert client.get("/healthz").json() == {"status": "ok"}
 
@@ -56,9 +72,12 @@ def test_customer_full_flow_customer_a(client):
     body, h = new_session(client, "KR", headers=AGENT)  # the console calls this with X-Agent-Id
     view = client.get("/api/customer/session", headers=h).json()
     assert view["session"]["display_name"].startswith("Unverified #")
-    assert view["session"]["waiting_for"] == "IDENTITY_INFO" and view["prompt"]["waiting_for"] == "IDENTITY_INFO"
+    assert view["session"]["waiting_for"] == "INTAKE" and view["prompt"]["waiting_for"] == "INTAKE"
+    assert "form" not in view["prompt"]
     assert view["messages"][0]["role"] == "assistant"
 
+    view = past_intake(client, h, "휴대폰 보험 알아보고 있어요")
+    assert view["prompt"]["form"]["topic"] == "contact"
     post_input(client, h, "IDENTITY_INFO", identity_input("A", consent=True))
     view = wait_for(client, h, "NEEDS")
     assert view["session"]["display_name"] == CUSTOMERS["A"]["full_name"]
@@ -115,6 +134,9 @@ def test_session_locale_defaults_to_market_and_switches_the_next_reply(client):
     assert client.put("/api/customer/session/locale", json={"locale": "en"}).status_code == 401
 
     # messages already sent stay in Korean; the next reply follows the new language, the market stays KR
+    post_input(client, h, "INTAKE", {"text": ""})
+    view = wait_for(client, h, "IDENTITY_INFO")
+    assert view["prompt"]["form"]["title"] == "Your contact details"  # the form follows the language at once
     post_input(client, h, "IDENTITY_INFO", identity_input("A", consent=True))
     view = wait_for(client, h, "NEEDS")
     assert view["messages"][0]["text"].startswith("안녕하세요")
@@ -145,7 +167,7 @@ def bundle_in_japanese(tmp_path):
     target = tmp_path / "1.1.0"
     shutil.copytree(Path(str(BUNDLED)) / default_bundle().version, target)
     config = json.loads((target / "config.json").read_text())
-    config["version"] = "1.1.0"
+    config["version"] = "1.2.0"
     config["languages"]["ja"] = {"name": "Japanese"}
     for entry in [*config["labels"].values(), *config["billing_periods"].values()]:
         entry["ja"] = entry["en"]
@@ -182,7 +204,7 @@ def test_a_bad_config_bundle_stops_startup_and_says_why(settings, external, llm,
     bad = tmp_path / "1.0.1"
     shutil.copytree(Path(str(BUNDLED)) / default_bundle().version, bad)
     config = json.loads((bad / "config.json").read_text())
-    config["version"] = "1.0.1"
+    config["version"] = "1.1.1"
     config["models"]["default"]["model_id"] = "anthropic.claude-opus-9"
     (bad / "config.json").write_text(json.dumps(config))
     settings = settings.model_copy(
@@ -205,6 +227,7 @@ def test_session_locale_can_be_chosen_at_creation(client):
 
 def test_input_validation_and_auth(client):
     _, h = new_session(client, "US")
+    past_intake(client, h)
     assert client.get("/api/customer/session").status_code == 401
     assert client.get("/api/customer/session", headers={"X-Session-Token": "bad"}).status_code == 401
     # wrong type for what the session waits for
@@ -213,6 +236,24 @@ def test_input_validation_and_auth(client):
     # schema validation of data
     r = client.post("/api/customer/session/input", headers=h, json={"type": "IDENTITY_INFO", "data": {"email": "x"}})
     assert r.status_code == 422
+    # identity forms and needs answers are checked by shape too
+    for input_type, data in [
+        ("IDENTITY_INFO", {"topic": "contact", "fields": {"email": "x"}}),
+        ("IDENTITY_INFO", {"topic": "passport", "fields": {}}),
+        ("IDENTITY_INFO", {"topic": "id_document", "fields": {"id_document_type": "ID", "id_document_number": "1"}}),
+        ("NEEDS", {"topic": "person"}),
+        ("NEEDS", {"topic": "person", "fields": {"age_range": "AGE_12"}}),
+        ("NEEDS", {"topic": "device", "fields": {"shoe_size": 42}}),
+        ("NEEDS", {"topic": "trip", "fields": {"departure_date": "next week"}}),
+        ("NEEDS", {"text": "  "}),
+    ]:
+        r = client.post("/api/customer/session/input", headers=h, json={"type": input_type, "data": data})
+        assert r.status_code == 422, (input_type, data, r.text)
+    # a valid identity form is accepted and the next form comes back in the prompt
+    fields = {k: CUSTOMERS["C"][k] for k in ("full_name", "email", "phone")}
+    post_input(client, h, "IDENTITY_INFO", {"topic": "contact", "fields": fields})
+    view = wait_for_form(client, h, "id_document")
+    assert view["prompt"]["form"]["fields"][1]["name"] == "id_document_number"
     # customers cannot send agent resolutions
     r = client.post("/api/customer/session/input", headers=h, json={"type": "AGENT", "data": {"resolution": "END"}})
     assert r.status_code == 403
@@ -223,6 +264,7 @@ def test_input_validation_and_auth(client):
 def test_agent_list_assign_and_resolve_handoff(client):
     d_body, d = new_session(client, "US")
     c_body, c = new_session(client, "US")
+    past_intake(client, d)
     post_input(client, d, "IDENTITY_INFO", identity_input("D", consent=False))
     wait_for(client, d, "OTP_CODE")
     post_input(client, d, "OTP_CODE", {"code": "000000"})

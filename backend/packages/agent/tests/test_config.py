@@ -63,9 +63,12 @@ def test_templates_take_plain_names_only():
 
 def test_the_baseline_bundle_covers_everything_the_agent_uses():
     bundle = default_bundle()
-    assert bundle.version == "1.2.0" and set(bundle.languages) == {"ko", "en"}
+    assert bundle.version == "1.3.0" and set(bundle.languages) == {"ko", "en"}
     assert bundle.model("assess_needs").model_id == "global.anthropic.claude-sonnet-4-6"
-    assert bundle.text("profiling.ask_more", "ko", fields="나이") == "추천을 위해 나이을(를) 더 알려 주세요."
+    assert (
+        bundle.text("profiling.ask_more", "ko", lead="여행 일정을 알려 주세요.")
+        == "감사합니다! 여행 일정을 알려 주세요."
+    )
     assert bundle.field_list("en", ["age_range", "trip.trip_cost_minor"]) == "your age, the total trip cost"
     assert bundle.billing_unit("ko", "PER_TRIP") == "여행 1건"
 

@@ -54,3 +54,10 @@ def mask_phone(phone: str | None) -> str:
     if not phone:
         return ""
     return "*" * max(len(phone) - 4, 0) + phone[-4:]
+
+
+def mask_id(number: str | None) -> str:
+    """An ID document number for the transcript: only its last two characters."""
+    if not number:
+        return ""
+    return "*" * max(len(number) - 2, 0) + number[-2:]

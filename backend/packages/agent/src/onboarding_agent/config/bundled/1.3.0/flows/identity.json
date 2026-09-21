@@ -1,0 +1,136 @@
+{
+  "copy": {
+    "consent_yes": {
+      "ko": "동의",
+      "en": "yes"
+    },
+    "consent_no": {
+      "ko": "동의 안 함",
+      "en": "no"
+    },
+    "identity_received": {
+      "ko": "본인 정보를 입력했습니다 — {name} (파트너 조회 {consent})",
+      "en": "Identity details submitted — {name} (partner lookup consent: {consent})"
+    },
+    "otp_received": {
+      "ko": "인증번호를 입력했습니다.",
+      "en": "Entered the verification code."
+    },
+    "agent_verified": {
+      "ko": "상담원이 본인 확인을 마쳤습니다.",
+      "en": "An agent has verified your identity."
+    },
+    "partner_verified": {
+      "ko": "파트너사 고객 정보로 본인 확인이 끝났습니다.",
+      "en": "You're verified through your partner account."
+    },
+    "otp_sent": {
+      "ko": "{phone} 번호로 인증번호를 보냈습니다. 받은 6자리 번호를 입력해 주세요.",
+      "en": "We sent a verification code to {phone}. Please enter the 6-digit code."
+    },
+    "otp_verified": {
+      "ko": "인증번호가 확인됐습니다.",
+      "en": "Code verified — thank you."
+    },
+    "otp_failed": {
+      "ko": "인증번호가 맞지 않아 입력하신 신분증으로 확인해 볼게요.",
+      "en": "That code didn't work, so I'll verify the ID document you gave instead."
+    },
+    "document_verified": {
+      "ko": "신분증으로 본인 확인이 끝났습니다.",
+      "en": "Your ID document is verified."
+    },
+    "identity_failed": {
+      "ko": "본인 확인을 마치지 못했습니다. 상담원을 연결해 드릴게요.",
+      "en": "I couldn't verify your identity, so I'm connecting you with an agent."
+    },
+    "form.contact.title": {
+      "ko": "연락처",
+      "en": "Your contact details"
+    },
+    "form.contact.reason": {
+      "ko": "본인 확인과 인증번호 발송에 사용해요.",
+      "en": "We use these to verify you and to text you a verification code."
+    },
+    "form.contact.lead": {
+      "ko": "이름과 연락처를 알려 주세요.",
+      "en": "Please share your name and contact details."
+    },
+    "form.id_document.title": {
+      "ko": "신분증",
+      "en": "ID document"
+    },
+    "form.id_document.reason": {
+      "ko": "휴대폰 인증이 안 될 때 신분증으로 본인을 확인해요. 번호는 암호화해 보관합니다.",
+      "en": "If the text-message check doesn't work, we verify you with this document. The number is stored encrypted."
+    },
+    "form.id_document.lead": {
+      "ko": "다음으로 신분증 정보를 알려 주세요.",
+      "en": "Next, your ID document."
+    },
+    "form.consent.title": {
+      "ko": "파트너사 정보 조회 동의",
+      "en": "Partner lookup consent"
+    },
+    "form.consent.reason": {
+      "ko": "동의하시면 제휴 판매처의 고객 정보와 구매 기록으로 바로 본인을 확인하고, 구매하신 기기 정보도 채워 드려요. 동의하지 않으셔도 휴대폰 인증으로 진행할 수 있어요.",
+      "en": "If you agree, we check your details and purchase history with our retail partner: you're verified straight away and the device you bought is filled in for you. If not, we verify you by text message instead."
+    },
+    "form.consent.lead": {
+      "ko": "마지막으로, 파트너사 정보 조회에 동의하시는지 알려 주세요.",
+      "en": "Last one: may we check your details with our retail partner?"
+    },
+    "field.full_name": {
+      "ko": "이름",
+      "en": "Full name"
+    },
+    "field.email": {
+      "ko": "이메일",
+      "en": "Email"
+    },
+    "field.email.placeholder": {
+      "ko": "name@example.com",
+      "en": "name@example.com"
+    },
+    "field.phone": {
+      "ko": "휴대폰 번호",
+      "en": "Mobile number"
+    },
+    "field.phone.placeholder": {
+      "ko": "+821012345678",
+      "en": "+12065550101"
+    },
+    "field.id_document_type": {
+      "ko": "신분증 종류",
+      "en": "Document type"
+    },
+    "option.id_document_type.NATIONAL_ID": {
+      "ko": "주민등록증",
+      "en": "National ID card"
+    },
+    "option.id_document_type.PASSPORT": {
+      "ko": "여권",
+      "en": "Passport"
+    },
+    "option.id_document_type.DRIVER_LICENSE": {
+      "ko": "운전면허증",
+      "en": "Driver's license"
+    },
+    "field.id_document_number": {
+      "ko": "신분증 번호",
+      "en": "Document number"
+    },
+    "field.third_party_consent": {
+      "ko": "파트너사 정보 조회 동의",
+      "en": "Partner lookup"
+    },
+    "option.third_party_consent.true": {
+      "ko": "동의",
+      "en": "I agree"
+    },
+    "option.third_party_consent.false": {
+      "ko": "동의 안 함",
+      "en": "I don't agree"
+    }
+  }
+}

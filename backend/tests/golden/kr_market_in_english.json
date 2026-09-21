@@ -5,6 +5,27 @@
    "session": {
     "status": "ACTIVE",
     "last_stage": "IDENTITY",
+    "waiting_for": "INTAKE",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "assistant",
+     "Hi! I help you find and apply for insurance. What are you looking for today? Feel free to ask me anything."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "INTAKE",
+    "message": "Hi! I help you find and apply for insurance. What are you looking for today? Feel free to ask me anything."
+   }
+  },
+  {
+   "input": "INTAKE",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
     "waiting_for": "IDENTITY_INFO",
     "mode": "AUTO",
     "locale": "en",
@@ -13,12 +34,44 @@
    "messages": [
     [
      "assistant",
-     "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+     "Great, let's get started. First I'll quickly verify your identity, then ask a few short questions to find cover that fits you."
+    ],
+    [
+     "assistant",
+     "Please share your name and contact details."
     ]
    ],
    "prompt": {
     "waiting_for": "IDENTITY_INFO",
-    "message": "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+    "message": "Please share your name and contact details.",
+    "form": {
+     "topic": "contact",
+     "title": "Your contact details",
+     "reason": "We use these to verify you and to text you a verification code.",
+     "fields": [
+      {
+       "name": "full_name",
+       "label": "Full name",
+       "kind": "text",
+       "required": true
+      },
+      {
+       "name": "email",
+       "label": "Email",
+       "kind": "email",
+       "required": true,
+       "placeholder": "name@example.com"
+      },
+      {
+       "name": "phone",
+       "label": "Mobile number",
+       "kind": "tel",
+       "required": true,
+       "placeholder": "+12065550101"
+      }
+     ],
+     "allow_text": false
+    }
    }
   },
   {
@@ -46,12 +99,44 @@
     ],
     [
      "assistant",
-     "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+     "Now let's find the right cover. What would you like to protect?"
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+    "message": "Now let's find the right cover. What would you like to protect?",
+    "form": {
+     "topic": "coverage",
+     "title": "What you want to protect",
+     "reason": "Which products fit depends on what you want to protect.",
+     "fields": [
+      {
+       "name": "objectives",
+       "label": "What to protect",
+       "kind": "multiselect",
+       "required": true,
+       "options": [
+        {
+         "value": "PROTECT_DEVICE",
+         "label": "A device against damage"
+        },
+        {
+         "value": "TRAVEL_COVER",
+         "label": "A trip abroad"
+        },
+        {
+         "value": "EXTEND_WARRANTY",
+         "label": "A longer device warranty"
+        },
+        {
+         "value": "REDUCE_PREMIUM",
+         "label": "A low premium"
+        }
+       ]
+      }
+     ],
+     "allow_text": true
+    }
    }
   },
   {
@@ -191,6 +276,10 @@
   "__start__",
   "greet",
   "ask_customer",
+  "understand_intake",
+  "collect_identity",
+  "ask_customer",
+  "collect_identity",
   "verify_identity",
   "fetch_purchases",
   "assess_needs",

@@ -1,0 +1,87 @@
+{
+  "llm": {
+    "collect_parties": {
+      "model": "default",
+      "instructions": "Decide whether the applicant is also the insured person and the payer. If not, list the other people with their role (INSURED or PAYER), full_name and date_of_birth (ISO 8601). Use null for a date of birth the customer has not given; never invent one. The applicant is always the policyholder (계약자) and cannot be changed here; if the customer asks for someone else to be the policyholder, set policyholder_change_requested and still record who is insured and who pays.",
+      "correction": "The parties recorded so far: {parties}. The customer is correcting the application; return the complete corrected parties. If the correction is not about who is insured or who pays, return the recorded parties unchanged."
+    },
+    "collect_answers": {
+      "model": "default",
+      "instructions": [
+        "Extract application answers from the customer's latest message into AnswersExtraction. Use exactly these field names: {fields}. Dates ISO 8601, money in minor units.",
+        "Answers so far: {answers}",
+        "Still missing: {missing}"
+      ]
+    },
+    "summarize_application": {
+      "model": "default",
+      "instructions": [
+        "Write a short plain-language summary of this insurance application for the customer to confirm before submission. Use only these facts:",
+        "{facts}"
+      ],
+      "user": "Summarize my application."
+    }
+  },
+  "copy": {
+    "opened": {
+      "ko": "{product} 청약서를 작성할게요.",
+      "en": "Great choice. Let's complete your {product} application."
+    },
+    "ask_parties": {
+      "ko": "피보험자(보장받는 분)와 보험료를 내는 분이 모두 본인인가요? 다른 분이 있다면 그분의 역할(피보험자/납입자), 이름, 생년월일을 알려 주세요.",
+      "en": "Are you both the insured person and the payer? If someone else is, tell me their role (insured or payer), full name and date of birth."
+    },
+    "ask_party_details": {
+      "ko": "다른 분의 이름과 생년월일을 알려 주세요.",
+      "en": "Please tell me the other person's full name and date of birth."
+    },
+    "parties_named": {
+      "ko": "당사자 정보를 확인했습니다 ({names}).",
+      "en": "Got it ({names})."
+    },
+    "parties_self": {
+      "ko": "당사자 정보를 확인했습니다 — 모두 본인입니다.",
+      "en": "Got it — you're the insured and the payer."
+    },
+    "answers_handoff": {
+      "ko": "청약에 필요한 정보를 다 받지 못해 상담원을 연결해 드릴게요.",
+      "en": "I still can't complete the application, so I'm bringing in an agent to help."
+    },
+    "ask_answers": {
+      "ko": "청약을 위해 {fields}을(를) 알려 주세요.",
+      "en": "To complete the application, please provide {fields}."
+    },
+    "ask_correction": {
+      "ko": "어떤 내용을 고칠까요?",
+      "en": "What would you like to change?"
+    },
+    "confirm_summary": {
+      "ko": "{summary}\n\n이대로 제출할까요?",
+      "en": "{summary}\n\nShall I submit this application?"
+    },
+    "confirm_yes": {
+      "ko": "네, 제출해 주세요.",
+      "en": "Yes, please submit."
+    },
+    "confirm_no": {
+      "ko": "고칠 내용이 있어요.",
+      "en": "I need to change something."
+    },
+    "submitted": {
+      "ko": "청약을 제출했습니다. 접수번호는 {ref}입니다. 심사 결과는 따로 안내해 드릴게요.",
+      "en": "Your application is submitted. Your reference number is {ref}. We'll be in touch with the underwriting decision."
+    },
+    "summary_handoff": {
+      "ko": "요약을 바로잡지 못해 상담원을 연결해 드릴게요. 입력하신 내용은 저장돼 있습니다.",
+      "en": "I haven't been able to get the summary right, so I'm bringing in an agent to help."
+    },
+    "no_longer_eligible": {
+      "ko": "알려 주신 내용으로는 {product}에 가입할 수 없습니다. 상담원이 이어서 도와드릴게요.\n{reasons}",
+      "en": "With what you've told me, {product} isn't available to you. An agent will follow up with you.\n{reasons}"
+    },
+    "policyholder_is_applicant": {
+      "ko": "계약자는 본인 확인을 마친 신청자 본인({name}님)만 될 수 있어요. 다른 분이 계약자가 되려면 그분이 직접 가입을 진행해야 합니다. 피보험자와 보험료 납입자는 바꿀 수 있어요.",
+      "en": "The policyholder can only be you ({name}), the verified applicant. For someone else to hold the policy, they need to apply themselves. The insured person and the payer can be someone else."
+    }
+  }
+}

@@ -13,4 +13,7 @@ DOMAINS: tuple[DomainModule, ...] = (conversation.module(STAGES), *STAGES, hando
 
 collect(DOMAINS, "edges")  # a node belongs to exactly one domain
 
-__all__ = ["DOMAINS", "STAGES", "DomainModule"]
+# waiting_for -> the form its prompt shows (IDENTITY_INFO, NEEDS)
+FORMS = {kind: spec.form for kind, spec in collect(DOMAINS, "inputs").items() if spec.form is not None}
+
+__all__ = ["DOMAINS", "FORMS", "STAGES", "DomainModule"]

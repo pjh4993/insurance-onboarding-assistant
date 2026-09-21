@@ -5,7 +5,7 @@
    "session": {
     "status": "ACTIVE",
     "last_stage": "IDENTITY",
-    "waiting_for": "IDENTITY_INFO",
+    "waiting_for": "INTAKE",
     "mode": "AUTO",
     "locale": "en",
     "current_node": "ask_customer"
@@ -13,12 +13,69 @@
    "messages": [
     [
      "assistant",
-     "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+     "Hi! I help you find and apply for insurance. What are you looking for today? Feel free to ask me anything."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "INTAKE",
+    "message": "Hi! I help you find and apply for insurance. What are you looking for today? Feel free to ask me anything."
+   }
+  },
+  {
+   "input": "INTAKE",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "IDENTITY_INFO",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "I just bought a laptop. Can I insure it?"
+    ],
+    [
+     "assistant",
+     "Happy to help with that. I'll check what fits once I know a little more. First I'll quickly verify your identity, then ask a few short questions to find cover that fits you."
+    ],
+    [
+     "assistant",
+     "Please share your name and contact details."
     ]
    ],
    "prompt": {
     "waiting_for": "IDENTITY_INFO",
-    "message": "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+    "message": "Please share your name and contact details.",
+    "form": {
+     "topic": "contact",
+     "title": "Your contact details",
+     "reason": "We use these to verify you and to text you a verification code.",
+     "fields": [
+      {
+       "name": "full_name",
+       "label": "Full name",
+       "kind": "text",
+       "required": true
+      },
+      {
+       "name": "email",
+       "label": "Email",
+       "kind": "email",
+       "required": true,
+       "placeholder": "name@example.com"
+      },
+      {
+       "name": "phone",
+       "label": "Mobile number",
+       "kind": "tel",
+       "required": true,
+       "placeholder": "+12065550101"
+      }
+     ],
+     "allow_text": false
+    }
    }
   },
   {
@@ -71,12 +128,47 @@
     ],
     [
      "assistant",
-     "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+     "Now let's find the right cover. What would you like to protect?"
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+    "message": "Now let's find the right cover. What would you like to protect?",
+    "form": {
+     "topic": "coverage",
+     "title": "What you want to protect",
+     "reason": "Which products fit depends on what you want to protect.",
+     "fields": [
+      {
+       "name": "objectives",
+       "label": "What to protect",
+       "kind": "multiselect",
+       "required": true,
+       "options": [
+        {
+         "value": "PROTECT_DEVICE",
+         "label": "A device against damage"
+        },
+        {
+         "value": "TRAVEL_COVER",
+         "label": "A trip abroad"
+        },
+        {
+         "value": "EXTEND_WARRANTY",
+         "label": "A longer device warranty"
+        },
+        {
+         "value": "REDUCE_PREMIUM",
+         "label": "A low premium"
+        }
+       ],
+       "value": [
+        "PROTECT_DEVICE"
+       ]
+      }
+     ],
+     "allow_text": true
+    }
    }
   },
   {
@@ -292,6 +384,10 @@
   "__start__",
   "greet",
   "ask_customer",
+  "understand_intake",
+  "collect_identity",
+  "ask_customer",
+  "collect_identity",
   "verify_identity",
   "ask_customer",
   "check_otp",
@@ -538,6 +634,12 @@
  },
  "llm_calls": [
   [
+   "understand_intake",
+   "IntakeReply",
+   "",
+   "English"
+  ],
+  [
    "assess_needs",
    "NeedsExtraction",
    "C",
@@ -582,6 +684,19 @@
  ],
  "llm_prompts": [
   {
+   "node": "understand_intake",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: unknown\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nThe customer has just opened the chat, and their first message is below. Fill the IntakeReply tool.\nreply: two or three short, friendly sentences that respond to what they wrote.\n- If it is about insurance or the products below, answer it briefly and plainly. Never quote prices or premiums, and never promise that something is covered or that they will be accepted: say you will check once you know a little more.\n- If it is unrelated, unclear or odd, say briefly that you help people find and apply for the insurance below, and invite them to continue.\n- Do not ask for personal details and do not describe the next steps; they are added after your reply.\nproduct_interest: the product type the message points to, or null when it does not clearly point to one.\nProducts sold in this market:\n- DEVICE_PROTECTION: 2-Year Laptop Protection with Accidents\n- EXTENDED_WARRANTY: 3-Year TV Protection\n- MOBILE_INSURANCE: bolt Mobile Handset Protection\n- TRAVEL_PROTECTION: Single Trip Protection"
+    ],
+    [
+     "human",
+     "I just bought a laptop. Can I insure it?"
+    ]
+   ]
+  },
+  {
    "node": "assess_needs",
    "messages": [
     [
@@ -590,7 +705,7 @@
     ],
     [
      "human",
-     "I'm 36, a nurse in Seattle. I just bought a $1,299 laptop and want accident cover."
+     "I just bought a laptop. Can I insure it?\n\nI'm 36, a nurse in Seattle. I just bought a $1,299 laptop and want accident cover."
     ]
    ]
   },
@@ -616,7 +731,7 @@
     ],
     [
      "human",
-     "I'm 36, a nurse in Seattle. I just bought a $1,299 laptop and want accident cover.\n\nActually the laptop cost $1,499."
+     "I just bought a laptop. Can I insure it?\n\nI'm 36, a nurse in Seattle. I just bought a $1,299 laptop and want accident cover.\n\nActually the laptop cost $1,499."
     ]
    ]
   },

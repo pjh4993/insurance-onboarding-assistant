@@ -1,0 +1,231 @@
+{
+  "llm": {
+    "assess_needs": {
+      "model": "default",
+      "instructions": [
+        "Extract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.",
+        "objectives are the cover the customer wants now: drop one they rule out. Losing a phone, luggage or belongings during a trip is TRAVEL_COVER (belongings cover), not PROTECT_DEVICE; only a device they want insured in its own right is PROTECT_DEVICE or EXTEND_WARRANTY.",
+        "Devices already known from partner purchase records: {known_devices}",
+        "Values captured so far: {values}"
+      ]
+    }
+  },
+  "copy": {
+    "purchases_found": {
+      "ko": "파트너사 구매 기록에서 {purchases} 구매를 찾았습니다.",
+      "en": "I found your recent purchase: {purchases}."
+    },
+    "ask_missing": {
+      "ko": "추천을 위해 몇 가지만 더 여쭤볼게요. {lead}",
+      "en": "A few more details and I can recommend cover. {lead}"
+    },
+    "ask_change": {
+      "ko": "어떤 점을 바꾸고 싶으신가요? 달라진 내용을 알려 주세요.",
+      "en": "What would you like to change? Tell me what's different."
+    },
+    "ask_needs": {
+      "ko": "이제 맞는 보험을 찾아볼게요. {lead}",
+      "en": "Now let's find the right cover. {lead}"
+    },
+    "needs_complete": {
+      "ko": "감사합니다. 가입할 수 있는 상품을 확인해 볼게요.",
+      "en": "Thanks — let me check which products fit you."
+    },
+    "needs_handoff": {
+      "ko": "필요한 정보를 다 받지 못해 상담원을 연결해 드릴게요.",
+      "en": "I still don't have everything I need, so I'm bringing in an agent to help."
+    },
+    "ask_more": {
+      "ko": "감사합니다! {lead}",
+      "en": "Thanks! {lead}"
+    },
+    "form.coverage.title": {
+      "ko": "보장받고 싶은 것",
+      "en": "What you want to protect"
+    },
+    "form.coverage.reason": {
+      "ko": "어떤 상품이 맞는지는 무엇을 보장받고 싶은지에 따라 달라져요.",
+      "en": "Which products fit depends on what you want to protect."
+    },
+    "form.coverage.lead": {
+      "ko": "무엇을 보장받고 싶으신가요?",
+      "en": "What would you like to protect?"
+    },
+    "form.person.title": {
+      "ko": "고객님 정보",
+      "en": "About you"
+    },
+    "form.person.reason": {
+      "ko": "상품마다 가입 나이와 거주 국가 조건이 있어서, 가입할 수 있는 상품을 확인하는 데 필요해요.",
+      "en": "Products have age and residence conditions, so we need these to check what you can apply for."
+    },
+    "form.person.lead": {
+      "ko": "고객님에 대해 조금 알려 주세요.",
+      "en": "Tell me a little about yourself."
+    },
+    "form.device.title": {
+      "ko": "기기 정보",
+      "en": "Your device"
+    },
+    "form.device.reason": {
+      "ko": "보장할 수 있는지와 보험료가 기기 종류와 구매 가격으로 정해져요.",
+      "en": "Whether a device can be covered, and its premium, depend on its type and price."
+    },
+    "form.device.lead": {
+      "ko": "보장받을 기기에 대해 알려 주세요.",
+      "en": "Tell me about the device you want to protect."
+    },
+    "form.trip.title": {
+      "ko": "여행 정보",
+      "en": "Your trip"
+    },
+    "form.trip.reason": {
+      "ko": "여행 보험의 보장과 보험료는 여행지와 기간에 따라 정해져요.",
+      "en": "Travel cover and its price depend on where you go and for how long."
+    },
+    "form.trip.lead": {
+      "ko": "여행 일정을 알려 주세요.",
+      "en": "Tell me about your trip."
+    },
+    "field.objectives": {
+      "ko": "보장 목적",
+      "en": "What to protect"
+    },
+    "option.objectives.PROTECT_DEVICE": {
+      "ko": "기기 파손·고장",
+      "en": "A device against damage"
+    },
+    "option.objectives.TRAVEL_COVER": {
+      "ko": "해외여행",
+      "en": "A trip abroad"
+    },
+    "option.objectives.EXTEND_WARRANTY": {
+      "ko": "제조사 보증 연장",
+      "en": "A longer device warranty"
+    },
+    "option.objectives.REDUCE_PREMIUM": {
+      "ko": "보험료 절약",
+      "en": "A low premium"
+    },
+    "field.age_range": {
+      "ko": "나이대",
+      "en": "Age range"
+    },
+    "option.age_range.AGE_UNDER_19": {
+      "ko": "19세 미만",
+      "en": "Under 19"
+    },
+    "option.age_range.AGE_19_29": {
+      "ko": "19–29세",
+      "en": "19–29"
+    },
+    "option.age_range.AGE_30_39": {
+      "ko": "30–39세",
+      "en": "30–39"
+    },
+    "option.age_range.AGE_40_49": {
+      "ko": "40–49세",
+      "en": "40–49"
+    },
+    "option.age_range.AGE_50_64": {
+      "ko": "50–64세",
+      "en": "50–64"
+    },
+    "option.age_range.AGE_65_PLUS": {
+      "ko": "65세 이상",
+      "en": "65 or older"
+    },
+    "field.residence_country": {
+      "ko": "거주 국가 (국가 코드)",
+      "en": "Country of residence (country code)"
+    },
+    "field.residence_country.placeholder": {
+      "ko": "예: KR",
+      "en": "e.g. US"
+    },
+    "field.occupation": {
+      "ko": "직업",
+      "en": "Occupation"
+    },
+    "field.device_category": {
+      "ko": "기기 종류",
+      "en": "Device type"
+    },
+    "option.device_category.SMARTPHONE": {
+      "ko": "스마트폰",
+      "en": "Smartphone"
+    },
+    "option.device_category.TABLET": {
+      "ko": "태블릿",
+      "en": "Tablet"
+    },
+    "option.device_category.NOTEBOOK": {
+      "ko": "노트북",
+      "en": "Laptop"
+    },
+    "option.device_category.TV": {
+      "ko": "TV",
+      "en": "TV"
+    },
+    "option.device_category.APPLIANCE": {
+      "ko": "가전제품",
+      "en": "Home appliance"
+    },
+    "option.device_category.WEARABLE": {
+      "ko": "웨어러블",
+      "en": "Wearable"
+    },
+    "field.manufacturer": {
+      "ko": "제조사",
+      "en": "Manufacturer"
+    },
+    "field.manufacturer.placeholder": {
+      "ko": "예: 삼성",
+      "en": "e.g. Apple"
+    },
+    "field.model": {
+      "ko": "모델명",
+      "en": "Model"
+    },
+    "field.model.placeholder": {
+      "ko": "예: Galaxy S26",
+      "en": "e.g. MacBook Air"
+    },
+    "field.purchase_date": {
+      "ko": "구매일",
+      "en": "Purchase date"
+    },
+    "field.purchase_price": {
+      "ko": "구매 가격",
+      "en": "Purchase price"
+    },
+    "field.purchase_price.placeholder": {
+      "ko": "예: 1350000",
+      "en": "e.g. 1299"
+    },
+    "field.destination_countries": {
+      "ko": "여행지 (국가 코드)",
+      "en": "Destination (country codes)"
+    },
+    "field.destination_countries.placeholder": {
+      "ko": "예: JP",
+      "en": "e.g. JP, FR"
+    },
+    "field.departure_date": {
+      "ko": "출발일",
+      "en": "Departure date"
+    },
+    "field.return_date": {
+      "ko": "귀국일",
+      "en": "Return date"
+    },
+    "field.trip_cost": {
+      "ko": "여행 경비 총액",
+      "en": "Total trip cost"
+    },
+    "field.trip_cost.placeholder": {
+      "ko": "예: 3000000",
+      "en": "e.g. 2500"
+    }
+  }
+}

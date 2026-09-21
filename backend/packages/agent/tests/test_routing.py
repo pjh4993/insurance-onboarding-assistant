@@ -13,7 +13,12 @@ ERR = {"last_error": {"node": "x", "kind": "ValueError", "attempts": 3}}
 @pytest.mark.parametrize(
     ("fn", "state", "expected"),
     [
-        (EDGES["ask_customer"], {"last_input": "IDENTITY_INFO"}, "verify_identity"),
+        (EDGES["greet"], {}, "ask_customer"),
+        (EDGES["ask_customer"], {"last_input": "INTAKE"}, "understand_intake"),
+        (EDGES["understand_intake"], {}, "collect_identity"),
+        (EDGES["ask_customer"], {"last_input": "IDENTITY_INFO"}, "collect_identity"),
+        (EDGES["collect_identity"], {"form_topic": "id_document"}, "ask_customer"),
+        (EDGES["collect_identity"], {"form_topic": None}, "verify_identity"),
         (EDGES["ask_customer"], {"last_input": "OTP_CODE"}, "check_otp"),
         (EDGES["ask_customer"], {"last_input": "NEEDS"}, "assess_needs"),
         (EDGES["ask_customer"], {"last_input": "PARTIES"}, "collect_parties"),
@@ -81,7 +86,7 @@ def test_every_router_sends_last_error_to_handoff(fn):
     [
         ({"handoff_resolution": "END", "handoff_reason": "IDENTITY_FAILED"}, END),
         ({"handoff_resolution": "VERIFIED", "handoff_reason": "IDENTITY_FAILED"}, "fetch_purchases"),
-        ({"handoff_resolution": "CONTINUE", "handoff_reason": "IDENTITY_FAILED"}, "greet"),
+        ({"handoff_resolution": "CONTINUE", "handoff_reason": "IDENTITY_FAILED"}, "collect_identity"),
         ({"handoff_resolution": "CONTINUE", "handoff_reason": "NO_ELIGIBLE_PRODUCT"}, "assess_needs"),
         ({"handoff_resolution": "CONTINUE", "handoff_reason": "NEEDS_INCOMPLETE"}, "assess_needs"),
         ({"handoff_resolution": "CONTINUE", "handoff_reason": "ANSWERS_INCOMPLETE"}, "collect_answers"),
@@ -122,7 +127,8 @@ def test_locale_of_falls_back_to_the_market_for_old_checkpoints():
 # In-flight sessions resume from checkpoints that name these nodes (`next`, `resume_node`), and the agent
 # console shows them as `current_node`. Renaming or removing one breaks those sessions: migrate on purpose.
 CHECKPOINTED_NODES = {
-    "greet", "ask_customer", "verify_identity", "check_otp", "check_document", "fetch_purchases",
+    "greet", "understand_intake", "ask_customer", "collect_identity", "verify_identity", "check_otp",
+    "check_document", "fetch_purchases",
     "assess_needs", "check_eligibility", "rank_products", "quote_premium", "explain_recommendation",
     "await_decision", "open_application", "collect_parties", "collect_answers", "summarize_application",
     "confirm_summary", "submit_application", "human_handoff", "await_agent",
@@ -135,6 +141,7 @@ def test_node_names_are_stable():
 
 def test_nodes_calling_the_llm_or_an_external_system_retry():
     assert set(RETRYING_NODES) == {
+        "understand_intake",
         "verify_identity",
         "check_otp",
         "check_document",
@@ -180,9 +187,9 @@ def test_state_fields_are_stable():
     assert fields == set(initial_state(session_id="s", party_id="p", market="KR", locale="ko"))
     assert fields == {
         "messages", "actor", "mode", "session_id", "party_id", "market", "locale", "stage", "waiting_for",
-        "last_input",
-        "identity_result", "otp_request_id", "otp_code",
-        "needs_assessment_id", "insurable_object_ids", "needs_complete", "needs_rounds",
+        "last_input", "form_topic", "intake", "product_interest",
+        "identity_result", "otp_request_id", "otp_code", "identity_topics",
+        "needs_assessment_id", "insurable_object_ids", "needs_complete", "needs_rounds", "needs_input",
         "recommendation_ids", "quote_ids", "eligible_count", "decision",
         "application_id", "parties_complete", "answers_complete", "answers_rounds", "confirmed",
         "confirm_rejections", "correcting",

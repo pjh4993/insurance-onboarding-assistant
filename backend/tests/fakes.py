@@ -156,6 +156,25 @@ NEEDS = {
         "missing_fields": ["age_range", "occupation", "residence_country"],
     },
 }
+# What the fake intake reply keys on: words in the customer's first message -> the product type it points to.
+INTAKE_INTERESTS = {
+    "MOBILE_INSURANCE": ("phone", "폰", "휴대폰", "갤럭시"),
+    "DEVICE_PROTECTION": ("laptop", "노트북", "tablet"),
+    "EXTENDED_WARRANTY": ("warranty", "보증"),
+    "TRAVEL_PROTECTION": ("travel", "trip", "여행"),
+}
+INTAKE_ON_TOPIC = "Happy to help with that. I'll check what fits once I know a little more."
+INTAKE_OFF_TOPIC = "I can't help with that, but I can help you find and apply for insurance."
+
+
+def intake_reply(text: str) -> dict[str, Any]:
+    lowered = text.casefold()
+    interest = next((t for t, words in INTAKE_INTERESTS.items() if any(w in lowered for w in words)), None)
+    if interest or "insurance" in lowered or "보험" in lowered:
+        return {"reply": INTAKE_ON_TOPIC, "product_interest": interest}
+    return {"reply": INTAKE_OFF_TOPIC, "product_interest": None}
+
+
 ANSWERS = {
     "A": {},
     "B": {"traveler_date_of_birth": "1985-11-02", "traveler_gender": "M"},
@@ -189,6 +208,8 @@ class FakeLLM:
         name = schema.__name__
         if name in self.overrides:
             return schema.model_validate(self.overrides[name])
+        if name == "IntakeReply":
+            return schema.model_validate(intake_reply(str(messages[-1].content)))
         if name == "NeedsExtraction":
             return schema.model_validate(NEEDS.get(key or "D", NEEDS["D"]))
         if name == "RecommendationRationale":

@@ -354,6 +354,9 @@ class Runtime:
             elif session.waiting_for == "CONFIRM" and values.get("application_id"):
                 app = await s.get(Application, uuid.UUID(values["application_id"]))
                 prompt["summary"] = app.summary if app else None
+        form = await self.agent.form(values, session.waiting_for, session.locale)
+        if form is not None:
+            prompt["form"] = form
         return prompt
 
     @staticmethod

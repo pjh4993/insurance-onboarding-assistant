@@ -101,6 +101,8 @@ class Flow:
 
 # Stores a free-form answer of one kind: (flow, state, value, now) -> (transcript text, state updates).
 InputRecorder = Callable[["Flow", dict[str, Any], dict[str, Any], datetime], Awaitable[tuple[str, dict[str, Any]]]]
+# The form a pending wait of one kind shows: (flow, state, locale) -> a FormSpec dict (CONTRACTS.md §3) or None.
+FormBuilder = Callable[["Flow", dict[str, Any], str], Awaitable[dict[str, Any] | None]]
 # Applies an agent's resolution of one handoff reason: (flow, state, resolution, now) -> (messages, updates).
 HandoffResolver = Callable[
     ["Flow", dict[str, Any], str | None, datetime], Awaitable[tuple[list[BaseMessage], dict[str, Any]]]
@@ -113,6 +115,7 @@ class InputKind:
 
     target: str  # the node that handles the answer
     record: InputRecorder | None = None  # stores it; without one the answer is kept as a message only
+    form: FormBuilder | None = None  # the small form the prompt carries while waiting for it
 
 
 @dataclass(frozen=True)

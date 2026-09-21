@@ -5,6 +5,27 @@
    "session": {
     "status": "ACTIVE",
     "last_stage": "IDENTITY",
+    "waiting_for": "INTAKE",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "assistant",
+     "Hi! I help you find and apply for insurance. What are you looking for today? Feel free to ask me anything."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "INTAKE",
+    "message": "Hi! I help you find and apply for insurance. What are you looking for today? Feel free to ask me anything."
+   }
+  },
+  {
+   "input": "INTAKE",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
     "waiting_for": "IDENTITY_INFO",
     "mode": "AUTO",
     "locale": "en",
@@ -13,12 +34,44 @@
    "messages": [
     [
      "assistant",
-     "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+     "Great, let's get started. First I'll quickly verify your identity, then ask a few short questions to find cover that fits you."
+    ],
+    [
+     "assistant",
+     "Please share your name and contact details."
     ]
    ],
    "prompt": {
     "waiting_for": "IDENTITY_INFO",
-    "message": "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+    "message": "Please share your name and contact details.",
+    "form": {
+     "topic": "contact",
+     "title": "Your contact details",
+     "reason": "We use these to verify you and to text you a verification code.",
+     "fields": [
+      {
+       "name": "full_name",
+       "label": "Full name",
+       "kind": "text",
+       "required": true
+      },
+      {
+       "name": "email",
+       "label": "Email",
+       "kind": "email",
+       "required": true,
+       "placeholder": "name@example.com"
+      },
+      {
+       "name": "phone",
+       "label": "Mobile number",
+       "kind": "tel",
+       "required": true,
+       "placeholder": "+12065550101"
+      }
+     ],
+     "allow_text": false
+    }
    }
   },
   {
@@ -96,12 +149,44 @@
     ],
     [
      "assistant",
-     "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+     "Now let's find the right cover. What would you like to protect?"
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+    "message": "Now let's find the right cover. What would you like to protect?",
+    "form": {
+     "topic": "coverage",
+     "title": "What you want to protect",
+     "reason": "Which products fit depends on what you want to protect.",
+     "fields": [
+      {
+       "name": "objectives",
+       "label": "What to protect",
+       "kind": "multiselect",
+       "required": true,
+       "options": [
+        {
+         "value": "PROTECT_DEVICE",
+         "label": "A device against damage"
+        },
+        {
+         "value": "TRAVEL_COVER",
+         "label": "A trip abroad"
+        },
+        {
+         "value": "EXTEND_WARRANTY",
+         "label": "A longer device warranty"
+        },
+        {
+         "value": "REDUCE_PREMIUM",
+         "label": "A low premium"
+        }
+       ]
+      }
+     ],
+     "allow_text": true
+    }
    }
   },
   {
@@ -121,12 +206,66 @@
     ],
     [
      "assistant",
-     "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
+     "Thanks! Tell me a little about yourself."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
+    "message": "Thanks! Tell me a little about yourself.",
+    "form": {
+     "topic": "person",
+     "title": "About you",
+     "reason": "Products have age and residence conditions, so we need these to check what you can apply for.",
+     "fields": [
+      {
+       "name": "age_range",
+       "label": "Age range",
+       "kind": "select",
+       "required": true,
+       "options": [
+        {
+         "value": "AGE_UNDER_19",
+         "label": "Under 19"
+        },
+        {
+         "value": "AGE_19_29",
+         "label": "19–29"
+        },
+        {
+         "value": "AGE_30_39",
+         "label": "30–39"
+        },
+        {
+         "value": "AGE_40_49",
+         "label": "40–49"
+        },
+        {
+         "value": "AGE_50_64",
+         "label": "50–64"
+        },
+        {
+         "value": "AGE_65_PLUS",
+         "label": "65 or older"
+        }
+       ]
+      },
+      {
+       "name": "residence_country",
+       "label": "Country of residence (country code)",
+       "kind": "text",
+       "required": true,
+       "placeholder": "e.g. US",
+       "value": "US"
+      },
+      {
+       "name": "occupation",
+       "label": "Occupation",
+       "kind": "text",
+       "required": false
+      }
+     ],
+     "allow_text": true
+    }
    }
   },
   {
@@ -146,12 +285,145 @@
     ],
     [
      "assistant",
-     "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
+     "Thanks! Tell me a little about yourself."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
+    "message": "Thanks! Tell me a little about yourself.",
+    "form": {
+     "topic": "person",
+     "title": "About you",
+     "reason": "Products have age and residence conditions, so we need these to check what you can apply for.",
+     "fields": [
+      {
+       "name": "age_range",
+       "label": "Age range",
+       "kind": "select",
+       "required": true,
+       "options": [
+        {
+         "value": "AGE_UNDER_19",
+         "label": "Under 19"
+        },
+        {
+         "value": "AGE_19_29",
+         "label": "19–29"
+        },
+        {
+         "value": "AGE_30_39",
+         "label": "30–39"
+        },
+        {
+         "value": "AGE_40_49",
+         "label": "40–49"
+        },
+        {
+         "value": "AGE_50_64",
+         "label": "50–64"
+        },
+        {
+         "value": "AGE_65_PLUS",
+         "label": "65 or older"
+        }
+       ]
+      },
+      {
+       "name": "residence_country",
+       "label": "Country of residence (country code)",
+       "kind": "text",
+       "required": true,
+       "placeholder": "e.g. US",
+       "value": "US"
+      },
+      {
+       "name": "occupation",
+       "label": "Occupation",
+       "kind": "text",
+       "required": false
+      }
+     ],
+     "allow_text": true
+    }
+   }
+  },
+  {
+   "input": "NEEDS",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "PROFILING",
+    "waiting_for": "NEEDS",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "I need phone insurance."
+    ],
+    [
+     "assistant",
+     "Thanks! Tell me a little about yourself."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "NEEDS",
+    "message": "Thanks! Tell me a little about yourself.",
+    "form": {
+     "topic": "person",
+     "title": "About you",
+     "reason": "Products have age and residence conditions, so we need these to check what you can apply for.",
+     "fields": [
+      {
+       "name": "age_range",
+       "label": "Age range",
+       "kind": "select",
+       "required": true,
+       "options": [
+        {
+         "value": "AGE_UNDER_19",
+         "label": "Under 19"
+        },
+        {
+         "value": "AGE_19_29",
+         "label": "19–29"
+        },
+        {
+         "value": "AGE_30_39",
+         "label": "30–39"
+        },
+        {
+         "value": "AGE_40_49",
+         "label": "40–49"
+        },
+        {
+         "value": "AGE_50_64",
+         "label": "50–64"
+        },
+        {
+         "value": "AGE_65_PLUS",
+         "label": "65 or older"
+        }
+       ]
+      },
+      {
+       "name": "residence_country",
+       "label": "Country of residence (country code)",
+       "kind": "text",
+       "required": true,
+       "placeholder": "e.g. US",
+       "value": "US"
+      },
+      {
+       "name": "occupation",
+       "label": "Occupation",
+       "kind": "text",
+       "required": false
+      }
+     ],
+     "allow_text": true
+    }
    }
   },
   {
@@ -196,12 +468,66 @@
     ],
     [
      "assistant",
-     "To recommend cover, please tell me your age, the device purchase price, the device manufacturer."
+     "A few more details and I can recommend cover. Tell me a little about yourself."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "To recommend cover, please tell me your age, the device purchase price, the device manufacturer."
+    "message": "A few more details and I can recommend cover. Tell me a little about yourself.",
+    "form": {
+     "topic": "person",
+     "title": "About you",
+     "reason": "Products have age and residence conditions, so we need these to check what you can apply for.",
+     "fields": [
+      {
+       "name": "age_range",
+       "label": "Age range",
+       "kind": "select",
+       "required": true,
+       "options": [
+        {
+         "value": "AGE_UNDER_19",
+         "label": "Under 19"
+        },
+        {
+         "value": "AGE_19_29",
+         "label": "19–29"
+        },
+        {
+         "value": "AGE_30_39",
+         "label": "30–39"
+        },
+        {
+         "value": "AGE_40_49",
+         "label": "40–49"
+        },
+        {
+         "value": "AGE_50_64",
+         "label": "50–64"
+        },
+        {
+         "value": "AGE_65_PLUS",
+         "label": "65 or older"
+        }
+       ]
+      },
+      {
+       "name": "residence_country",
+       "label": "Country of residence (country code)",
+       "kind": "text",
+       "required": true,
+       "placeholder": "e.g. US",
+       "value": "US"
+      },
+      {
+       "name": "occupation",
+       "label": "Occupation",
+       "kind": "text",
+       "required": false
+      }
+     ],
+     "allow_text": true
+    }
    }
   },
   {
@@ -221,12 +547,66 @@
     ],
     [
      "assistant",
-     "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
+     "Thanks! Tell me a little about yourself."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
+    "message": "Thanks! Tell me a little about yourself.",
+    "form": {
+     "topic": "person",
+     "title": "About you",
+     "reason": "Products have age and residence conditions, so we need these to check what you can apply for.",
+     "fields": [
+      {
+       "name": "age_range",
+       "label": "Age range",
+       "kind": "select",
+       "required": true,
+       "options": [
+        {
+         "value": "AGE_UNDER_19",
+         "label": "Under 19"
+        },
+        {
+         "value": "AGE_19_29",
+         "label": "19–29"
+        },
+        {
+         "value": "AGE_30_39",
+         "label": "30–39"
+        },
+        {
+         "value": "AGE_40_49",
+         "label": "40–49"
+        },
+        {
+         "value": "AGE_50_64",
+         "label": "50–64"
+        },
+        {
+         "value": "AGE_65_PLUS",
+         "label": "65 or older"
+        }
+       ]
+      },
+      {
+       "name": "residence_country",
+       "label": "Country of residence (country code)",
+       "kind": "text",
+       "required": true,
+       "placeholder": "e.g. US",
+       "value": "US"
+      },
+      {
+       "name": "occupation",
+       "label": "Occupation",
+       "kind": "text",
+       "required": false
+      }
+     ],
+     "allow_text": true
+    }
    }
   },
   {
@@ -246,12 +626,66 @@
     ],
     [
      "assistant",
-     "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
+     "Thanks! Tell me a little about yourself."
     ]
    ],
    "prompt": {
     "waiting_for": "NEEDS",
-    "message": "Thanks! To recommend cover I also need your age, the device purchase price, the device manufacturer."
+    "message": "Thanks! Tell me a little about yourself.",
+    "form": {
+     "topic": "person",
+     "title": "About you",
+     "reason": "Products have age and residence conditions, so we need these to check what you can apply for.",
+     "fields": [
+      {
+       "name": "age_range",
+       "label": "Age range",
+       "kind": "select",
+       "required": true,
+       "options": [
+        {
+         "value": "AGE_UNDER_19",
+         "label": "Under 19"
+        },
+        {
+         "value": "AGE_19_29",
+         "label": "19–29"
+        },
+        {
+         "value": "AGE_30_39",
+         "label": "30–39"
+        },
+        {
+         "value": "AGE_40_49",
+         "label": "40–49"
+        },
+        {
+         "value": "AGE_50_64",
+         "label": "50–64"
+        },
+        {
+         "value": "AGE_65_PLUS",
+         "label": "65 or older"
+        }
+       ]
+      },
+      {
+       "name": "residence_country",
+       "label": "Country of residence (country code)",
+       "kind": "text",
+       "required": true,
+       "placeholder": "e.g. US",
+       "value": "US"
+      },
+      {
+       "name": "occupation",
+       "label": "Occupation",
+       "kind": "text",
+       "required": false
+      }
+     ],
+     "allow_text": true
+    }
    }
   },
   {
@@ -306,6 +740,10 @@
   "__start__",
   "greet",
   "ask_customer",
+  "understand_intake",
+  "collect_identity",
+  "ask_customer",
+  "collect_identity",
   "verify_identity",
   "ask_customer",
   "check_otp",
@@ -313,6 +751,8 @@
   "human_handoff",
   "await_agent",
   "fetch_purchases",
+  "assess_needs",
+  "ask_customer",
   "assess_needs",
   "ask_customer",
   "assess_needs",
@@ -378,6 +818,12 @@
   "application_parties": []
  },
  "llm_calls": [
+  [
+   "assess_needs",
+   "NeedsExtraction",
+   "D",
+   "English"
+  ],
   [
    "assess_needs",
    "NeedsExtraction",
@@ -491,6 +937,19 @@
     [
      "human",
      "I need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance."
+    ]
+   ]
+  },
+  {
+   "node": "assess_needs",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: John Roe\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nExtract the customer's profile and insurance needs from their messages into the NeedsExtraction tool. Use null for anything the customer has not said; do not guess.\nDevices already known from partner purchase records: []\nValues captured so far: {\"age_range\": null, \"occupation\": null, \"residence_country\": \"US\", \"existing_coverage\": [], \"objectives\": [\"PROTECT_DEVICE\"], \"device\": {\"device_category\": \"SMARTPHONE\"}, \"trip\": null}"
+    ],
+    [
+     "human",
+     "I need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance.\n\nI need phone insurance."
     ]
    ]
   }

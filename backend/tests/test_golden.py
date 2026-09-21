@@ -23,6 +23,23 @@ def needs(key: str) -> tuple:
     return ("NEEDS", {"text": CUSTOMERS[key]["needs_text"]})
 
 
+def intake(text: str = "") -> tuple:
+    return ("INTAKE", {"text": text})
+
+
+def identity_forms(key: str, *, consent: bool) -> list[tuple]:
+    """The identity details one small form at a time, as the customer UI sends them."""
+    c = CUSTOMERS[key]
+    return [
+        ("IDENTITY_INFO", {"topic": "contact", "fields": {k: c[k] for k in ("full_name", "email", "phone")}}),
+        (
+            "IDENTITY_INFO",
+            {"topic": "id_document", "fields": {k: c[k] for k in ("id_document_type", "id_document_number")}},
+        ),
+        ("IDENTITY_INFO", {"topic": "consent", "fields": {"third_party_consent": consent}}),
+    ]
+
+
 # A scenario is (market, steps) or (market, steps, locale). A step is an input (type, data[, actor]), a fault
 # injection ("fail", "llm" | "external", target, n), a canned LLM reply for one schema ("llm_reply",
 # schema_name, payload), or a language switch ("locale", "ko" | "en").
@@ -30,8 +47,17 @@ SCENARIOS: dict[str, tuple] = {
     "a_partner_match_to_submission": (
         "KR",
         [
-            ("IDENTITY_INFO", identity_input("A", consent=True)),
-            needs("A"),
+            intake("새로 산 갤럭시 폰 보험 알아보고 있어요"),
+            *identity_forms("A", consent=True),
+            # forms only: merged without the LLM; the partner purchase already describes the device
+            ("NEEDS", {"topic": "coverage", "fields": {"objectives": ["PROTECT_DEVICE"]}}),
+            (
+                "NEEDS",
+                {
+                    "topic": "person",
+                    "fields": {"age_range": "AGE_30_39", "residence_country": "KR", "occupation": "개발자"},
+                },
+            ),
             ("DECISION", {"decision": "ACCEPT"}),
             ("PARTIES", {"text": "제가 피보험자이자 납입자예요."}),
             ("CONFIRM", {"confirmed": True}),
@@ -40,9 +66,11 @@ SCENARIOS: dict[str, tuple] = {
     "b_otp_travel_answers": (
         "KR",
         [
+            intake(),
             ("IDENTITY_INFO", identity_input("B", consent=True)),
             ("OTP_CODE", {"code": CUSTOMERS["B"]["otp"]["valid_code"]}),
-            needs("B"),
+            # a form and free text together: the text goes through the LLM, the form's fields win
+            ("NEEDS", {"topic": "coverage", "fields": {"objectives": ["TRAVEL_COVER"]}, "text": needs("B")[1]["text"]}),
             ("DECISION", {"decision": "ACCEPT"}),
             ("PARTIES", {"text": "저 혼자 가요."}),
             ("ANSWERS", {"text": "1985년 11월 2일생 남자입니다."}),
@@ -53,6 +81,7 @@ SCENARIOS: dict[str, tuple] = {
     "c_document_laptop_change": (
         "US",
         [
+            intake("I just bought a laptop. Can I insure it?"),
             ("IDENTITY_INFO", identity_input("C", consent=False, with_dob=True)),
             ("OTP_CODE", {"code": "123456"}),
             needs("C"),
@@ -74,9 +103,11 @@ SCENARIOS: dict[str, tuple] = {
     "d_identity_handoff_verified_needs_guard": (
         "US",
         [
+            intake(),
             ("IDENTITY_INFO", identity_input("D", consent=True)),
             ("OTP_CODE", {"code": "000000"}),
             ("AGENT", {"resolution": "VERIFIED", "note": "Checked ID in person."}, "AGENT"),
+            needs("D"),  # fills what to protect; the three after it add nothing and hand off
             needs("D"),
             needs("D"),
             needs("D"),
@@ -87,17 +118,21 @@ SCENARIOS: dict[str, tuple] = {
             ("AGENT", {"resolution": "END"}, "AGENT"),
         ],
     ),
-    "d_identity_handoff_retry_from_greet": (
+    "d_identity_handoff_retry_identity": (
         "US",
         [
+            intake("What's the weather like in Seattle?"),
             ("IDENTITY_INFO", identity_input("D", consent=False)),
             ("OTP_CODE", {"code": "000000"}),
+            # identity starts over with the forms pre-filled (never the document number)
             ("AGENT", {"resolution": "CONTINUE"}, "AGENT"),
+            identity_forms("D", consent=False)[0],
         ],
     ),
     "decline": (
         "KR",
         [
+            intake(),
             ("IDENTITY_INFO", identity_input("A", consent=True)),
             needs("A"),
             ("DECISION", {"decision": "DECLINE"}),
@@ -106,6 +141,7 @@ SCENARIOS: dict[str, tuple] = {
     "no_eligible_product_handoff": (
         "KR",
         [
+            intake(),
             ("IDENTITY_INFO", identity_input("A", consent=True)),
             # lives abroad: every KR product requires a KR resident
             ("llm_reply", "NeedsExtraction", {**NEEDS["A"], "residence_country": "JP"}),
@@ -118,6 +154,7 @@ SCENARIOS: dict[str, tuple] = {
     "answers_incomplete_handoff": (
         "KR",
         [
+            intake(),
             ("IDENTITY_INFO", identity_input("B", consent=True)),
             ("OTP_CODE", {"code": CUSTOMERS["B"]["otp"]["valid_code"]}),
             needs("B"),
@@ -135,6 +172,7 @@ SCENARIOS: dict[str, tuple] = {
     "kr_market_in_english": (
         "KR",
         [
+            intake(),
             ("IDENTITY_INFO", identity_input("A", consent=True)),
             needs("A"),
             ("DECISION", {"decision": "ACCEPT"}),
@@ -146,6 +184,7 @@ SCENARIOS: dict[str, tuple] = {
     "locale_switch_mid_session": (
         "KR",
         [
+            intake(),
             ("IDENTITY_INFO", identity_input("B", consent=True)),
             ("OTP_CODE", {"code": CUSTOMERS["B"]["otp"]["valid_code"]}),
             ("locale", "en"),
@@ -161,6 +200,7 @@ SCENARIOS: dict[str, tuple] = {
     "errors_llm_handoff_and_contract_retry": (
         "KR",
         [
+            intake(),
             ("IDENTITY_INFO", identity_input("A", consent=True)),
             ("fail", "llm", "assess_needs", 3),
             needs("A"),

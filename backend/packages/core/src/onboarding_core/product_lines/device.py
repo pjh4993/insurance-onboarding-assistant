@@ -9,6 +9,9 @@ from typing import Any
 from onboarding_core.party.models import Party
 from onboarding_core.product_lines.base import ProductLine
 
+# The device categories eligibility rules and the needs extraction use.
+DEVICE_CATEGORIES = ("SMARTPHONE", "TABLET", "NOTEBOOK", "TV", "APPLIANCE", "WEARABLE")
+
 CATEGORY_ALIASES = {
     "LAPTOP": "NOTEBOOK",
     "NOTEBOOK_COMPUTER": "NOTEBOOK",

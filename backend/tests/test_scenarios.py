@@ -18,11 +18,15 @@ async def send(rt, session_id: str, input_type: str, data: dict, actor: str = "C
     return await rt.get_session(session_id)
 
 
-async def start(rt, market: str) -> str:
+async def start(rt, market: str, intake: str = "") -> str:
+    """A new session past its intake turn, waiting for the first identity form."""
     session, _token = await rt.create_session(market)
-    assert session.waiting_for == "IDENTITY_INFO"
+    assert session.waiting_for == "INTAKE"
     assert session.last_stage == "IDENTITY"
-    return str(session.session_id)
+    sid = str(session.session_id)
+    s = await send(rt, sid, "INTAKE", {"text": intake})
+    assert s.waiting_for == "IDENTITY_INFO" and s.last_stage == "IDENTITY"
+    return sid
 
 
 async def party_of(rt, session_id: str) -> Party:
@@ -173,11 +177,12 @@ async def test_customer_d_agent_verifies_then_needs_loop_guard(runtime):
     s = await send(rt, sid, "AGENT", {"resolution": "VERIFIED"}, actor="AGENT")
     assert (await party_of(rt, sid)).verification_method == "AGENT"
     assert s.waiting_for == "NEEDS"
-    for _ in range(2):
+    # the first answer fills what to protect; the next ones add nothing, and the third of those hands off
+    for _ in range(3):
         s = await send(rt, sid, "NEEDS", {"text": CUSTOMERS["D"]["needs_text"]})
         assert s.waiting_for == "NEEDS"
     s = await send(rt, sid, "NEEDS", {"text": CUSTOMERS["D"]["needs_text"]})
-    assert s.waiting_for == "AGENT" and s.status == "HANDOFF"  # guard after 3 rounds
+    assert s.waiting_for == "AGENT" and s.status == "HANDOFF"
 
 
 async def test_change_creates_new_needs_version_and_expires_old(runtime):

@@ -15,6 +15,9 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
+from onboarding_agent.deps import AgentDeps
+from onboarding_agent.flows import FORMS
+from onboarding_agent.flows.base import Flow
 from onboarding_agent.state import initial_state
 
 log = logging.getLogger(__name__)
@@ -47,9 +50,19 @@ class AgentSnapshot:
 
 
 class AgentRunner:
-    def __init__(self, graph: CompiledStateGraph, *, retry_max_attempts: int) -> None:
+    def __init__(self, graph: CompiledStateGraph, *, retry_max_attempts: int, deps: AgentDeps | None = None) -> None:
         self.graph = graph
         self.retry_max_attempts = retry_max_attempts
+        self.deps = deps  # needed to build prompt forms; without it `form` returns None
+
+    async def form(self, values: dict[str, Any], waiting_for: str | None, locale: str) -> dict[str, Any] | None:
+        """The small form (`FormSpec`, CONTRACTS.md §3) the pending wait shows, or None. It is built from the
+        state and the domain DB when read, so labels follow the session's current language and the checkpoint
+        holds no pre-filled PII."""
+        build = FORMS.get(waiting_for or "")
+        if build is None or self.deps is None:
+            return None
+        return await build(Flow(self.deps), values, locale)
 
     @staticmethod
     def config(thread_id: str) -> dict[str, Any]:

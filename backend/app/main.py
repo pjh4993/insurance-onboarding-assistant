@@ -135,7 +135,9 @@ def create_app(settings: Settings | None = None, overrides: Overrides | None = N
                 clock=clock,
                 on_entity=entity_listener(broker),
             )
-            agent = AgentRunner(build_graph(deps, checkpointer), retry_max_attempts=settings.retry_max_attempts)
+            agent = AgentRunner(
+                build_graph(deps, checkpointer), retry_max_attempts=settings.retry_max_attempts, deps=deps
+            )
             rt = Runtime(
                 agent=agent,
                 sessionmaker=sessionmaker,

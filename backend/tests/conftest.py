@@ -99,7 +99,7 @@ async def runtime(settings, external, llm, clock):
             clock=clock,
             on_entity=entity_listener(broker),
         )
-        agent = AgentRunner(build_graph(deps, saver), retry_max_attempts=settings.retry_max_attempts)
+        agent = AgentRunner(build_graph(deps, saver), retry_max_attempts=settings.retry_max_attempts, deps=deps)
         bundle = deps.bundle
         rt = Runtime(
             agent=agent,

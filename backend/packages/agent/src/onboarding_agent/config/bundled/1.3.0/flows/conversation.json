@@ -1,0 +1,35 @@
+{
+  "llm": {
+    "understand_intake": {
+      "model": "default",
+      "instructions": [
+        "The customer has just opened the chat, and their first message is below. Fill the IntakeReply tool.",
+        "reply: two or three short, friendly sentences that respond to what they wrote.",
+        "- If it is about insurance or the products below, answer it briefly and plainly. Never quote prices or premiums, and never promise that something is covered or that they will be accepted: say you will check once you know a little more.",
+        "- If it is unrelated, unclear or odd, say briefly that you help people find and apply for the insurance below, and invite them to continue.",
+        "- Do not ask for personal details and do not describe the next steps; they are added after your reply.",
+        "product_interest: the product type the message points to, or null when it does not clearly point to one.",
+        "Products sold in this market:",
+        "{products}"
+      ]
+    }
+  },
+  "copy": {
+    "greeting": {
+      "ko": "안녕하세요! 보험 찾기와 가입을 도와드리는 상담 도우미예요. 어떤 보험을 찾고 계신가요? 궁금한 점이 있으면 편하게 적어 주세요.",
+      "en": "Hi! I help you find and apply for insurance. What are you looking for today? Feel free to ask me anything."
+    },
+    "intake_opener": {
+      "ko": "좋아요, 바로 시작해 볼게요.",
+      "en": "Great, let's get started."
+    },
+    "intake_thanks": {
+      "ko": "말씀 감사합니다.",
+      "en": "Thanks for letting me know."
+    },
+    "intake_next": {
+      "ko": "먼저 간단히 본인 확인을 한 뒤, 몇 가지 질문으로 맞는 보험을 찾아 드릴게요.",
+      "en": "First I'll quickly verify your identity, then ask a few short questions to find cover that fits you."
+    }
+  }
+}

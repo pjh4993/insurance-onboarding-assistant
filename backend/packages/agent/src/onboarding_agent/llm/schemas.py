@@ -7,8 +7,25 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from onboarding_core.catalog.seed import PRODUCTS
+
 AgeRange = Literal["AGE_UNDER_19", "AGE_19_29", "AGE_30_39", "AGE_40_49", "AGE_50_64", "AGE_65_PLUS"]
 Objective = Literal["PROTECT_DEVICE", "TRAVEL_COVER", "EXTEND_WARRANTY", "REDUCE_PREMIUM"]
+# The catalog's product types (MOBILE_INSURANCE, DEVICE_PROTECTION, ...).
+ProductType = Literal[tuple(sorted({p["product_type"] for p in PRODUCTS}))]
+
+
+class IntakeReply(BaseModel):
+    """A reply to the customer's first message, and the product type it points to."""
+
+    reply: str = Field(
+        "",
+        description="Two or three short sentences that respond to what the customer said: a brief answer when it "
+        "is about insurance (no prices, no promises about cover), otherwise what this assistant can help with",
+    )
+    product_interest: ProductType | None = Field(
+        None, description="The product type the customer is interested in; null when it is unclear"
+    )
 
 
 class NeedsExtraction(BaseModel):

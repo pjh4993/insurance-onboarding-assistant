@@ -1,0 +1,321 @@
+{
+ "turns": [
+  {
+   "input": "(start)",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "INTAKE",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "assistant",
+     "Hi! I help you find and apply for insurance. What are you looking for today? Feel free to ask me anything."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "INTAKE",
+    "message": "Hi! I help you find and apply for insurance. What are you looking for today? Feel free to ask me anything."
+   }
+  },
+  {
+   "input": "INTAKE",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "IDENTITY_INFO",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "What's the weather like in Seattle?"
+    ],
+    [
+     "assistant",
+     "I can't help with that, but I can help you find and apply for insurance. First I'll quickly verify your identity, then ask a few short questions to find cover that fits you."
+    ],
+    [
+     "assistant",
+     "Please share your name and contact details."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "IDENTITY_INFO",
+    "message": "Please share your name and contact details.",
+    "form": {
+     "topic": "contact",
+     "title": "Your contact details",
+     "reason": "We use these to verify you and to text you a verification code.",
+     "fields": [
+      {
+       "name": "full_name",
+       "label": "Full name",
+       "kind": "text",
+       "required": true
+      },
+      {
+       "name": "email",
+       "label": "Email",
+       "kind": "email",
+       "required": true,
+       "placeholder": "name@example.com"
+      },
+      {
+       "name": "phone",
+       "label": "Mobile number",
+       "kind": "tel",
+       "required": true,
+       "placeholder": "+12065550101"
+      }
+     ],
+     "allow_text": false
+    }
+   }
+  },
+  {
+   "input": "IDENTITY_INFO",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "OTP_CODE",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "Identity details submitted — John Roe (partner lookup consent: no)"
+    ],
+    [
+     "assistant",
+     "We sent a verification code to ********0102. Please enter the 6-digit code."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "OTP_CODE",
+    "message": "We sent a verification code to ********0102. Please enter the 6-digit code."
+   }
+  },
+  {
+   "input": "OTP_CODE",
+   "session": {
+    "status": "HANDOFF",
+    "last_stage": "HANDOFF",
+    "waiting_for": "AGENT",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "await_agent"
+   },
+   "messages": [
+    [
+     "customer",
+     "Entered the verification code."
+    ],
+    [
+     "assistant",
+     "That code didn't work, so I'll verify the ID document you gave instead."
+    ],
+    [
+     "assistant",
+     "I couldn't verify your identity, so I'm connecting you with an agent."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "AGENT",
+    "message": "I couldn't verify your identity, so I'm connecting you with an agent."
+   }
+  },
+  {
+   "input": "AGENT",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "IDENTITY_INFO",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "agent",
+     "Agent resolution: CONTINUE"
+    ],
+    [
+     "assistant",
+     "Please share your name and contact details."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "IDENTITY_INFO",
+    "message": "Please share your name and contact details.",
+    "form": {
+     "topic": "contact",
+     "title": "Your contact details",
+     "reason": "We use these to verify you and to text you a verification code.",
+     "fields": [
+      {
+       "name": "full_name",
+       "label": "Full name",
+       "kind": "text",
+       "required": true,
+       "value": "John Roe"
+      },
+      {
+       "name": "email",
+       "label": "Email",
+       "kind": "email",
+       "required": true,
+       "placeholder": "name@example.com",
+       "value": "john.roe@example.com"
+      },
+      {
+       "name": "phone",
+       "label": "Mobile number",
+       "kind": "tel",
+       "required": true,
+       "placeholder": "+12065550101",
+       "value": "+12065550102"
+      }
+     ],
+     "allow_text": false
+    }
+   }
+  },
+  {
+   "input": "IDENTITY_INFO",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "IDENTITY_INFO",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "Full name: John Roe · Email: john.roe@example.com · Mobile number: +12065550102"
+    ],
+    [
+     "assistant",
+     "Next, your ID document."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "IDENTITY_INFO",
+    "message": "Next, your ID document.",
+    "form": {
+     "topic": "id_document",
+     "title": "ID document",
+     "reason": "If the text-message check doesn't work, we verify you with this document. The number is stored encrypted.",
+     "fields": [
+      {
+       "name": "id_document_type",
+       "label": "Document type",
+       "kind": "select",
+       "required": true,
+       "options": [
+        {
+         "value": "NATIONAL_ID",
+         "label": "National ID card"
+        },
+        {
+         "value": "PASSPORT",
+         "label": "Passport"
+        },
+        {
+         "value": "DRIVER_LICENSE",
+         "label": "Driver's license"
+        }
+       ],
+       "value": "DRIVER_LICENSE"
+      },
+      {
+       "name": "id_document_number",
+       "label": "Document number",
+       "kind": "text",
+       "required": true
+      }
+     ],
+     "allow_text": false
+    }
+   }
+  }
+ ],
+ "node_path": [
+  "__start__",
+  "greet",
+  "ask_customer",
+  "understand_intake",
+  "collect_identity",
+  "ask_customer",
+  "collect_identity",
+  "verify_identity",
+  "ask_customer",
+  "check_otp",
+  "check_document",
+  "human_handoff",
+  "await_agent",
+  "collect_identity",
+  "ask_customer",
+  "collect_identity",
+  "ask_customer"
+ ],
+ "entities": {
+  "party": {
+   "party_id": "<uuid>",
+   "party_type": "PERSON",
+   "full_name": "John Roe",
+   "email": "john.roe@example.com",
+   "phone": "+12065550102",
+   "date_of_birth": null,
+   "id_document_type": "DRIVER_LICENSE",
+   "third_party_consent_at": null,
+   "partner_customer_ref": null,
+   "verification_status": "PENDING",
+   "verification_method": null,
+   "verification_attempts": 0,
+   "verified_at": null
+  },
+  "needs_assessment": null,
+  "insurable_objects": [],
+  "recommendations": [],
+  "application": null,
+  "application_parties": []
+ },
+ "llm_calls": [
+  [
+   "understand_intake",
+   "IntakeReply",
+   "",
+   "English"
+  ]
+ ],
+ "llm_prompts": [
+  {
+   "node": "understand_intake",
+   "messages": [
+    [
+     "system",
+     "You are the onboarding assistant of an insurance company.\nCustomer: unknown\nMarket: US. Reply in English. Today is 2026-09-21.\nMoney is in integer minor units. KRW has no subunit, so the minor unit is one won: 299만 원 -> 2990000, 1,350,000원 -> 1350000. USD is in cents: $1,299 -> 129900.\n\nThe customer has just opened the chat, and their first message is below. Fill the IntakeReply tool.\nreply: two or three short, friendly sentences that respond to what they wrote.\n- If it is about insurance or the products below, answer it briefly and plainly. Never quote prices or premiums, and never promise that something is covered or that they will be accepted: say you will check once you know a little more.\n- If it is unrelated, unclear or odd, say briefly that you help people find and apply for the insurance below, and invite them to continue.\n- Do not ask for personal details and do not describe the next steps; they are added after your reply.\nproduct_interest: the product type the message points to, or null when it does not clearly point to one.\nProducts sold in this market:\n- DEVICE_PROTECTION: 2-Year Laptop Protection with Accidents\n- EXTENDED_WARRANTY: 3-Year TV Protection\n- MOBILE_INSURANCE: bolt Mobile Handset Protection\n- TRAVEL_PROTECTION: Single Trip Protection"
+    ],
+    [
+     "human",
+     "What's the weather like in Seattle?"
+    ]
+   ]
+  }
+ ],
+ "external_calls": [
+  "POST /identity/v1/otp",
+  "POST /identity/v1/otp/otp-1/verify",
+  "POST /identity/v1/documents/verify"
+ ]
+}

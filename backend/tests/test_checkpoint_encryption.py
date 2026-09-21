@@ -32,12 +32,13 @@ def test_gzip_serde_reads_uncompressed_payloads():
 async def test_raw_checkpoint_rows_hide_seeded_phone(runtime, settings):
     rt = runtime
     c = CUSTOMERS["B"]
-    sid = await start(rt, "KR")
+    sid = await start(rt, "KR", intake="다음 달 도쿄 가는데 여행자보험 필요해요")
     await send(rt, sid, "IDENTITY_INFO", identity_input("B", consent=True))
     await send(rt, sid, "OTP_CODE", {"code": c["otp"]["valid_code"]})
     await send(rt, sid, "NEEDS", {"text": c["needs_text"]})
 
-    secrets = [c["phone"], c["phone"][1:], c["id_document_number"], c["email"], c["full_name"], "일본 여행", '"000000"']
+    secrets = [c["phone"], c["phone"][1:], c["id_document_number"], c["email"], c["full_name"], "일본 여행"]
+    secrets += ['"000000"', "도쿄"]  # the OTP; the intake text
     with psycopg.connect(settings.psycopg_conninfo) as conn:
         rows = []
         for table in ("checkpoints", "checkpoint_blobs", "checkpoint_writes"):

@@ -1,4 +1,5 @@
-"""Stage 1, identity verification: partner match (with consent), then OTP, then the ID document."""
+"""Stage 1, identity verification: the details come in small forms (contact, ID document, consent), then
+partner match (with consent), then OTP, then the ID document."""
 
 from __future__ import annotations
 
@@ -10,39 +11,89 @@ from langchain_core.runnables import RunnableConfig
 
 from onboarding_agent.config import TextSpec
 from onboarding_agent.flows.base import DomainModule, Flow, HandoffKind, InputKind
+from onboarding_agent.flows.forms import FormField, form_copy, form_spec, render
 from onboarding_agent.routing import HANDOFF, has_error
-from onboarding_agent.texts import locale_of, mask_phone, say
+from onboarding_agent.texts import locale_of, mask_id, mask_phone, say
 from onboarding_core.crypto import decrypt_field, encrypt_field, hmac_hex
 from onboarding_core.util import iso, parse_date
+
+ID_DOCUMENT_TYPES = ("NATIONAL_ID", "PASSPORT", "DRIVER_LICENSE")
+
+# The identity forms, asked in this order. Every field is required.
+IDENTITY_TOPICS: dict[str, tuple[FormField, ...]] = {
+    "contact": (
+        FormField("full_name", "text"),
+        FormField("email", "email", placeholder=True),
+        FormField("phone", "tel", placeholder=True),
+    ),
+    "id_document": (
+        FormField("id_document_type", "select", ID_DOCUMENT_TYPES),
+        FormField("id_document_number", "text"),
+    ),
+    "consent": (FormField("third_party_consent", "boolean"),),
+}
 
 
 async def record_identity_info(
     flow: Flow, state: dict[str, Any], value: dict[str, Any], now: datetime
 ) -> tuple[str, dict[str, Any]]:
-    """The customer's contact details, ID document (encrypted, plus an HMAC) and partner consent."""
+    """The customer's contact details, ID document (encrypted, plus an HMAC) and partner consent: one form's
+    worth (`{topic, fields}`), or all of it at once (the full shape agents and older clients send)."""
     lang = locale_of(state)
+    topic = value.get("topic")
+    if topic:
+        topics, fields = ([topic] if topic in IDENTITY_TOPICS else []), dict(value.get("fields") or {})
+    else:
+        topics, fields = list(IDENTITY_TOPICS), value
     async with flow.d.uow() as uow:
         party = await flow._party(uow, state)
-        party.full_name = str(value.get("full_name") or "").strip() or None
-        party.email = str(value.get("email") or "").strip() or None
-        party.phone = str(value.get("phone") or "").strip() or None
-        party.id_document_type = value.get("id_document_type")
-        number = str(value.get("id_document_number") or "").strip()
-        if number:
-            party.id_document_number_enc = encrypt_field(flow.d.config.aes_key, number)
-            party.id_document_hmac = hmac_hex(flow.d.config.hmac_key, number)
-        if value.get("date_of_birth"):
-            party.date_of_birth = parse_date(value["date_of_birth"])
-        party.third_party_consent_at = now if value.get("third_party_consent") else None
+        if "contact" in topics:
+            party.full_name = str(fields.get("full_name") or "").strip() or None
+            party.email = str(fields.get("email") or "").strip() or None
+            party.phone = str(fields.get("phone") or "").strip() or None
+        if "id_document" in topics:
+            party.id_document_type = fields.get("id_document_type")
+            number = str(fields.get("id_document_number") or "").strip()
+            if number:
+                party.id_document_number_enc = encrypt_field(flow.d.config.aes_key, number)
+                party.id_document_hmac = hmac_hex(flow.d.config.hmac_key, number)
+            if fields.get("date_of_birth"):
+                party.date_of_birth = parse_date(fields["date_of_birth"])
+        if "consent" in topics:
+            party.third_party_consent_at = now if fields.get("third_party_consent") else None
         party.verification_status = "PENDING"
     await flow._touch(state, "party", state["party_id"])
+    answered = set(state.get("identity_topics") or []) | set(topics)
+    updates = {"identity_result": None, "identity_topics": [t for t in IDENTITY_TOPICS if t in answered]}
+    if topic:
+        number = str(fields.get("id_document_number") or "").strip()
+        shown = {"id_document_number": mask_id(number)} if number else None
+        return render(flow, lang, "identity", IDENTITY_TOPICS.get(topic, ()), fields, shown), updates
     consent = (
         flow.text(lang, "identity.consent_yes")
-        if value.get("third_party_consent")
+        if fields.get("third_party_consent")
         else flow.text(lang, "identity.consent_no")
     )
-    text = flow.text(lang, "identity.identity_received", consent=consent, name=party.full_name)
-    return text, {"identity_result": None}
+    return flow.text(lang, "identity.identity_received", consent=consent, name=party.full_name), updates
+
+
+async def identity_form(flow: Flow, state: dict[str, Any], lang: str) -> dict[str, Any] | None:
+    """The form for the identity topic being asked, pre-filled with what the party already has (after a
+    retry). The document number is never sent back; consent is pre-filled only when it was given."""
+    topic = state.get("form_topic")
+    if topic not in IDENTITY_TOPICS:
+        return None
+    async with flow.d.uow() as uow:
+        party = await flow._party(uow, state)
+    known = {
+        "full_name": party.full_name,
+        "email": party.email,
+        "phone": party.phone,
+        "id_document_type": party.id_document_type,
+        "third_party_consent": True if party.third_party_consent_at else None,
+    }
+    fields = [(f, True, known.get(f.name)) for f in IDENTITY_TOPICS[topic]]
+    return form_spec(flow, lang, "identity", topic, fields, allow_text=False)
 
 
 async def record_otp_code(
@@ -72,14 +123,25 @@ async def resolve_identity_failure(
     await flow._touch(state, "party", state["party_id"])
     if resolution == "VERIFIED":
         msgs.append(say(flow.text(lang, "identity.agent_verified"), now))
-    return msgs, {}
+        return msgs, {}
+    return msgs, {"identity_topics": []}  # ask every form again, pre-filled
 
 
 def resume_after_identity_failure(state: dict[str, Any]) -> str:
-    return "fetch_purchases" if state.get("handoff_resolution") == "VERIFIED" else "greet"
+    return "fetch_purchases" if state.get("handoff_resolution") == "VERIFIED" else "collect_identity"
 
 
 class IdentityFlow(Flow):
+    async def collect_identity(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
+        """Asks for the next identity form not answered yet; once all are in, verification starts."""
+        answered = set(state.get("identity_topics") or [])
+        pending = [t for t in IDENTITY_TOPICS if t not in answered]
+        out: dict[str, Any] = {"stage": "IDENTITY", "identity_result": None, "form_topic": None}
+        if not pending:
+            return out
+        text = self.text(locale_of(state), f"identity.form.{pending[0]}.lead")
+        return {**out, "waiting_for": "IDENTITY_INFO", "form_topic": pending[0], "messages": [say(text, self.now())]}
+
     async def verify_identity(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         lang = locale_of(state)
         async with self.d.uow() as uow:
@@ -170,6 +232,12 @@ class IdentityFlow(Flow):
         }
 
 
+def after_collect_identity(state: dict[str, Any]) -> str:
+    if has_error(state):
+        return HANDOFF
+    return "ask_customer" if state.get("form_topic") else "verify_identity"
+
+
 def after_verify_identity(state: dict[str, Any]) -> str:
     if has_error(state):
         return HANDOFF
@@ -201,6 +269,7 @@ TEXTS = TextSpec(
         "otp_failed": frozenset(),
         "document_verified": frozenset(),
         "identity_failed": frozenset(),
+        **form_copy(IDENTITY_TOPICS),
     },
 )
 
@@ -210,13 +279,14 @@ MODULE = DomainModule(
     texts=TEXTS,
     flow=IdentityFlow,
     edges={
+        "collect_identity": after_collect_identity,
         "verify_identity": after_verify_identity,
         "check_otp": after_check_otp,
         "check_document": after_check_document,
     },
     retrying=frozenset({"check_document", "check_otp", "verify_identity"}),
     inputs={
-        "IDENTITY_INFO": InputKind("verify_identity", record_identity_info),
+        "IDENTITY_INFO": InputKind("collect_identity", record_identity_info, identity_form),
         "OTP_CODE": InputKind("check_otp", record_otp_code),
     },
     handoffs={"IDENTITY_FAILED": HandoffKind(resume_after_identity_failure, resolve_identity_failure)},
