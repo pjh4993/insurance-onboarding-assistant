@@ -27,7 +27,7 @@ The numbers in `design/` and `infra/` are a reading order: each document assumes
   views, new session links, take over, answer as agent, handoff resolution.
 - Terraform for both environments (develop has a domain, HTTPS and Cognito for the agent paths), a bootstrap
   stack for remote state, CI checks, a develop deploy and a prod promotion.
-- Traces and structured logs to Grafana Cloud, and this documentation site at `/docs`.
+- Traces and structured logs to Grafana Cloud, and this documentation site on its own host (`dev.docs.` / `docs.`).
 
 What is known to be limited, and what was designed but not built, is in
 [future improvements](decisions/future-improvements.md). How to run and test it locally is in
@@ -57,6 +57,6 @@ Beyond the brief: [design/04-data-model.md](design/04-data-model.md) (entities a
 
 ## Reading the site locally
 
-The deployed site is public at [onboardassist.click/docs](https://onboardassist.click/docs/). `make docs` serves this folder, the README and the contracts as the same site locally;
+The deployed site is public at [dev.docs.onboardassist.click](https://dev.docs.onboardassist.click/). `make docs` serves this folder, the README and the contracts as the same site locally;
 `make docs-build` is the same build with `--strict`, which fails on a broken link. Both need only `uv`. On GitHub
 the same pages read as they are, mermaid included.

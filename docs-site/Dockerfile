@@ -1,4 +1,4 @@
-# The design docs as a static site under /docs. Built from the repo root:
+# The design docs as a static site, served at the root of the docs host. Built from the repo root:
 #   docker build -f docs-site/Dockerfile .
 
 FROM python:3.13-slim AS build
@@ -13,7 +13,7 @@ RUN DISABLE_MKDOCS_2_WARNING=true mkdocs build --strict --site-dir /site
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine
 COPY docs-site/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /site /usr/share/nginx/html/docs
+COPY --from=build /site /usr/share/nginx/html
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO /dev/null http://127.0.0.1:8080/docs/ || exit 1
+  CMD wget -qO /dev/null http://127.0.0.1:8080/ || exit 1

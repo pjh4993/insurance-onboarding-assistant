@@ -35,7 +35,7 @@ docs/               design documents: design/, infra/, decisions/, guides/, rese
 CONTRACTS.md        API, mock and LLM-shape contracts between the services
 docker-compose.yml  local stack: postgres, mock, backend, frontend
 Makefile            make docs / make docs-build: the documents as a local site (mkdocs, via uvx)
-docs-site/          nginx image serving that site at https://onboardassist.click/docs
+docs-site/          nginx image serving that site at https://dev.docs.onboardassist.click
 tools/diagrams/     generators for the SVG diagrams in docs/
 ```
 

@@ -17,9 +17,10 @@ partner_api_url  = "https://partner.invalid"
 identity_api_url = "https://identity.invalid"
 contract_api_url = "https://contract.invalid"
 
-# Empty until prod gets its own hostname (e.g. app.onboardassist.click with
-# route53_zone_name = "onboardassist.click"). Empty = HTTP-only ALB.
-domain_name = ""
+# Hosts in the zone develop's domain registration created (develop: dev., dev.docs.).
+domain_name       = "app.onboardassist.click"
+docs_domain_name  = "docs.onboardassist.click"
+route53_zone_name = "onboardassist.click"
 
 # develop owns the OIDC provider and ECR repositories; prod looks them up.
 create_shared_ci_resources = false

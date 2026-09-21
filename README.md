@@ -5,11 +5,11 @@ AI customer onboarding and policy recommendation, from identity check to submitt
 </h3>
 
 <p align="center">
-| <a href="https://onboardassist.click/docs/"><b>Documentation</b></a>
-| <a href="https://onboardassist.click/agent"><b>Live demo</b></a>
-| <a href="https://onboardassist.click/docs/design/01-solution-architecture/"><b>Architecture</b></a>
-| <a href="https://onboardassist.click/docs/guides/demo/"><b>Demo walkthrough</b></a>
-| <a href="https://onboardassist.click/docs/guides/development/"><b>Development</b></a> |
+| <a href="https://dev.docs.onboardassist.click/"><b>Documentation</b></a>
+| <a href="https://dev.onboardassist.click/agent"><b>Live demo</b></a>
+| <a href="https://dev.docs.onboardassist.click/design/01-solution-architecture/"><b>Architecture</b></a>
+| <a href="https://dev.docs.onboardassist.click/guides/demo/"><b>Demo walkthrough</b></a>
+| <a href="https://dev.docs.onboardassist.click/guides/development/"><b>Development</b></a> |
 </p>
 
 ---
@@ -43,7 +43,7 @@ Open http://localhost:13000/agent, click **New session**, and open the customer 
 ## Documentation
 
 The design documents live in [`docs/`](docs/README.md) and are published at
-[onboardassist.click/docs](https://onboardassist.click/docs/):
+[dev.docs.onboardassist.click](https://dev.docs.onboardassist.click/):
 
 - **Design**: solution architecture, LangGraph design, state management, data model, observability
 - **Infrastructure**: AWS architecture, networking, Terraform, CI/CD

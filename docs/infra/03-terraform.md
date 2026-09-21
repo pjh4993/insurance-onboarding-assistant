@@ -32,7 +32,7 @@ infra/
 | `security` | ALB, frontend, backend, mock and RDS security groups and the rules between them; endpoint SG rules; KMS key | VPC ID, `enable_mocks` | SG IDs, KMS key ARN |
 | `data` | RDS instance, subnet group, parameter group (`rds.force_ssl`), RDS-managed master secret, generated checkpoint AES key and session HMAC key in Secrets Manager | Instance class, Multi-AZ, deletion protection, KMS key | Address, DB name/user, secret ARNs |
 | `auth` | Cognito user pool (admin-created users, optional TOTP MFA), hosted UI domain, app client for the ALB | Domain | Pool ARN, client ID, pool domain |
-| `edge` | ALB (idle timeout 300 s), frontend target group (health check `/api/healthz`), docs target group (`/docs/`) and its public path rule, HTTP listener, and with a domain: ACM certificate validated in Route 53, alias record, HTTPS listener, Cognito rule on `/agent`, `/agent/*`, `/api/agent/*` | Domain, Route 53 zone, subnets, SG, Cognito settings | Target group ARN, DNS name, `base_url` |
+| `edge` | ALB (idle timeout 300 s), frontend target group (health check `/api/healthz`), docs target group (`/`) and, with a docs host, its public host-header rule, HTTP listener, and with a domain: ACM certificate validated in Route 53, alias records for the app and docs hosts, HTTPS listener, Cognito rule on `/agent`, `/agent/*`, `/api/agent/*` | Domain, Route 53 zone, subnets, SG, Cognito settings | Target group ARN, DNS name, `base_url` |
 | `service` | ECS service (circuit breaker with rollback), task definition, Service Connect (server or client only), task and execution roles, log group (30 days) | Image, port, CPU/memory, env vars, secrets, desired count, SG, optional target group | Service name |
 | `ci` | GitHub OIDC provider and ECR repositories (created or looked up), deploy role trusted for the listed OIDC subjects | Repository, OIDC subjects, `create_shared_resources`, state bucket and lock table | Deploy role ARN, ECR URLs |
 
@@ -48,7 +48,8 @@ plain HTTP on port 80, so the stack can be planned and applied without one.
 | Variable | develop | prod |
 |---|---|---|
 | `enable_mocks` | `true` | `false` |
-| `domain_name` | `onboardassist.click` | `""` (none yet) |
+| `domain_name` | `dev.onboardassist.click` | `app.onboardassist.click` |
+| `docs_domain_name` | `dev.docs.onboardassist.click` | `docs.onboardassist.click` |
 | `interface_endpoint_azs` | `2a` | `2a`, `2c` |
 | `single_nat_gateway` | `true` (1 NAT) | `false` (1 per AZ) |
 | `desired_count` | 1 | 2 |

@@ -1,5 +1,7 @@
 locals {
   https_enabled = var.domain_name != ""
+  docs_enabled  = local.https_enabled && var.docs_domain_name != ""
+  hostnames     = compact([var.domain_name, local.docs_enabled ? var.docs_domain_name : ""])
   zone_name     = var.route53_zone_name != "" ? var.route53_zone_name : var.domain_name
 }
 
@@ -48,7 +50,7 @@ resource "aws_lb_target_group" "docs" {
   deregistration_delay = 5 # static files: nothing in flight worth waiting for
 
   health_check {
-    path                = "/docs/"
+    path                = "/"
     matcher             = "200"
     interval            = 15
     timeout             = 5
@@ -106,9 +108,10 @@ data "aws_route53_zone" "this" {
 resource "aws_acm_certificate" "this" {
   count = local.https_enabled ? 1 : 0
 
-  domain_name       = var.domain_name
-  validation_method = "DNS"
-  tags              = var.tags
+  domain_name               = var.domain_name
+  subject_alternative_names = local.docs_enabled ? [var.docs_domain_name] : []
+  validation_method         = "DNS"
+  tags                      = var.tags
 
   lifecycle {
     create_before_destroy = true
@@ -136,10 +139,10 @@ resource "aws_acm_certificate_validation" "this" {
 }
 
 resource "aws_route53_record" "alias" {
-  count = local.https_enabled ? 1 : 0
+  for_each = local.https_enabled ? toset(local.hostnames) : toset([])
 
   zone_id = data.aws_route53_zone.this[0].zone_id
-  name    = var.domain_name
+  name    = each.value
   type    = "A"
 
   alias {
@@ -207,12 +210,13 @@ resource "aws_lb_listener_rule" "agent_cognito" {
 }
 
 # ---------------------------------------------------------------------------
-# /docs: the design docs site, public (no login) on whichever listener serves
-# traffic: HTTPS with a domain, HTTP without one.
+# Docs host: the design docs site on its own hostname, public (no login).
 # ---------------------------------------------------------------------------
 
 resource "aws_lb_listener_rule" "docs" {
-  listener_arn = local.https_enabled ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
+  count = local.docs_enabled ? 1 : 0
+
+  listener_arn = aws_lb_listener.https[0].arn
   priority     = 20
 
   action {
@@ -221,14 +225,21 @@ resource "aws_lb_listener_rule" "docs" {
   }
 
   condition {
-    path_pattern {
-      values = ["/docs", "/docs/*"]
+    host_header {
+      values = [var.docs_domain_name]
     }
   }
 }
 
-# The rule used to authenticate first; keep the same rule (and its priority) rather than recreate it.
+# The rule first authenticated, then matched /docs on the app host; keep the same rule (and its priority)
+# rather than recreate it.
 moved {
   from = aws_lb_listener_rule.docs_cognito[0]
-  to   = aws_lb_listener_rule.docs
+  to   = aws_lb_listener_rule.docs[0]
 }
+
+moved {
+  from = aws_lb_listener_rule.docs
+  to   = aws_lb_listener_rule.docs[0]
+}
+

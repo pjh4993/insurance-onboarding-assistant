@@ -15,8 +15,8 @@ network simple.
 | Service | Used for | Why |
 |---|---|---|
 | **ECS on Fargate** | Runs the frontend, backend, docs site and (develop only) mock as ECS services in one cluster, with Container Insights | Required by the brief. Fargate removes host management. One task definition per service lets frontend and backend deploy independently |
-| **Application Load Balancer** | Public entry. Routes `/docs` and `/docs/*` to the docs site (public) and everything else to the frontend. With a domain: HTTPS (TLS 1.2/1.3 policy), HTTP → HTTPS redirect, and Cognito login on `/agent`, `/agent/*`, `/api/agent/*`. Without a domain: plain HTTP on port 80 | Built-in Cognito authentication, health checks, and SSE support with the idle timeout raised to 300 s |
-| **Route 53 + ACM** | develop's domain `onboardassist.click` (registered in Route 53, which created the hosted zone). Terraform issues a DNS-validated ACM certificate and an alias record to the ALB | HTTPS and Cognito both need a domain. Public ACM certificates are free |
+| **Application Load Balancer** | Public entry. Routes the docs host (`dev.docs.` / `docs.`) to the docs site (public) and everything else to the frontend. With a domain: HTTPS (TLS 1.2/1.3 policy), HTTP → HTTPS redirect, and Cognito login on `/agent`, `/agent/*`, `/api/agent/*`. Without a domain: plain HTTP on port 80 | Built-in Cognito authentication, health checks, and SSE support with the idle timeout raised to 300 s |
+| **Route 53 + ACM** | the zone `onboardassist.click` (registered in Route 53, which created the hosted zone) holds an app host and a docs host per environment: develop `dev.` and `dev.docs.onboardassist.click`, prod `app.` and `docs.onboardassist.click`; one certificate covers both. The apex serves nothing. Terraform issues a DNS-validated ACM certificate and an alias record to the ALB | HTTPS and Cognito both need a domain. Public ACM certificates are free |
 | **RDS for PostgreSQL** | One PostgreSQL 16 instance, three schemas: `checkpoint`, `domain`, `catalog`. gp3 storage, `rds.force_ssl = 1` | Entities are relational. `PostgresSaver` takes an encrypting serializer as a normal argument. One instance is the cheapest option |
 | **Amazon Bedrock** | LLM calls through the Converse API. Model `global.anthropic.claude-sonnet-4-6` with **global cross-region inference** from Seoul | The account has quota and accepted terms for this model, and it handles Korean extraction and summaries well. See [tradeoffs.md](../decisions/tradeoffs.md#2-llm-claude-sonnet-46-on-bedrock) |
 | **Secrets Manager** | The RDS master password (managed by RDS), the checkpoint AES key, and the HMAC key for session tokens and ID numbers. Terraform generates the two application keys | ECS injects them into the backend container as environment variables; nothing sensitive is in images or task definitions |
@@ -87,7 +87,7 @@ same; only `terraform.tfvars` differs.
 |---|---|---|
 | External systems | Mock service (one ECS service) | Real endpoints. Partner, identity and contract admin do not exist yet, so they are `https://*.invalid` placeholders |
 | Bedrock | Real, through the VPC endpoint | Real, through the VPC endpoint |
-| Domain | `onboardassist.click`: HTTPS, ACM certificate, Cognito on the agent paths | None yet: HTTP-only ALB, no Cognito |
+| Domain | `dev.onboardassist.click` and `dev.docs.onboardassist.click`: HTTPS, ACM certificate, Cognito on the agent paths | `app.onboardassist.click` and `docs.onboardassist.click`, set up the same way when prod is first applied |
 | NAT gateways | 1 | 1 per AZ |
 | Interface endpoints | One AZ (2a) only | Both AZs |
 | ECS tasks | 1 per service | 2 per service, spread across AZs |

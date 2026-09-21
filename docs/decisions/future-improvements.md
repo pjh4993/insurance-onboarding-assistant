@@ -40,7 +40,6 @@ be closed before real use.
 
 | Item | What it would do | Notes |
 |---|---|---|
-| Prod domain | Give prod a hostname (for example `app.onboardassist.click` with `route53_zone_name = "onboardassist.click"`) so it gets HTTPS and Cognito like develop | develop already has `onboardassist.click`. Terraform is switched by `domain_name` |
 | Prod apply | Apply `envs/prod` (Multi-AZ RDS, two tasks per service, endpoints in both AZs, NAT per AZ) | Needs the per-session lock in Postgres first (two backend tasks). Real partner, identity and contract admin endpoints do not exist yet |
 | Prod promotion run | Run `deploy-prod.yml`, which deploys the develop-verified image SHA after approval | The workflow is built |
 | Full smoke test | After each develop deploy, run seed customer A end to end through the ALB | Today: `/healthz` through the frontend to the backend |

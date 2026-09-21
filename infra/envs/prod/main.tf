@@ -87,6 +87,7 @@ module "edge" {
   public_subnet_ids     = module.network.public_subnet_ids
   alb_security_group_id = module.security.alb_security_group_id
   domain_name           = var.domain_name
+  docs_domain_name      = var.docs_domain_name
   route53_zone_name     = var.route53_zone_name
   deletion_protection   = var.environment == "prod"
 
@@ -269,7 +270,7 @@ module "mock" {
   service_connect_server        = true
 }
 
-# Design docs site (static, nginx) at /docs, behind the agent Cognito login.
+# Design docs site (static, nginx), public on its own host (docs_domain_name).
 module "docs" {
   source = "../../modules/service"
 

@@ -37,6 +37,12 @@ variable "domain_name" {
   default     = ""
 }
 
+variable "docs_domain_name" {
+  description = "Hostname of the docs site, in the same zone as domain_name. Empty, or no domain_name = no docs host."
+  type        = string
+  default     = ""
+}
+
 variable "route53_zone_name" {
   description = "Hosted zone that holds domain_name. Defaults to domain_name itself."
   type        = string

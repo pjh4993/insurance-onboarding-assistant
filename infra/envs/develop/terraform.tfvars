@@ -10,8 +10,12 @@ desired_count = 1
 db_multi_az            = false
 db_deletion_protection = false
 
-# Registered in Route 53; the registration created the public hosted zone.
-domain_name = "onboardassist.click"
+# onboardassist.click is registered in Route 53, which created the public hosted
+# zone. Each environment gets an app host and a docs host in it (develop: dev.,
+# dev.docs.; prod: app., docs.); the apex itself serves nothing.
+domain_name       = "dev.onboardassist.click"
+docs_domain_name  = "dev.docs.onboardassist.click"
+route53_zone_name = "onboardassist.click"
 
 create_shared_ci_resources = true
 github_oidc_subjects       = ["ref:refs/heads/develop"]

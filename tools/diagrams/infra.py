@@ -24,7 +24,7 @@ def aws_overview():
                               "and CloudWatch Logs through VPC endpoints, with KMS encrypting secrets and RDS.")
     s.box(20, 170, 140, 60, "Customer / agent", ("browser",), dashed=True, radius=30)
     s.group(190, 20, 1030, 580, "AWS account, ap-northeast-2")
-    s.box(210, 60, 210, 54, "Route 53 + ACM", ("onboardassist.click (develop)",))
+    s.box(210, 60, 210, 54, "Route 53 + ACM", ("dev. + dev.docs.onboardassist.click",))
     s.box(450, 60, 200, 54, "Cognito", ("user pool (agents)",))
     s.group(210, 140, 720, 410, "VPC 10.0.0.0/16")
     s.box(230, 180, 290, 54, "ALB", ("HTTPS 443 (HTTP 80 without a domain)",))
