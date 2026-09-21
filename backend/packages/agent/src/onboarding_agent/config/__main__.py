@@ -1,5 +1,7 @@
 """Operate agent config bundles.
 
+Locations are local paths or fsspec URIs (s3://bucket/prefix, memory://..., ...).
+
     python -m onboarding_agent.config validate <dir | s3://bucket/prefix> [--version 1.2]
     python -m onboarding_agent.config versions <dir | s3://bucket/prefix>
     python -m onboarding_agent.config pull     <dir | s3://bucket/prefix> <dest-dir> [--version 1.2.0]
@@ -12,11 +14,12 @@ bundle's model ids against a comma-separated list, as the backend does with LLM_
 from __future__ import annotations
 
 import argparse
+import getpass
 import sys
-from pathlib import Path
+from datetime import UTC, datetime
 
 from onboarding_agent.config import ConfigError, load_bundle, publish
-from onboarding_agent.config.source import open_source, published, pull, resolve
+from onboarding_agent.config.source import open_store, published, pull, resolve
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -30,12 +33,13 @@ def main(argv: list[str] | None = None) -> int:
     ls.add_argument("uri")
     p = sub.add_parser("pull", help="copy a published version into an empty local directory")
     p.add_argument("uri")
-    p.add_argument("dest", type=Path)
+    p.add_argument("dest", help="an empty directory: a local path or an fsspec URI")
     p.add_argument("--version")
     pub = sub.add_parser("publish", help="validate a local bundle and publish it under its version")
     pub.add_argument("bundle_dir")
     pub.add_argument("uri")
     pub.add_argument("--allowed-models")
+    pub.add_argument("--notes", default="", help="what changed, kept in the version's release.json")
     args = parser.parse_args(argv)
 
     def allowed(value: str | None) -> list[str] | None:
@@ -47,13 +51,21 @@ def main(argv: list[str] | None = None) -> int:
             languages = ", ".join(bundle.languages)
             print(f"ok: {bundle.source} version {bundle.version} (languages: {languages})")
         elif args.command == "versions":
-            print("\n".join(published(open_source(args.uri))) or "(none)")
+            print("\n".join(published(open_store(args.uri))) or "(none)")
         elif args.command == "pull":
-            bundle, version = resolve(open_source(args.uri), args.version)
+            bundle, version = resolve(open_store(args.uri), args.version)
             files = pull(bundle, args.dest)
             print(f"pulled {version or bundle.location}: {len(files)} files into {args.dest}")
         elif args.command == "publish":
-            version = publish(args.bundle_dir, args.uri, allowed_model_ids=allowed(args.allowed_models))
+            release = {
+                "published_by": getpass.getuser(),
+                "published_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                "via": "cli",
+                "notes": args.notes,
+            }
+            version = publish(
+                args.bundle_dir, args.uri, release=release, allowed_model_ids=allowed(args.allowed_models)
+            )
             print(f"published {version} to {args.uri.rstrip('/')}/{version}/ — restart the backend to use it")
     except ConfigError as exc:
         print(exc, file=sys.stderr)

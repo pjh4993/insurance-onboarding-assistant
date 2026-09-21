@@ -3,7 +3,6 @@ directories and S3, and the publishing rules."""
 
 from __future__ import annotations
 
-import io
 import json
 import shutil
 from collections.abc import Callable
@@ -12,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from onboarding_agent.config import BUNDLED, ConfigError, Template, default_bundle, load_bundle, publish
-from onboarding_agent.config.source import S3Source, published, resolve
+from onboarding_agent.config.source import open_store, published, resolve
 
 BASELINE = Path(str(BUNDLED)) / default_bundle().version  # the newest bundle shipped with the package
 
@@ -181,76 +180,53 @@ def test_publishing_follows_semver(tmp_path):
 
 
 def published_versions(base: Path) -> list[str]:
-    from onboarding_agent.config.source import LocalSource
-
-    return published(LocalSource(base))
+    return published(open_store(str(base)))
 
 
-# ------------------------------------------------------------------------------------------ S3
+# ------------------------------------------------------------------------------------------ fsspec
 
 
-class FakeS3:
-    """The slice of the boto3 S3 client that S3Source uses, over a dict of keys."""
-
-    class exceptions:  # noqa: N801 - mirrors boto3's client.exceptions
-        class NoSuchKey(Exception):
-            pass
-
-    def __init__(self) -> None:
-        self.objects: dict[str, bytes] = {}
-        self.puts: list[tuple[str, str | None]] = []
-
-    def put_object(self, Bucket, Key, Body, ContentType=None, IfNoneMatch=None):  # noqa: N803
-        from botocore.exceptions import ClientError
-
-        self.puts.append((Key, IfNoneMatch))
-        if IfNoneMatch == "*" and Key in self.objects:
-            raise ClientError({"Error": {"Code": "PreconditionFailed"}}, "PutObject")
-        self.objects[Key] = Body
-
-    def get_object(self, Bucket, Key):  # noqa: N803
-        if Key not in self.objects:
-            raise self.exceptions.NoSuchKey(Key)
-        return {"Body": io.BytesIO(self.objects[Key])}
-
-    def list_objects_v2(self, Bucket, Prefix="", Delimiter=None, MaxKeys=None):  # noqa: N803
-        keys = sorted(k for k in self.objects if k.startswith(Prefix))
-        if Delimiter:
-            prefixes = sorted(
-                {
-                    Prefix + k[len(Prefix) :].split(Delimiter)[0] + Delimiter
-                    for k in keys
-                    if Delimiter in k[len(Prefix) :]
-                }
-            )
-            return {"CommonPrefixes": [{"Prefix": p} for p in prefixes]}
-        return {"Contents": [{"Key": k} for k in keys[:MaxKeys]]}
-
-    def get_paginator(self, name):
-        fake = self
-
-        class Paginator:
-            def paginate(self, **kwargs):
-                yield fake.list_objects_v2(**kwargs)
-
-        return Paginator()
-
-
-def test_bundles_publish_to_and_load_from_s3(tmp_path):
-    s3 = FakeS3()
-    uri = "s3://agent-config-bucket/agent-config"
-    assert publish(str(variant(tmp_path, "1.0.0")), uri, s3_client=s3) == "1.0.0"
-    assert publish(str(variant(tmp_path, "1.1.0", with_japanese)), uri, s3_client=s3) == "1.1.0"
-    assert "agent-config/1.1.0/config.json" in s3.objects
-
-    # every write is conditional, so S3 refuses to replace an object even if the listing raced another publish
-    assert s3.puts and all(if_none_match == "*" for _, if_none_match in s3.puts)
-    source = S3Source("agent-config-bucket", "agent-config/1.0.0", s3)
-    with pytest.raises(FileExistsError):
-        source.write("config.json", b"{}")
-
-    bundle = load_bundle(uri, s3_client=s3)
-    assert (bundle.version, bundle.source) == ("1.1.0", f"{uri}/1.1.0")
-    assert load_bundle(uri, "1.0", s3_client=s3).version == "1.0.0"
-    source, version = resolve(S3Source("agent-config-bucket", "agent-config", s3), "1")
+def test_bundles_publish_to_and_load_from_any_fsspec_filesystem(tmp_path):
+    uri = f"memory://agent-config-test-{tmp_path.name}/agent-config"  # stands in for s3://bucket/prefix
+    assert publish(str(variant(tmp_path, "1.0.0")), uri) == "1.0.0"
+    assert publish(str(variant(tmp_path, "1.1.0", with_japanese)), uri) == "1.1.0"
+    assert open_store(uri).sub("1.1.0").files() == [
+        "config.json",
+        *sorted(
+            f"flows/{f}.json"
+            for f in ("application", "conversation", "handoff", "identity", "profiling", "recommendation")
+        ),
+        "release.json",
+    ]
+    bundle = load_bundle(uri)
+    assert bundle.version == "1.1.0"
+    assert bundle.source.startswith("memory://") and bundle.source.endswith("/agent-config/1.1.0")
+    assert load_bundle(uri, "1.0").version == "1.0.0"
+    source, version = resolve(open_store(uri), "1")
     assert version == "1.1.0" and source.exists("flows/identity.json")
+
+
+def test_every_write_is_create_only(tmp_path, monkeypatch):
+    """Store writes with fsspec's mode="create", which s3fs sends as a conditional put (If-None-Match: *)."""
+    base = open_store(f"memory://agent-config-test-{tmp_path.name}/agent-config")
+    modes = []
+    pipe_file = base.fs.pipe_file
+    monkeypatch.setattr(
+        base.fs,
+        "pipe_file",
+        lambda path, data, mode="overwrite", **kw: (modes.append(mode), pipe_file(path, data, mode=mode, **kw))[1],
+    )
+    publish(str(variant(tmp_path, "1.0.0")), f"memory://agent-config-test-{tmp_path.name}/agent-config")
+    base.sub("1.0.0").write("extra.json", b"{}")
+    with pytest.raises(FileExistsError):
+        base.sub("1.0.0").write("config.json", b"{}")
+    assert modes and set(modes) == {"create"}
+
+
+def test_s3fs_turns_create_into_a_conditional_put():
+    import inspect
+
+    import s3fs
+
+    source = inspect.getsource(s3fs.S3FileSystem._pipe_file)
+    assert 'mode == "create"' in source and "IfNoneMatch" in source
