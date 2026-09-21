@@ -427,6 +427,98 @@ textarea {
   min-height: 44px;
 }
 
+/* ---- topic forms (prompt.form) */
+.topic-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.topic-form__head h4 {
+  font-size: 15px;
+  color: var(--ink);
+}
+.topic-form__reason {
+  margin-top: 2px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+.topic-form__text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.topic-form__or {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+/* .field styles text inputs; checkboxes inside a field (boolean, multiselect chips) stay plain */
+.field input[type="checkbox"] {
+  min-height: 0;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+.field .check {
+  font-weight: 500;
+  color: var(--ink);
+}
+.field__req {
+  color: var(--danger);
+}
+.field__error {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--danger);
+}
+.field--invalid input:not([type="checkbox"]),
+.field--invalid select {
+  border-color: var(--danger);
+}
+.chips {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.chips legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+.chips__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+}
+.chip input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.chip--on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.chip:focus-within {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 /* ---- recommendation cards */
 .decision {
   display: flex;

@@ -39,6 +39,7 @@
   },
   "stageStrip": { "label": "Onboarding progress" },
   "waiting": {
+    "INTAKE": "Intake",
     "IDENTITY_INFO": "Identity details",
     "OTP_CODE": "OTP code",
     "NEEDS": "Needs",
@@ -122,6 +123,7 @@
     "nothing": "Nothing to answer right now.",
     "agentPlaceholder": "Answer as agent ({kind})…",
     "placeholder": {
+      "INTAKE": "What would you like to protect? e.g. a trip to Tokyo next month",
       "NEEDS": "Tell us about yourself and what you want to protect…",
       "PARTIES": "Who is insured, and who pays? e.g. “Just me”",
       "ANSWERS": "Answer the questions above…"
@@ -137,6 +139,13 @@
     "consent": "I agree that my details may be checked with the retail partner I bought from, so my purchase can be pre-filled.",
     "consentNote": "Optional — without it we verify you by SMS code.",
     "submit": "Verify my identity"
+  },
+  "topicForm": {
+    "submit": "Continue",
+    "choose": "Choose…",
+    "required": "Required",
+    "invalidNumber": "Enter a number",
+    "orText": "Or answer in your own words"
   },
   "otp": {
     "label": "Verification code",
@@ -199,6 +208,7 @@
     },
     "duration": "Usually takes under 5 minutes",
     "privacy": "What you share is used only for this application, and a human agent can step in at any time.",
+    "intakeFailed": "We could not send your first message. Please send it again below.",
     "errorTitle": "Something went wrong",
     "expired": "This session has ended, or the link is no longer valid.",
     "expiredHint": "Start a new application here, or ask the agent who sent you the link for a new one.",

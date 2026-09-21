@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { NextIntlClientProvider, useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { sessionLocale, type Locale } from "@/i18n/locales";
 import { MESSAGES } from "@/i18n/messages";
 import { ApiError, customerApi } from "@/lib/api";
-import { landingStore, shouldShowLanding } from "@/lib/landing";
+import { intakeToSend, landingStore, shouldShowLanding } from "@/lib/landing";
 import { appendMessage } from "@/lib/session";
 import type { InputBody, SessionView } from "@/lib/types";
 import { useEventStream } from "@/lib/useEventStream";
@@ -26,6 +26,9 @@ export function CustomerChat() {
   const [startedNow, setStartedNow] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [localeError, setLocaleError] = useState(false);
+  const [intakeFailed, setIntakeFailed] = useState(false);
+  // Sessions this tab already sent INTAKE for; backs up landingStore when sessionStorage is unavailable.
+  const intakeSent = useRef(new Set<string>());
 
   const load = useCallback(() => {
     customerApi
@@ -62,6 +65,32 @@ export function CustomerChat() {
     },
   });
 
+  // Send the landing text as the INTAKE answer once the session asks for it (see intakeToSend).
+  const sessionId = view?.session.session_id;
+  const waitingFor = view ? (view.prompt ? view.prompt.waiting_for : view.session.waiting_for) : undefined;
+  useEffect(() => {
+    if (!sessionId) return;
+    const text = intakeToSend({
+      waitingFor,
+      started: startedNow || landingStore.started(sessionId),
+      sent: intakeSent.current.has(sessionId) || landingStore.intakeSent(sessionId),
+      interest: landingStore.interest(sessionId),
+    });
+    if (text === null) return;
+    intakeSent.current.add(sessionId);
+    landingStore.markIntakeSent(sessionId);
+    setIntakeFailed(false);
+    setBusy(true);
+    customerApi
+      .sendInput({ type: "INTAKE", data: { text } })
+      .then(() => landingStore.clearInterest(sessionId))
+      .catch(() => {
+        // Not retried: the INTAKE composer shows the text so the customer can send it.
+        setIntakeFailed(true);
+        setBusy(false);
+      });
+  }, [sessionId, waitingFor, startedNow]);
+
   const locale = view ? sessionLocale(view.session) : null;
 
   // The server rendered <html lang> and the title from the browser's language; follow the session once it is known.
@@ -73,7 +102,10 @@ export function CustomerChat() {
 
   async function submit(body: InputBody) {
     await customerApi.sendInput(body);
-    if (body.type === "NEEDS" && view) landingStore.clearInterest(view.session.session_id);
+    if (body.type === "INTAKE") {
+      setIntakeFailed(false);
+      if (view) landingStore.clearInterest(view.session.session_id);
+    }
     setBusy(true);
   }
 
@@ -118,6 +150,7 @@ export function CustomerChat() {
         )}
         switching={switching}
         localeError={localeError}
+        intakeFailed={intakeFailed}
         onStart={start}
         onSubmit={submit}
         onLocale={changeLocale}
@@ -163,6 +196,7 @@ function CustomerSession({
   showLanding,
   switching,
   localeError,
+  intakeFailed,
   onStart,
   onSubmit,
   onLocale,
@@ -174,6 +208,7 @@ function CustomerSession({
   showLanding: boolean;
   switching: boolean;
   localeError: boolean;
+  intakeFailed: boolean;
   onStart: (interest: string) => void;
   onSubmit: (body: InputBody) => Promise<void>;
   onLocale: (locale: Locale) => void;
@@ -211,6 +246,11 @@ function CustomerSession({
         </div>
       </header>
       {localeNotice}
+      {intakeFailed && (
+        <p className="locale-error" role="alert">
+          {t("customer.intakeFailed")}
+        </p>
+      )}
       <section className="customer__chat">
         <MessageList messages={messages} perspective="customer" busy={busy} />
       </section>
@@ -222,7 +262,7 @@ function CustomerSession({
           busy={busy}
           onSubmit={onSubmit}
           showPromptMessage={!!prompt?.message && prompt.message !== lastBotText}
-          needsDraft={landingStore.interest(session.session_id)}
+          intakeDraft={landingStore.interest(session.session_id)}
         />
       </footer>
     </main>

@@ -610,6 +610,13 @@
   background: var(--c-go);
   padding: 0 18px;
 }
+.customer__input .topic-form__head h4 {
+  font-size: 16px;
+}
+.customer__input .field input,
+.customer__input .field select {
+  font-size: 16px; /* keeps iOS from zooming into the field */
+}
 .customer__input .waiting,
 .customer__input .input-panel--closed {
   border: none;

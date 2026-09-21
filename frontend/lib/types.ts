@@ -16,6 +16,7 @@ export type Stage =
   | "WITHDRAWN";
 
 export type WaitingFor =
+  | "INTAKE"
   | "IDENTITY_INFO"
   | "OTP_CODE"
   | "NEEDS"
@@ -78,11 +79,41 @@ export type RecommendationCard = {
   quote: Quote | null;
 };
 
+export type FormFieldKind = "text" | "email" | "tel" | "date" | "number" | "select" | "multiselect" | "boolean";
+
+/** One field of a topic form; labels come localized from the backend. */
+export type FormField = {
+  /** The key sent back in `fields`. */
+  name: string;
+  label: string;
+  kind: FormFieldKind;
+  /** select / multiselect */
+  options?: { value: string; label: string }[];
+  required: boolean;
+  placeholder?: string;
+  /** Pre-filled when already known (partner data, an earlier answer). */
+  value?: unknown;
+};
+
+/** A small form for one topic, sent with IDENTITY_INFO and NEEDS prompts. */
+export type FormSpec = {
+  /** Stable id, e.g. "contact", "id_document", "device", "trip". */
+  topic: string;
+  title: string;
+  /** One line: why we ask this now. */
+  reason: string;
+  fields: FormField[];
+  /** The customer may answer in free text instead of the form. */
+  allow_text: boolean;
+};
+
 export type Prompt = {
   waiting_for: WaitingFor;
   message: string;
   options?: RecommendationCard[];
   summary?: string;
+  /** Present for IDENTITY_INFO and NEEDS on backends with topic forms. */
+  form?: FormSpec;
 };
 
 export type SessionView = { session: SessionSummary; messages: Message[]; prompt: Prompt | null };
@@ -112,22 +143,31 @@ export type InputType = Exclude<WaitingFor, null>;
 
 /** `data` shape per `type` (CONTRACTS.md §3, "InputBody.data by type"). */
 export type InputDataMap = {
-  IDENTITY_INFO: {
-    full_name: string;
-    email: string;
-    phone: string;
-    id_document_type: string;
-    id_document_number: string;
-    third_party_consent: boolean;
-  };
+  INTAKE: { text: string };
+  IDENTITY_INFO: IdentityInfoData | TopicAnswer;
   OTP_CODE: { code: string };
-  NEEDS: { text: string };
+  NEEDS: { text: string } | TopicAnswer | (TopicAnswer & { text: string });
   DECISION: { decision: "ACCEPT" | "DECLINE" | "CHANGE"; recommendation_id?: string; text?: string };
   PARTIES: { text: string };
   ANSWERS: { text: string };
   CONFIRM: { confirmed: boolean; text?: string };
   AGENT: { resolution: "VERIFIED" | "CONTINUE" | "END"; note?: string };
 };
+
+/** The one-shot identity form, still accepted next to topic answers. */
+export type IdentityInfoData = {
+  full_name: string;
+  email: string;
+  phone: string;
+  id_document_type: string;
+  id_document_number: string;
+  third_party_consent: boolean;
+};
+
+export type FormFieldValue = string | number | boolean | string[];
+
+/** A submitted topic form: keys of `fields` are the prompt's FormField names. */
+export type TopicAnswer = { topic: string; fields: Record<string, FormFieldValue> };
 
 export type InputBody = { [K in InputType]: { type: K; data: InputDataMap[K] } }[InputType];
 

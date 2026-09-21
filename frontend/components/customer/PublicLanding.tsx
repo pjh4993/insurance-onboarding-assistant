@@ -18,8 +18,8 @@ type StartError = { kind: "rateLimited"; minutes: number | null } | { kind: "fai
 
 /**
  * The public landing page (/): the session-link Landing, for anyone. Starting creates a session through
- * /api/start (which sets the httpOnly session cookie), remembers what the visitor typed or picked for the
- * first profiling answer (lib/landing.ts), and opens the chat at /chat.
+ * /api/start (which sets the httpOnly session cookie), remembers what the visitor typed or picked (sent as
+ * the INTAKE answer, lib/landing.ts), and opens the chat at /chat.
  */
 export function PublicLanding({
   initialLocale,
@@ -49,7 +49,7 @@ export function PublicLanding({
     setError(null);
     try {
       const { session_id } = await publicApi.start(market, locale);
-      // Marks the new session as started, so /chat skips its own landing screen and pre-fills NEEDS.
+      // Marks the new session as started, so /chat skips its own landing screen and sends the text as INTAKE.
       landingStore.start(session_id, interest);
       router.push("/chat");
     } catch (e) {

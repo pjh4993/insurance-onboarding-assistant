@@ -9,7 +9,7 @@ const STEPS = ["verify", "questions", "recommend", "apply"] as const;
 
 /**
  * First screen of /s/{token}: what the assistant does, the four steps, and a chat-style box to start.
- * Whatever the customer types or picks here becomes their first profiling answer (see lib/landing.ts).
+ * Whatever the customer types or picks here is sent as their INTAKE answer (see lib/landing.ts).
  */
 export function Landing({
   market,
