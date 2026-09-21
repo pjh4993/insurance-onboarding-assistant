@@ -17,7 +17,7 @@ variable "github_repository" {
 }
 
 variable "oidc_subjects" {
-  description = "Allowed token 'sub' claims, relative to repo:<github_repository>:. develop: ref:refs/heads/main. prod: environment:prod."
+  description = "Allowed token 'sub' claims, relative to repo:<github_repository>:. develop: ref:refs/heads/develop. prod: environment:prod."
   type        = list(string)
 }
 

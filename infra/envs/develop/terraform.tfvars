@@ -14,7 +14,7 @@ db_deletion_protection = false
 domain_name = "onboardassist.click"
 
 create_shared_ci_resources = true
-github_oidc_subjects       = ["ref:refs/heads/main"]
+github_oidc_subjects       = ["ref:refs/heads/develop"]
 
 # Replace <ACCOUNT_ID>; must match -backend-config="bucket=...".
 state_bucket_name = "onboarding-tfstate-<ACCOUNT_ID>"

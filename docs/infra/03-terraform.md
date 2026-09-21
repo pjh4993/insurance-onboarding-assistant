@@ -95,9 +95,9 @@ commit SHA) and `state_bucket_name` are passed by the deploy workflows with `-va
 
 | Where | Command |
 |---|---|
-| PR and push to `main` (CI) | `terraform fmt -recursive -check`, then `terraform init -backend=false` and `terraform validate` for `envs/develop`, `envs/prod` and `bootstrap`. No plan is run in CI |
-| Push to `main` (deploy) | `terraform apply` for `envs/develop` with the new `image_tag`. Skipped until the deploy role variable is set |
-| Prod | `terraform apply` for `envs/prod` from `deploy-prod.yml`, behind approval (not run for this submission) |
+| PR and push to `develop` or `main` (CI) | `terraform fmt -recursive -check`, then `terraform init -backend=false` and `terraform validate` for `envs/develop`, `envs/prod` and `bootstrap`. No plan is run in CI |
+| Push to `develop` (deploy) | `terraform apply` for `envs/develop` with the new `image_tag`. Skipped until the deploy role variable is set |
+| Push to `main` (prod) | `terraform apply` for `envs/prod` from `deploy-prod.yml`, behind approval. Skipped until `AWS_DEPLOY_ROLE_ARN_PROD` is set (not run for this submission) |
 | Locally | `cd infra/envs/develop && terraform init -backend-config="bucket=<state bucket>" && terraform plan -var image_tag=<sha> -var state_bucket_name=<state bucket>` |
 
 ### One-time setup
@@ -120,11 +120,12 @@ someone with admin credentials; after that, deploys run from GitHub Actions.
 5. **GitHub repository variables** (Settings → Secrets and variables → Actions → Variables):
    `AWS_DEPLOY_ROLE_ARN_DEVELOP` = the develop `deploy_role_arn`, `TF_STATE_BUCKET` = the bootstrap
    `state_bucket_name`. Until `AWS_DEPLOY_ROLE_ARN_DEVELOP` is set, `deploy-develop.yml` skips its jobs.
-6. **First deploy**: push to `main` (or run `deploy-develop` by hand). It builds and pushes the images, applies
+6. **First deploy**: push to `develop` (or run `deploy-develop` by hand on `develop`). It builds and pushes the images, applies
    the full develop stack, waits for the services, and smoke-tests `<base_url>/healthz`.
 7. **Agent accounts**: the Cognito pool only allows admin-created users. Create each agent in the console or with
    `aws cognito-idp admin-create-user`.
-8. **Prod, when it is time**: create the GitHub Environment `prod` with required reviewers and the variables
-   `AWS_DEPLOY_ROLE_ARN_PROD` and `TF_STATE_BUCKET`. The prod deploy role comes from the first `envs/prod` apply,
+8. **Prod, when it is time**: create the GitHub Environment `prod` with required reviewers and the variable
+   `TF_STATE_BUCKET`, and set the repository variable `AWS_DEPLOY_ROLE_ARN_PROD` (a repository variable, since
+   the workflow checks it before entering the environment; until it is set, pushes to `main` skip the deploy). The prod deploy role comes from the first `envs/prod` apply,
    again by an admin. Prod looks up the OIDC provider and ECR repositories that develop created, so develop must
    exist first.

@@ -128,7 +128,7 @@ same; only `terraform.tfvars` differs.
 | ECS tasks | 1 per service | 2 per service, spread across AZs |
 | RDS | `db.t4g.micro`, single-AZ | `db.t4g.small`, Multi-AZ |
 | GitHub OIDC provider, ECR repositories | Created here | Looked up from develop |
-| Deploy | Automatic on push to `main`, once the deploy role variable is set in GitHub | Manual, after approval, same image SHA |
+| Deploy | Automatic on push to `develop`, once the deploy role variable is set in GitHub | On push to `main` (a fast-forward of `develop`), after approval, same image SHA |
 
 Scope for this submission: `envs/develop` is the environment the deploy workflow targets; `envs/prod` uses the
 same code with different variables, and applying it is deferred. Two things must change before prod: the

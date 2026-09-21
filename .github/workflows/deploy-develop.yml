@@ -1,10 +1,11 @@
 name: deploy-develop
 
-# Every push to main builds the three images once, tags them with the commit
-# SHA, and rolls develop forward. prod later promotes the same SHA.
+# Every push to develop builds the three images once, tags them with the commit
+# SHA, and rolls develop forward. main is fast-forwarded to a tested develop
+# commit, and deploy-prod promotes that same SHA.
 on:
   push:
-    branches: [main]
+    branches: [develop]
   workflow_dispatch:
 
 permissions:

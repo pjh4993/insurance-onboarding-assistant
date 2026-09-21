@@ -1,9 +1,13 @@
 name: deploy-prod
 
-# Manual promotion of an image SHA that already passed develop. No rebuild:
-# the same immutable ECR tags are deployed. Required reviewers are configured
-# on the GitHub Environment "prod".
+# Promotes an image SHA that already passed develop. No rebuild: the same
+# immutable ECR tags are deployed. A push to main promotes its head, which is a
+# fast-forward of develop, so its images exist; a manual run can promote (or
+# roll back to) any SHA. Required reviewers are configured on the GitHub
+# Environment "prod".
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       image_sha:
@@ -21,14 +25,17 @@ concurrency:
 
 env:
   AWS_REGION: ap-northeast-2
-  IMAGE_TAG: ${{ inputs.image_sha }}
+  IMAGE_TAG: ${{ inputs.image_sha || github.sha }}
   TF_ROOT: infra/envs/prod
 
-# Environment "prod" variables:
+# Repository variable (a job-level `if` cannot read environment variables):
 #   AWS_DEPLOY_ROLE_ARN_PROD  terraform output deploy_role_arn (envs/prod)
+# Environment "prod" variables:
 #   TF_STATE_BUCKET           state bucket from infra/bootstrap
 jobs:
   deploy:
+    # Skip until prod's one-time AWS setup has set the deploy role variable.
+    if: ${{ vars.AWS_DEPLOY_ROLE_ARN_PROD != '' }}
     runs-on: ubuntu-latest
     environment: prod # OIDC sub = repo:pjh4993/bolttech-onboarding-assistant:environment:prod
     defaults:
@@ -43,7 +50,7 @@ jobs:
       # Infra code comes from the same commit as the images.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.image_sha }}
+          ref: ${{ env.IMAGE_TAG }}
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:

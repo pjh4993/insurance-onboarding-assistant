@@ -5,19 +5,22 @@ an environment-specific deploy role through **OIDC**.
 
 ## 1. Pipeline
 
+Work lands on `develop`, which deploys the develop environment. `main` only ever moves by fast-forwarding to a
+`develop` commit that is already running in develop, and a push to `main` promotes that commit's images to prod.
+
 ```mermaid
 flowchart LR
-    pr["Pull request<br/>or push to main"] --> checks["ci.yml<br/>lint, test, build,<br/>terraform fmt/validate,<br/>docker build"]
-    push["Push to main"] --> dd["deploy-develop.yml<br/>push images (tag = SHA)<br/>terraform apply develop<br/>wait for ECS<br/>smoke test"]
-    dd --> promote["Manual run with a SHA<br/>+ approval (Environment: prod)"]
+    pr["Pull request<br/>or push to develop / main"] --> checks["ci.yml<br/>lint, test, build,<br/>terraform fmt/validate,<br/>docker build"]
+    push["Push to develop"] --> dd["deploy-develop.yml<br/>push images (tag = SHA)<br/>terraform apply develop<br/>wait for ECS<br/>smoke test"]
+    dd --> promote["Fast-forward main to that SHA<br/>+ approval (Environment: prod)"]
     promote --> dp["deploy-prod.yml<br/>same image SHA<br/>terraform apply prod<br/>wait for ECS<br/>smoke test"]
 ```
 
 | Workflow | Trigger | Steps |
 |---|---|---|
-| `ci.yml` | Pull request; push to `main` | **backend**: `uv sync`, `ruff check`, `pytest` against a Postgres 16 service container (graph tests use in-process fakes built from the seed customers). **mock**: `ruff check`, `pytest`. **frontend**: `pnpm install`, `pnpm lint`, `tsc --noEmit`, `pnpm build`. **terraform** (1.5.7): `fmt -recursive -check`, then `init -backend=false` and `validate` for `envs/develop`, `envs/prod` and `bootstrap`. **docker**: build all three images (no push). **docs**: `make docs-build`, the strict mkdocs build that fails on a broken link |
-| `deploy-develop.yml` | Push to `main`; manual run | Runs only when the repository variable `AWS_DEPLOY_ROLE_ARN_DEVELOP` is set. **images**: assume the develop role, build and push `onboarding/{backend,mock,frontend,docs}:<sha>` to ECR (`docs` is the mkdocs site, built from the repo root with `docs-site/Dockerfile`). **deploy**: `terraform init` with the state bucket, `terraform apply` on `envs/develop` with `image_tag=<sha>`, `.github/scripts/wait-for-rollout.sh`, then the smoke test |
-| `deploy-prod.yml` | Manual (`workflow_dispatch`) with a full 40-character SHA | Runs in the `prod` GitHub Environment, so its required reviewers must approve. Checks out that SHA, assumes the prod role, checks that the backend and frontend images for that SHA exist in ECR (no rebuild), `terraform apply` on `envs/prod`, waits for ECS, smoke test |
+| `ci.yml` | Pull request; push to `develop` or `main` | **backend**: `uv sync`, `ruff check`, `pytest` against a Postgres 16 service container (graph tests use in-process fakes built from the seed customers). **mock**: `ruff check`, `pytest`. **frontend**: `pnpm install`, `pnpm lint`, `tsc --noEmit`, `pnpm build`. **terraform** (1.5.7): `fmt -recursive -check`, then `init -backend=false` and `validate` for `envs/develop`, `envs/prod` and `bootstrap`. **docker**: build all three images (no push). **docs**: `make docs-build`, the strict mkdocs build that fails on a broken link |
+| `deploy-develop.yml` | Push to `develop`; manual run on `develop` | Runs only when the repository variable `AWS_DEPLOY_ROLE_ARN_DEVELOP` is set. **images**: assume the develop role, build and push `onboarding/{backend,mock,frontend,docs}:<sha>` to ECR (`docs` is the mkdocs site, built from the repo root with `docs-site/Dockerfile`). **deploy**: `terraform init` with the state bucket, `terraform apply` on `envs/develop` with `image_tag=<sha>`, `.github/scripts/wait-for-rollout.sh`, then the smoke test |
+| `deploy-prod.yml` | Push to `main` (deploys its head); manual run with a full 40-character SHA, e.g. to roll back | Runs only when the repository variable `AWS_DEPLOY_ROLE_ARN_PROD` is set. Runs in the `prod` GitHub Environment, so its required reviewers must approve. Checks out that SHA, assumes the prod role, checks that the backend and frontend images for that SHA exist in ECR (no rebuild), `terraform apply` on `envs/prod`, waits for ECS, smoke test |
 
 Not built: a `terraform plan` posted on the PR, and running the frontend unit tests (`pnpm test`) in CI; both run
 locally (see the README).
@@ -27,7 +30,7 @@ locally (see the README).
 - The `ci` Terraform module in each environment creates that environment's deploy role. The GitHub OIDC
   identity provider is account-wide: develop creates it, prod looks it up.
 - Each role's trust policy is limited to this repository (`pjh4993/bolttech-onboarding-assistant`) and one
-  subject: the develop role to `ref:refs/heads/main`, the prod role to `environment:prod`.
+  subject: the develop role to `ref:refs/heads/develop`, the prod role to `environment:prod`.
   The repository sends GitHub's immutable subject, which carries the owner and repository ids
   (`repo:pjh4993@12472082/bolttech-onboarding-assistant@1379320933:…`), so a repository recreated under the same
   name gets no access. `modules/ci` variable `github_repository` holds that prefix.
@@ -40,7 +43,9 @@ locally (see the README).
 
 Images are tagged with the git commit SHA, ECR tags are immutable, and prod never rebuilds. What runs in prod is
 byte-for-byte the image that passed develop. `deploy-prod.yml` also checks out the same SHA, so the Terraform code
-matches the images. Rolling back means deploying an earlier SHA.
+matches the images. Rolling back means deploying an earlier SHA. A push to `main` finds its images only because
+`main` is fast-forwarded to a `develop` commit, never merged: a merge commit has no images, and the workflow stops
+at the image check.
 
 ## 4. Deployment safety
 
