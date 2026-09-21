@@ -22,24 +22,7 @@ infra/
     prod/       identical main.tf; different terraform.tfvars and state key
 ```
 
-```mermaid
-flowchart TB
-    boot["bootstrap<br/>state bucket + lock table"]
-    subgraph env["envs/develop or envs/prod"]
-        main["main.tf<br/>composes modules,<br/>ECS cluster, namespace"]
-    end
-    boot -. "remote state" .-> env
-    main --> network & security & data & edge & ci
-    main --> auth["auth<br/>(only if domain_name set)"]
-    main --> svc_fe["service<br/>(frontend)"]
-    main --> svc_be["service<br/>(backend)"]
-    main --> svc_mock["service<br/>(mock, only if enable_mocks)"]
-    network --> security
-    security --> data
-    network --> edge
-    auth --> edge
-    edge --> svc_fe
-```
+![Terraform module layout](assets/terraform-layout.svg)
 
 ## 2. Modules
 

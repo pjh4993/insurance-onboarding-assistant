@@ -8,13 +8,7 @@ an environment-specific deploy role through **OIDC**.
 Work lands on `develop`, which deploys the develop environment. `main` only ever moves by fast-forwarding to a
 `develop` commit that is already running in develop, and a push to `main` promotes that commit's images to prod.
 
-```mermaid
-flowchart LR
-    pr["Pull request<br/>or push to develop / main"] --> checks["ci.yml<br/>lint, test, build,<br/>terraform fmt/validate,<br/>docker build"]
-    push["Push to develop"] --> dd["deploy-develop.yml<br/>push images (tag = SHA)<br/>terraform apply develop<br/>wait for ECS<br/>smoke test"]
-    dd --> promote["Fast-forward main to that SHA<br/>+ approval (Environment: prod)"]
-    promote --> dp["deploy-prod.yml<br/>same image SHA<br/>terraform apply prod<br/>wait for ECS<br/>smoke test"]
-```
+![CI/CD pipeline](assets/cicd-pipeline.svg)
 
 | Workflow | Trigger | Steps |
 |---|---|---|

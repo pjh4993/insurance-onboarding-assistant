@@ -7,27 +7,7 @@ authentication.
 
 One VPC in ap-northeast-2, two availability zones (2a and 2c), three subnet tiers per zone.
 
-```mermaid
-flowchart TB
-    igw["Internet gateway"]
-    subgraph vpc["VPC 10.0.0.0/16"]
-        subgraph pub["Public tier"]
-            pa["10.0.0.0/24 (2a)<br/>ALB, NAT"]
-            pc["10.0.1.0/24 (2c)<br/>ALB, NAT (prod)"]
-        end
-        subgraph app["Private app tier"]
-            aa["10.0.10.0/24 (2a)<br/>ECS tasks, interface endpoints"]
-            ac["10.0.11.0/24 (2c)<br/>ECS tasks, interface endpoints (prod)"]
-        end
-        subgraph data["Private data tier"]
-            da["10.0.20.0/24 (2a)<br/>RDS"]
-            dc["10.0.21.0/24 (2c)<br/>RDS standby (prod)"]
-        end
-    end
-    igw <--> pub
-    app -- "outbound via NAT" --> pub
-    app --> data
-```
+![VPC subnet topology](assets/networking-topology.svg)
 
 | Tier | CIDR (2a, 2c) | Contains | Internet |
 |---|---|---|---|
@@ -62,24 +42,7 @@ reached by the browser, not by the tasks. Develop has one NAT gateway; prod has 
 
 ## 2. Traffic flows
 
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant A as ALB
-    participant F as Frontend (Next.js)
-    participant K as Backend (FastAPI)
-    participant M as Mock (develop)
-    participant D as RDS
-    participant R as Bedrock (VPC endpoint)
-    B->>A: HTTPS 443 (HTTP 80 without a domain)
-    A->>F: HTTP 3000
-    F->>K: HTTP 8000 via Service Connect (http://backend:8000)
-    K->>D: PostgreSQL 5432, TLS
-    K->>M: HTTP 8080 via Service Connect (http://mock:8080)
-    K->>R: HTTPS 443
-    K-->>F: SSE stream
-    F-->>B: SSE stream (passed through)
-```
+![Request sequence from browser to backend](assets/networking-request-sequence.svg)
 
 | Segment | Protocol | Port |
 |---|---|---|
@@ -133,23 +96,7 @@ Task egress is open (to reach the endpoints and NAT); ingress is what limits eac
 
 ## 4. Security boundaries
 
-```mermaid
-flowchart LR
-    subgraph internet["Internet"]
-        b(["Browser"])
-    end
-    subgraph edgez["Edge boundary"]
-        alb["ALB + Cognito (agents)"]
-    end
-    subgraph appz["App boundary (private subnets)"]
-        fe["Frontend<br/>attaches caller identity"]
-        be["Backend<br/>only reachable from frontend"]
-    end
-    subgraph dataz["Data boundary (no internet)"]
-        rds[("RDS<br/>only reachable from backend")]
-    end
-    b --> alb --> fe --> be --> rds
-```
+![Security boundaries](assets/networking-boundaries.svg)
 
 | Boundary | What protects it |
 |---|---|

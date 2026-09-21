@@ -8,42 +8,7 @@ network simple.
 
 ## 1. Overview
 
-```mermaid
-flowchart LR
-    user(["Customer / agent<br/>browser"])
-
-    subgraph aws["AWS account, ap-northeast-2"]
-        r53["Route 53 + ACM<br/>onboardassist.click (develop)"]
-        cognito["Cognito<br/>user pool (agents)"]
-        subgraph vpc["VPC 10.0.0.0/16"]
-            alb["ALB<br/>HTTPS 443 (HTTP 80 without a domain)"]
-            subgraph ecs["ECS cluster (Fargate)"]
-                fe["frontend service"]
-                be["backend service"]
-                mock["mock service<br/>(develop only)"]
-            end
-            rds[("RDS PostgreSQL 16<br/>checkpoint / domain / catalog")]
-            vpce["VPC endpoints<br/>bedrock-runtime, secretsmanager,<br/>ecr.api, ecr.dkr, logs, s3"]
-        end
-        bedrock["Bedrock<br/>global.anthropic.claude-sonnet-4-6"]
-        sm["Secrets Manager"]
-        kms["KMS"]
-        ecr["ECR"]
-        cw["CloudWatch Logs"]
-    end
-
-    user --> r53
-    user --> alb
-    alb -. "/agent/* login" .-> cognito
-    alb --> fe
-    fe -- "Service Connect :8000" --> be
-    be -- "Service Connect :8080" --> mock
-    be -- "TLS :5432" --> rds
-    be --> vpce
-    vpce --> bedrock & sm & ecr & cw
-    sm -.-> kms
-    rds -.-> kms
-```
+![AWS architecture overview](assets/aws-overview.svg)
 
 ## 2. Services and why
 
