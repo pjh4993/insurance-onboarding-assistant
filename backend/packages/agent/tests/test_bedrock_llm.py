@@ -12,12 +12,12 @@ from pathlib import Path
 import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from onboarding_agent.config import BUNDLED, load_bundle
+from onboarding_agent.config import BUNDLED, default_bundle, load_bundle
 from onboarding_agent.llm.provider import BedrockStructuredLLM
 from onboarding_agent.llm.schemas import NeedsExtraction
 
 REQUESTS: list[tuple[str, dict]] = []
-BUNDLED_BASELINE = Path(str(BUNDLED)) / "1.1.0"
+BUNDLED_BASELINE = Path(str(BUNDLED)) / default_bundle().version  # the newest bundle shipped
 
 
 class ConverseHandler(BaseHTTPRequestHandler):

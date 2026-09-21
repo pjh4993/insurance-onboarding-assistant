@@ -369,3 +369,16 @@ async def test_a_birth_date_is_asked_for_once(runtime, llm):
     assert s.waiting_for == "PARTIES"
     s = await send(rt, sid, "PARTIES", {"text": "생년월일은 잘 모르겠어요."})
     assert s.waiting_for == "CONFIRM"
+
+
+async def test_asking_for_another_policyholder_is_explained(runtime, llm):
+    rt = runtime
+    sid = await _to_parties(rt)
+    payer = {"role": "PAYER", "full_name": "김민수", "date_of_birth": "2005-11-20"}
+    llm.overrides["PartiesExtraction"] = {"all_self": False, "parties": [payer], "policyholder_change_requested": True}
+    s = await send(rt, sid, "PARTIES", {"text": "계약자랑 납입자는 남편 김민수(2005-11-20)로 해 주세요."})
+    assert s.waiting_for == "CONFIRM"
+    texts = [m["text"] for m in (await rt.session_view(s))["messages"] if m["role"] == "assistant"]
+    assert any("계약자는 본인 확인을 마친 신청자 본인" in t and CUSTOMERS["A"]["full_name"] in t for t in texts)
+    roles = {(p["role"], p["full_name"]) for p in (await rt.session_detail(s))["entities"]["application_parties"]}
+    assert {("PAYER", "김민수"), ("POLICYHOLDER", CUSTOMERS["A"]["full_name"])} <= roles

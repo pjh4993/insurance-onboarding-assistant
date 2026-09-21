@@ -53,6 +53,9 @@ class PartiesExtraction(BaseModel):
         default_factory=list,
         description='Other people: {role: "INSURED" | "PAYER", full_name, date_of_birth (ISO 8601)}',
     )
+    policyholder_change_requested: bool = Field(
+        False, description="True when the customer asks for someone other than the applicant to be the policyholder"
+    )
 
 
 class AnswersExtraction(BaseModel):

@@ -194,6 +194,7 @@ class RecommendationRationale(BaseModel):
 class PartiesExtraction(BaseModel):
     all_self: bool
     parties: list[dict] = []               # {role: "INSURED" | "PAYER", full_name, date_of_birth}
+    policyholder_change_requested: bool = False  # the customer asked for another policyholder (not allowed)
 
 class AnswersExtraction(BaseModel):
     answers: dict

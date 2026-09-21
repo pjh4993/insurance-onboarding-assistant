@@ -163,6 +163,12 @@ class ApplicationFlow(Flow):
             PartiesExtraction,
             [self._system(state, party, instructions), HumanMessage(texts[-1] if texts else "-")],
         )
+        # The applicant is always the policyholder: say so, then carry on with the insured and the payer.
+        explained = (
+            [say(self.text(lang, "application.policyholder_is_applicant", name=party.full_name or ""), now)]
+            if ext.policyholder_change_requested
+            else []
+        )
         me = (party.full_name or "").strip()
         others = [
             p
@@ -187,13 +193,13 @@ class ApplicationFlow(Flow):
                 "confirmed": None,
                 "last_input": None,
                 "waiting_for": "PARTIES",
-                "messages": [say(text, now)],
+                "messages": [*explained, say(text, now)],
             }
 
         app_id = as_uuid(state["application_id"])
         if correcting and _who(others, party) == _who(current, party):
             # The correction was about something else: the parties stay, collect_answers takes the message.
-            return {"parties_complete": True, "correcting": False, "last_input": "ANSWERS"}
+            return {"parties_complete": True, "correcting": False, "last_input": "ANSWERS", "messages": explained}
         async with self.d.uow() as uow:
             roles: dict[str, uuid.UUID] = {"POLICYHOLDER": party.party_id}
             names = []
@@ -240,7 +246,7 @@ class ApplicationFlow(Flow):
             "parties_complete": True,
             "correcting": False,
             "last_input": "ANSWERS" if correcting else None,
-            "messages": [say(text, now)],
+            "messages": [*explained, say(text, now)],
         }
 
     async def collect_answers(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
@@ -510,6 +516,7 @@ TEXTS = TextSpec(
         "parties_self": frozenset(),
         "answers_handoff": frozenset(),
         "summary_handoff": frozenset(),
+        "policyholder_is_applicant": frozenset({"name"}),
         "no_longer_eligible": frozenset({"product", "reasons"}),
         "ask_answers": frozenset({"fields"}),
         "ask_correction": frozenset(),

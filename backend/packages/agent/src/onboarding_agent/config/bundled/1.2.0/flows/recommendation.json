@@ -1,0 +1,50 @@
+{
+  "llm": {
+    "explain_recommendation": {
+      "model": "default",
+      "instructions": [
+        "Write one short, customer-facing reason (1-2 sentences) for each recommended product, using only the listed grounds and the customer's needs. Do not invent coverage or prices. Return every recommendation_id exactly as given.",
+        "Customer needs: {needs}",
+        "Recommendations:",
+        "{recommendations}"
+      ],
+      "item": [
+        "- recommendation_id: {recommendation_id}",
+        "  product: {product} ({product_type}), rank {rank}",
+        "  price: {price}, cover {cover_start} to {cover_end}",
+        "  grounds: {grounds}"
+      ],
+      "user": "Explain these recommendations."
+    }
+  },
+  "copy": {
+    "no_eligible_product": {
+      "ko": "지금 알려 주신 내용으로는 가입할 수 있는 상품이 없습니다. 상담원이 이어서 도와드릴게요.\n{reasons}",
+      "en": "Based on what you told me, none of our products fit right now. An agent will follow up with you.\n{reasons}"
+    },
+    "offer_item": {
+      "ko": "{rank}. {product} — {price}\n   {rationale}",
+      "en": "{rank}. {product} — {price}\n   {rationale}"
+    },
+    "offers": {
+      "ko": "추천 상품입니다:\n{offers}\n\n가입할 상품을 고르시거나, 답을 바꾸거나, 가입하지 않을 수 있어요.",
+      "en": "Here's what I recommend:\n{offers}\n\nChoose one to apply, change your answers, or decline."
+    },
+    "accept": {
+      "ko": "{product}에 가입할게요.",
+      "en": "I'd like {product}."
+    },
+    "decline": {
+      "ko": "가입하지 않을게요.",
+      "en": "No thanks, I'll pass."
+    },
+    "change": {
+      "ko": "답을 바꾸고 싶어요.",
+      "en": "I'd like to change my answers."
+    },
+    "declined": {
+      "ko": "알겠습니다. 언제든 다시 찾아 주세요.",
+      "en": "Understood. You're welcome back any time."
+    }
+  }
+}
