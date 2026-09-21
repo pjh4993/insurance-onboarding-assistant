@@ -5,8 +5,7 @@ from __future__ import annotations
 import pytest
 from langgraph.graph import END
 
-from onboarding_agent import routing as r
-from onboarding_agent.build import ALL_NODES, should_retry
+from onboarding_agent.build import ALL_NODES, EDGES, RETRYING_NODES, should_retry
 
 ERR = {"last_error": {"node": "x", "kind": "ValueError", "attempts": 3}}
 
@@ -14,50 +13,48 @@ ERR = {"last_error": {"node": "x", "kind": "ValueError", "attempts": 3}}
 @pytest.mark.parametrize(
     ("fn", "state", "expected"),
     [
-        (r.after_ask_customer, {"last_input": "IDENTITY_INFO"}, "verify_identity"),
-        (r.after_ask_customer, {"last_input": "OTP_CODE"}, "check_otp"),
-        (r.after_ask_customer, {"last_input": "NEEDS"}, "assess_needs"),
-        (r.after_ask_customer, {"last_input": "PARTIES"}, "collect_parties"),
-        (r.after_ask_customer, {"last_input": "ANSWERS"}, "collect_answers"),
-        (r.after_verify_identity, {"identity_result": "MATCHED"}, "fetch_purchases"),
-        (r.after_verify_identity, {"identity_result": "NOT_MATCHED"}, "ask_customer"),
-        (r.after_check_otp, {"identity_result": "OTP_OK"}, "fetch_purchases"),
-        (r.after_check_otp, {"identity_result": "OTP_FAILED"}, "check_document"),
-        (r.after_check_document, {"identity_result": "DOC_OK"}, "fetch_purchases"),
-        (r.after_check_document, {"identity_result": "DOC_FAILED"}, "human_handoff"),
-        (r.after_fetch_purchases, {}, "assess_needs"),
-        (r.after_assess_needs, {"needs_complete": False}, "ask_customer"),
-        (r.after_assess_needs, {"needs_complete": True}, "check_eligibility"),
-        (r.after_assess_needs, {"needs_complete": False, "handoff_reason": "NEEDS_INCOMPLETE"}, "human_handoff"),
-        (r.after_check_eligibility, {"eligible_count": 0}, "human_handoff"),
-        (r.after_check_eligibility, {"eligible_count": 2}, "rank_products"),
-        (r.after_rank_products, {}, "quote_premium"),
-        (r.after_quote_premium, {"eligible_count": 1}, "explain_recommendation"),
-        (r.after_quote_premium, {"eligible_count": 0}, "human_handoff"),
-        (r.after_explain_recommendation, {}, "await_decision"),
-        (r.after_await_decision, {"decision": "ACCEPT"}, "open_application"),
-        (r.after_await_decision, {"decision": "DECLINE"}, END),
-        (r.after_await_decision, {"decision": "CHANGE"}, "assess_needs"),
-        (r.after_open_application, {}, "collect_parties"),
-        (r.after_collect_parties, {"parties_complete": False}, "ask_customer"),
-        (r.after_collect_parties, {"parties_complete": True}, "collect_answers"),
-        (r.after_collect_answers, {"answers_complete": False}, "ask_customer"),
-        (r.after_collect_answers, {"answers_complete": True}, "summarize_application"),
-        (r.after_collect_answers, {"handoff_reason": "ANSWERS_INCOMPLETE"}, "human_handoff"),
-        (r.after_summarize_application, {}, "confirm_summary"),
-        (r.after_confirm_summary, {"confirmed": True}, "submit_application"),
-        (r.after_confirm_summary, {"confirmed": False}, "collect_answers"),
-        (r.after_submit_application, {}, END),
-        (r.after_human_handoff, {}, "await_agent"),
+        (EDGES["ask_customer"], {"last_input": "IDENTITY_INFO"}, "verify_identity"),
+        (EDGES["ask_customer"], {"last_input": "OTP_CODE"}, "check_otp"),
+        (EDGES["ask_customer"], {"last_input": "NEEDS"}, "assess_needs"),
+        (EDGES["ask_customer"], {"last_input": "PARTIES"}, "collect_parties"),
+        (EDGES["ask_customer"], {"last_input": "ANSWERS"}, "collect_answers"),
+        (EDGES["verify_identity"], {"identity_result": "MATCHED"}, "fetch_purchases"),
+        (EDGES["verify_identity"], {"identity_result": "NOT_MATCHED"}, "ask_customer"),
+        (EDGES["check_otp"], {"identity_result": "OTP_OK"}, "fetch_purchases"),
+        (EDGES["check_otp"], {"identity_result": "OTP_FAILED"}, "check_document"),
+        (EDGES["check_document"], {"identity_result": "DOC_OK"}, "fetch_purchases"),
+        (EDGES["check_document"], {"identity_result": "DOC_FAILED"}, "human_handoff"),
+        (EDGES["fetch_purchases"], {}, "assess_needs"),
+        (EDGES["assess_needs"], {"needs_complete": False}, "ask_customer"),
+        (EDGES["assess_needs"], {"needs_complete": True}, "check_eligibility"),
+        (EDGES["assess_needs"], {"needs_complete": False, "handoff_reason": "NEEDS_INCOMPLETE"}, "human_handoff"),
+        (EDGES["check_eligibility"], {"eligible_count": 0}, "human_handoff"),
+        (EDGES["check_eligibility"], {"eligible_count": 2}, "rank_products"),
+        (EDGES["rank_products"], {}, "quote_premium"),
+        (EDGES["quote_premium"], {"eligible_count": 1}, "explain_recommendation"),
+        (EDGES["quote_premium"], {"eligible_count": 0}, "human_handoff"),
+        (EDGES["explain_recommendation"], {}, "await_decision"),
+        (EDGES["await_decision"], {"decision": "ACCEPT"}, "open_application"),
+        (EDGES["await_decision"], {"decision": "DECLINE"}, END),
+        (EDGES["await_decision"], {"decision": "CHANGE"}, "assess_needs"),
+        (EDGES["open_application"], {}, "collect_parties"),
+        (EDGES["collect_parties"], {"parties_complete": False}, "ask_customer"),
+        (EDGES["collect_parties"], {"parties_complete": True}, "collect_answers"),
+        (EDGES["collect_answers"], {"answers_complete": False}, "ask_customer"),
+        (EDGES["collect_answers"], {"answers_complete": True}, "summarize_application"),
+        (EDGES["collect_answers"], {"handoff_reason": "ANSWERS_INCOMPLETE"}, "human_handoff"),
+        (EDGES["summarize_application"], {}, "confirm_summary"),
+        (EDGES["confirm_summary"], {"confirmed": True}, "submit_application"),
+        (EDGES["confirm_summary"], {"confirmed": False}, "collect_answers"),
+        (EDGES["submit_application"], {}, END),
+        (EDGES["human_handoff"], {}, "await_agent"),
     ],
 )
 def test_routes(fn, state, expected):
     assert fn(state) == expected
 
 
-@pytest.mark.parametrize(
-    "fn", [getattr(r, f"after_{n}") for n in ALL_NODES if n not in ("human_handoff", "await_agent")]
-)
+@pytest.mark.parametrize("fn", [EDGES[n] for n in ALL_NODES if n not in ("human_handoff", "await_agent")])
 def test_every_router_sends_last_error_to_handoff(fn):
     assert (
         fn(
@@ -92,7 +89,7 @@ def test_every_router_sends_last_error_to_handoff(fn):
     ],
 )
 def test_after_await_agent(state, expected):
-    assert r.after_await_agent(state) == expected
+    assert EDGES["await_agent"](state) == expected
 
 
 def test_retry_predicate():
@@ -129,3 +126,18 @@ CHECKPOINTED_NODES = {
 
 def test_node_names_are_stable():
     assert set(ALL_NODES) == CHECKPOINTED_NODES
+
+
+def test_nodes_calling_the_llm_or_an_external_system_retry():
+    assert set(RETRYING_NODES) == {
+        "verify_identity",
+        "check_otp",
+        "check_document",
+        "fetch_purchases",
+        "assess_needs",
+        "explain_recommendation",
+        "collect_parties",
+        "collect_answers",
+        "summarize_application",
+        "submit_application",
+    }

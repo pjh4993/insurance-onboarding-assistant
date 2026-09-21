@@ -1,5 +1,6 @@
-"""Graph wiring (wiki/lifecycle.md §3). Every processing node has a conditional edge whose router
-sends a populated `last_error` to `human_handoff`."""
+"""Graph wiring (wiki/lifecycle.md §3): one flat graph assembled from the domain modules in
+`onboarding_agent.flows`. Every processing node has a conditional edge whose router sends a populated
+`last_error` to `human_handoff`."""
 
 from __future__ import annotations
 
@@ -9,24 +10,12 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import RetryPolicy
 
-from onboarding_agent import routing as r
 from onboarding_agent.deps import AgentDeps
-from onboarding_agent.nodes import Nodes
+from onboarding_agent.flows import DOMAINS
 from onboarding_agent.state import OnboardingState
 
 # Nodes that call the LLM or an external system get a RetryPolicy (exponential backoff).
-RETRYING_NODES = {
-    "verify_identity",
-    "check_otp",
-    "check_document",
-    "fetch_purchases",
-    "submit_application",
-    "assess_needs",
-    "explain_recommendation",
-    "collect_parties",
-    "collect_answers",
-    "summarize_application",
-}
+RETRYING_NODES = frozenset().union(*(d.retrying for d in DOMAINS))
 
 _PROGRAMMING_ERRORS = (AttributeError, KeyError, NameError, TypeError, LookupError, AssertionError)
 
@@ -39,34 +28,13 @@ def should_retry(exc: Exception) -> bool:
     return not isinstance(exc, _PROGRAMMING_ERRORS)
 
 
-EDGES = {
-    "greet": r.after_greet,
-    "ask_customer": r.after_ask_customer,
-    "verify_identity": r.after_verify_identity,
-    "check_otp": r.after_check_otp,
-    "check_document": r.after_check_document,
-    "fetch_purchases": r.after_fetch_purchases,
-    "assess_needs": r.after_assess_needs,
-    "check_eligibility": r.after_check_eligibility,
-    "rank_products": r.after_rank_products,
-    "quote_premium": r.after_quote_premium,
-    "explain_recommendation": r.after_explain_recommendation,
-    "await_decision": r.after_await_decision,
-    "open_application": r.after_open_application,
-    "collect_parties": r.after_collect_parties,
-    "collect_answers": r.after_collect_answers,
-    "summarize_application": r.after_summarize_application,
-    "confirm_summary": r.after_confirm_summary,
-    "submit_application": r.after_submit_application,
-    "human_handoff": r.after_human_handoff,
-    "await_agent": r.after_await_agent,
-}
+EDGES = {name: router for d in DOMAINS for name, router in d.edges.items()}
 
 ALL_NODES = list(EDGES)
 
 
 def build_graph(deps: AgentDeps, checkpointer: BaseCheckpointSaver | None) -> CompiledStateGraph:
-    nodes = Nodes(deps)
+    nodes = {name: fn for d in DOMAINS for name, fn in d.nodes(deps).items()}
     retry = RetryPolicy(
         max_attempts=deps.config.retry_max_attempts,
         initial_interval=deps.config.retry_initial_interval,
@@ -74,7 +42,7 @@ def build_graph(deps: AgentDeps, checkpointer: BaseCheckpointSaver | None) -> Co
     )
     g = StateGraph(OnboardingState)
     for name in ALL_NODES:
-        g.add_node(name, getattr(nodes, name), retry_policy=retry if name in RETRYING_NODES else None)
+        g.add_node(name, nodes[name], retry_policy=retry if name in RETRYING_NODES else None)
     g.set_entry_point("greet")
     targets = [*ALL_NODES, END]
     for name, router in EDGES.items():
