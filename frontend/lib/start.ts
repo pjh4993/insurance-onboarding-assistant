@@ -14,12 +14,13 @@ export function parseStartBody(body: unknown): StartBody | null {
 }
 
 /**
- * The client's address for the backend's per-IP limit: the first entry of X-Forwarded-For, which the ALB
- * sets to the connecting address (plus anything the client sent before it). Null when there is none.
+ * The client's address for the backend's per-IP limit: the LAST entry of X-Forwarded-For. The ALB appends
+ * the address it accepted the connection from after anything the client sent, so earlier entries are the
+ * client's own claims and would let anyone pick their rate-limit bucket. Null when there is none.
  */
 export function clientIp(forwardedFor: string | null | undefined): string | null {
-  const first = forwardedFor?.split(",")[0]?.trim();
-  return first && first.length <= 64 ? first : null;
+  const last = forwardedFor?.split(",").at(-1)?.trim();
+  return last && last.length <= 64 ? last : null;
 }
 
 /** Seconds to wait after a 429: the body's retry_after, else the Retry-After header (seconds form). */

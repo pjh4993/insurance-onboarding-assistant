@@ -21,17 +21,21 @@ describe("parseStartBody", () => {
 });
 
 describe("clientIp", () => {
-  it("takes the first X-Forwarded-For entry", () => {
+  it("takes the last X-Forwarded-For entry, the one the ALB appended", () => {
     expect(clientIp("203.0.113.7")).toBe("203.0.113.7");
-    expect(clientIp(" 203.0.113.7 , 10.0.0.1, 10.0.0.2")).toBe("203.0.113.7");
-    expect(clientIp("2001:db8::1, 10.0.0.1")).toBe("2001:db8::1");
+    expect(clientIp("2001:db8::1")).toBe("2001:db8::1");
+  });
+
+  it("ignores addresses the client put in the header itself", () => {
+    expect(clientIp("1.2.3.4, 198.51.100.9")).toBe("198.51.100.9");
+    expect(clientIp(" spoofed , 5.6.7.8 , 203.0.113.7 ")).toBe("203.0.113.7");
   });
 
   it("is null without a usable address", () => {
     expect(clientIp(null)).toBeNull();
     expect(clientIp(undefined)).toBeNull();
     expect(clientIp("")).toBeNull();
-    expect(clientIp(" , 10.0.0.1")).toBeNull();
+    expect(clientIp("10.0.0.1, ")).toBeNull();
     expect(clientIp("x".repeat(65))).toBeNull();
   });
 });
