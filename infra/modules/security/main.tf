@@ -72,6 +72,16 @@ resource "aws_vpc_security_group_egress_rule" "alb_to_frontend" {
   referenced_security_group_id = aws_security_group.frontend.id
 }
 
+# The ALB's authenticate-cognito action calls the Cognito token and userinfo endpoints itself.
+resource "aws_vpc_security_group_egress_rule" "alb_to_idp" {
+  security_group_id = aws_security_group.alb.id
+  description       = "ALB to the Cognito IdP endpoints"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
 # --- Frontend ---------------------------------------------------------------
 
 resource "aws_vpc_security_group_ingress_rule" "frontend_from_alb" {
