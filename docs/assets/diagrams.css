@@ -1,0 +1,20 @@
+/* Inlined SVG diagrams (see .mkdocs/hooks.py). Material sizes a <figure> to fit its content, and the SVG sizes
+   itself to 100% of the figure, so neither has a width and the browser falls back to ~300px. Give the figure
+   the column's width; the SVG's own max-width keeps small diagrams at their drawn size. */
+.md-typeset figure.diagram {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin: 1.5em 0;
+}
+
+.md-typeset figure.diagram > svg {
+  width: 100%;
+  height: auto;
+}
+
+/* The diagrams are drawn 950–1240px wide; the default ~61rem grid leaves a ~690px column between the two
+   sidebars, which shrinks diagram text to ~7px. A wider grid gives the column ~900px on a desktop screen. */
+.md-grid {
+  max-width: 1440px;
+}

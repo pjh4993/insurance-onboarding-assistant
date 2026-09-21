@@ -69,6 +69,7 @@ theme:
 extra_css:
   - assets/huggingface.css
   - assets/svg-zoom.css
+  - assets/diagrams.css
 
 # Inline SVG diagrams zoom on click. glightbox cannot: it only opens <img>.
 extra_javascript:
