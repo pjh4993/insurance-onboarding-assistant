@@ -207,28 +207,13 @@ resource "aws_lb_listener_rule" "agent_cognito" {
 }
 
 # ---------------------------------------------------------------------------
-# /docs: the design docs site. Behind the same Cognito login as /agent when a
-# domain is set; plain forward in HTTP-only mode.
+# /docs: the design docs site, public (no login) on whichever listener serves
+# traffic: HTTPS with a domain, HTTP without one.
 # ---------------------------------------------------------------------------
 
-resource "aws_lb_listener_rule" "docs_cognito" {
-  count = local.https_enabled ? 1 : 0
-
-  listener_arn = aws_lb_listener.https[0].arn
+resource "aws_lb_listener_rule" "docs" {
+  listener_arn = local.https_enabled ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
   priority     = 20
-
-  action {
-    type = "authenticate-cognito"
-
-    authenticate_cognito {
-      user_pool_arn              = var.cognito.user_pool_arn
-      user_pool_client_id        = var.cognito.user_pool_client_id
-      user_pool_domain           = var.cognito.user_pool_domain
-      on_unauthenticated_request = "authenticate"
-      scope                      = "openid email profile"
-      session_timeout            = 28800
-    }
-  }
 
   action {
     type             = "forward"
@@ -242,20 +227,8 @@ resource "aws_lb_listener_rule" "docs_cognito" {
   }
 }
 
-resource "aws_lb_listener_rule" "docs_http" {
-  count = local.https_enabled ? 0 : 1
-
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 20
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.docs.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/docs", "/docs/*"]
-    }
-  }
+# The rule used to authenticate first; keep the same rule (and its priority) rather than recreate it.
+moved {
+  from = aws_lb_listener_rule.docs_cognito[0]
+  to   = aws_lb_listener_rule.docs
 }

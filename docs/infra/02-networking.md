@@ -166,8 +166,8 @@ flowchart LR
 
 1. When a domain is set (develop: `onboardassist.click`), the HTTPS listener has a rule for `/agent`, `/agent/*`
    and `/api/agent/*` with an `authenticate-cognito` action. The console's own API calls are covered by the same
-   ALB session cookie (8 hours). A second rule does the same for `/docs` and `/docs/*`, forwarding to the docs
-   site, so the design docs need the same login.
+   ALB session cookie (8 hours). `/docs` and `/docs/*` go to the docs site through a plain forward rule, with no
+   login: the design docs are public.
 2. The Cognito user pool accepts only accounts an admin creates (email as username, optional TOTP MFA).
 3. After login, the ALB adds `x-amzn-oidc-identity` (the user's `sub`) and a signed JWT, `x-amzn-oidc-data`, to
    each request it forwards.
