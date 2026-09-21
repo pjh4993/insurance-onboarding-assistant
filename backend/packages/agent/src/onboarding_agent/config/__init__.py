@@ -10,8 +10,10 @@ removing one is a major version, which only an agent built for that major will l
 
 from __future__ import annotations
 
+import getpass
 import json
 from collections.abc import Collection, Mapping
+from datetime import UTC, datetime
 from functools import cache
 from importlib.resources import files
 from typing import Any
@@ -50,6 +52,7 @@ def load_from(bundle: Store, *, version: str | None = None, allowed_model_ids: C
     loaded = Bundle.parse(bundle.read, agent_spec(), source=bundle.location, allowed_model_ids=allowed_model_ids)
     if version is not None and loaded.version != version:
         raise ConfigError(f"{bundle.location}: config.json says version {loaded.version}, its directory says {version}")
+    loaded.files = {path: bundle.read(path) for path in bundle_paths(bundle)}
     return loaded
 
 
@@ -127,6 +130,52 @@ def publish(
     return publish_bundle(draft, base, release=release, allowed_model_ids=allowed_model_ids).version
 
 
+BUMPS = ("patch", "minor")
+
+
+def next_version(base: Store, current: str, bump: str = "patch") -> str:
+    """The version a push of a bundle at `current` gets: one `bump` above the latest published version of its
+    major, or `current` itself when that major has nothing published yet. A new major is a new contract with
+    the code, so it is never picked automatically."""
+    if bump not in BUMPS:
+        raise ConfigError(f"bump must be one of {BUMPS}, not {bump!r}")
+    major = semver(current)[0]
+    same_major = [v for v in published(base) if semver(v)[0] == major]
+    if not same_major:
+        return current
+    latest_major, minor, patch = semver(same_major[-1])
+    return f"{latest_major}.{minor}.{patch + 1}" if bump == "patch" else f"{latest_major}.{minor + 1}.0"
+
+
+def push_bundle(
+    bundle: Bundle,
+    base: Store,
+    *,
+    bump: str = "patch",
+    version: str | None = None,
+    release: Mapping[str, Any] | None = None,
+    allowed_model_ids: Collection[str] | None = None,
+) -> Bundle:
+    """Publish `bundle` under `base` as `version`, or as the next `bump` version (see `next_version`), noting
+    the version it was based on. Returns the published bundle."""
+    if not bundle.files:
+        raise ConfigError("this bundle has no files to push; load it with Bundle.from_pretrained")
+    target = version or next_version(base, bundle.version, bump)
+    files = dict(bundle.files)
+    config = json.loads(files["config.json"])
+    config["version"] = target
+    files["config.json"] = (json.dumps(config, ensure_ascii=False, indent=2) + "\n").encode()
+    note = {
+        "published_by": getpass.getuser(),
+        "published_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "via": "push_to_hub",
+        "based_on": bundle.version if bundle.version in published(base) else None,
+        **(release or {}),
+    }
+    with draft_store(files) as draft:
+        return publish_bundle(draft, base, release=note, allowed_model_ids=allowed_model_ids)
+
+
 def release_of(base: Store, version: str) -> dict[str, Any]:
     """The release note of a published version ({} for one published without)."""
     bundle = base.sub(version)
@@ -168,6 +217,9 @@ __all__ = [
     "draft_store",
     "open_store",
     "publish",
+    "BUMPS",
+    "next_version",
     "publish_bundle",
+    "push_bundle",
     "release_of",
 ]

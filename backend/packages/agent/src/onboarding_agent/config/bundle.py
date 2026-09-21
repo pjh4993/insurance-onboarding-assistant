@@ -101,6 +101,59 @@ class Bundle:
         self._billing = billing
         self._copy = copy
         self._llm = llm
+        # The raw files it was read from ({relative path: bytes}), for save_pretrained and push_to_hub.
+        self.files: dict[str, bytes] = {}
+
+    # --------------------------------------------------------------------------------- hub
+
+    @classmethod
+    def from_pretrained(cls, repo: str | None = None, version: str | None = None, **kwargs: Any) -> Bundle:
+        """Load a bundle from a repo (a local path or fsspec URI holding versions, or one bundle directory) at
+        `version` (exact or a prefix; default the newest this agent supports). No repo: the shipped baseline.
+        Keyword arguments go to `load_bundle` (allowed_model_ids, storage_options)."""
+        from onboarding_agent.config import load_bundle
+
+        return load_bundle(repo, version, **kwargs)
+
+    def save_pretrained(self, directory: str) -> list[str]:
+        """Write this bundle's files into an empty directory (a local path or fsspec URI) to edit them."""
+        from onboarding_agent.config.source import open_store
+
+        target = open_store(directory)
+        if target.files():
+            raise ConfigError(f"{directory} is not empty")
+        for path, data in self.files.items():
+            target.write(path, data)
+        return sorted(self.files)
+
+    def push_to_hub(
+        self,
+        repo: str,
+        *,
+        bump: str = "patch",
+        version: str | None = None,
+        notes: str = "",
+        published_by: str | None = None,
+        storage_options: Mapping[str, Any] | None = None,
+        allowed_model_ids: Collection[str] | None = None,
+    ) -> str:
+        """Publish this bundle to `repo` as the next `bump` ("patch" or "minor") above the latest version of its
+        major there, or as `version`. Validated first; published versions are never overwritten. Returns the
+        version it was published as."""
+        from onboarding_agent.config import push_bundle
+        from onboarding_agent.config.source import open_store
+
+        release: dict[str, Any] = {"notes": notes}
+        if published_by:
+            release["published_by"] = published_by
+        return push_bundle(
+            self,
+            open_store(repo, storage_options),
+            bump=bump,
+            version=version,
+            release=release,
+            allowed_model_ids=allowed_model_ids,
+        ).version
 
     # --------------------------------------------------------------------------------- reading
 

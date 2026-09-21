@@ -5,10 +5,13 @@ Locations are local paths or fsspec URIs (s3://bucket/prefix, memory://..., ...)
     python -m onboarding_agent.config validate <dir | s3://bucket/prefix> [--version 1.2]
     python -m onboarding_agent.config versions <dir | s3://bucket/prefix>
     python -m onboarding_agent.config pull     <dir | s3://bucket/prefix> <dest-dir> [--version 1.2.0]
+    python -m onboarding_agent.config push     <bundle-dir> <dir | s3://bucket/prefix> [--bump patch|minor]
     python -m onboarding_agent.config publish  <bundle-dir> <dir | s3://bucket/prefix>
 
-The usual edit: pull the version in use, change it, bump `version` in config.json, validate the local copy,
-publish it, then restart the backend (it reads the bundle once, at startup). `--allowed-models` checks the
+The usual edit: pull the version in use, change it, push it (the next patch or minor version is picked for
+you; `publish` instead takes the version written in config.json), then restart the backend (it reads the
+bundle once, at startup). In Python: Bundle.from_pretrained(...).save_pretrained(dir), edit, then
+Bundle.from_pretrained(dir).push_to_hub(repo, bump="minor"). `--allowed-models` checks the
 bundle's model ids against a comma-separated list, as the backend does with LLM_ALLOWED_MODEL_IDS."""
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ import getpass
 import sys
 from datetime import UTC, datetime
 
-from onboarding_agent.config import ConfigError, load_bundle, publish
+from onboarding_agent.config import Bundle, ConfigError, load_bundle, publish
 from onboarding_agent.config.source import open_store, published, pull, resolve
 
 
@@ -35,6 +38,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("uri")
     p.add_argument("dest", help="an empty directory: a local path or an fsspec URI")
     p.add_argument("--version")
+    push = sub.add_parser("push", help="publish a bundle as the next patch/minor version (push_to_hub)")
+    push.add_argument("bundle_dir", help="the edited bundle: a local path or fsspec URI")
+    push.add_argument("uri", help="the repo to publish to")
+    push.add_argument("--bump", choices=["patch", "minor"], default="patch")
+    push.add_argument("--version", help="publish as exactly this version instead of bumping")
+    push.add_argument("--notes", default="", help="what changed, kept in the version's release.json")
+    push.add_argument("--allowed-models")
     pub = sub.add_parser("publish", help="validate a local bundle and publish it under its version")
     pub.add_argument("bundle_dir")
     pub.add_argument("uri")
@@ -56,6 +66,17 @@ def main(argv: list[str] | None = None) -> int:
             bundle, version = resolve(open_store(args.uri), args.version)
             files = pull(bundle, args.dest)
             print(f"pulled {version or bundle.location}: {len(files)} files into {args.dest}")
+        elif args.command == "push":
+            bundle = Bundle.from_pretrained(args.bundle_dir)
+            version = bundle.push_to_hub(
+                args.uri,
+                bump=args.bump,
+                version=args.version,
+                notes=args.notes,
+                allowed_model_ids=allowed(args.allowed_models),
+            )
+            target = f"{args.uri.rstrip('/')}/{version}/"
+            print(f"pushed {version} (from {bundle.version}) to {target} — restart the backend to use it")
         elif args.command == "publish":
             release = {
                 "published_by": getpass.getuser(),

@@ -230,3 +230,58 @@ def test_s3fs_turns_create_into_a_conditional_put():
 
     source = inspect.getsource(s3fs.S3FileSystem._pipe_file)
     assert 'mode == "create"' in source and "IfNoneMatch" in source
+
+
+# ------------------------------------------------------------------------------------------ push_to_hub
+
+
+def test_push_to_hub_picks_the_next_version(tmp_path):
+    from onboarding_agent.config import Bundle, release_of
+
+    repo = str(tmp_path / "hub")
+    baseline = Bundle.from_pretrained()
+    assert baseline.push_to_hub(repo, notes="first") == "1.0.0"  # nothing published yet: its own version
+    assert baseline.push_to_hub(repo) == "1.0.1"
+    assert baseline.push_to_hub(repo, bump="minor", notes="new copy") == "1.1.0"
+    assert baseline.push_to_hub(repo, version="1.4.2") == "1.4.2"
+    assert published_versions(tmp_path / "hub") == ["1.0.0", "1.0.1", "1.1.0", "1.4.2"]
+
+    base = open_store(repo)
+    note = release_of(base, "1.1.0")
+    assert note["notes"] == "new copy" and note["via"] == "push_to_hub" and note["based_on"] == "1.0.0"
+    assert json.loads(base.sub("1.1.0").read("config.json"))["version"] == "1.1.0"
+    with pytest.raises(ConfigError, match="bump must be one of"):
+        baseline.push_to_hub(repo, bump="major")
+
+
+def test_pull_edit_push_round_trip(tmp_path):
+    from onboarding_agent.config import Bundle
+
+    repo = str(tmp_path / "hub")
+    Bundle.from_pretrained().push_to_hub(repo)
+    work = tmp_path / "work"
+    Bundle.from_pretrained(repo).save_pretrained(str(work))
+    profiling = json.loads((work / "flows" / "profiling.json").read_text())
+    profiling["copy"]["needs_complete"]["en"] = "Thanks! Checking what fits you now."
+    (work / "flows" / "profiling.json").write_text(json.dumps(profiling, ensure_ascii=False))
+
+    edited = Bundle.from_pretrained(str(work))
+    assert edited.push_to_hub(repo, bump="minor") == "1.1.0"
+    assert Bundle.from_pretrained(repo).text("profiling.needs_complete", "en") == "Thanks! Checking what fits you now."
+    # a broken edit is refused before anything is written
+    profiling["copy"]["needs_complete"]["en"] = "Thanks {name}"
+    (work / "flows" / "profiling.json").write_text(json.dumps(profiling, ensure_ascii=False))
+    with pytest.raises(ConfigError, match="unknown placeholder"):
+        Bundle.from_pretrained(str(work))
+    assert published_versions(tmp_path / "hub") == ["1.0.0", "1.1.0"]
+
+
+def test_cli_push(tmp_path, capsys):
+    from onboarding_agent.config.__main__ import main
+
+    repo = str(tmp_path / "hub")
+    assert main(["push", str(BASELINE), repo, "--notes", "baseline"]) == 0
+    assert main(["push", str(BASELINE), repo, "--bump", "minor"]) == 0
+    assert "pushed 1.1.0 (from 1.0.0)" in capsys.readouterr().out
+    assert main(["versions", repo]) == 0
+    assert capsys.readouterr().out.split() == ["1.0.0", "1.1.0"]
