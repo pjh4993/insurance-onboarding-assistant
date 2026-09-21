@@ -1,4 +1,4 @@
-"""Customer-facing copy (KR in Korean, US in English) and message constructors."""
+"""Customer-facing copy in the session's language (`ko` or `en`) and message constructors."""
 
 from __future__ import annotations
 
@@ -8,11 +8,17 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from onboarding_core.locale import Locale, default_locale
 from onboarding_core.util import iso
 
 
-def t(market: str, ko: str, en: str) -> str:
-    return ko if market == "KR" else en
+def locale_of(state: dict[str, Any]) -> Locale:
+    """The language for copy and LLM replies. Checkpoints written before `locale` existed fall back to the market."""
+    return state.get("locale") or default_locale(state["market"])
+
+
+def t(locale: str, ko: str, en: str) -> str:
+    return ko if locale == "ko" else en
 
 
 def say(text: str, now: datetime) -> AIMessage:
@@ -44,13 +50,13 @@ def money(amount_minor: int, currency: str) -> str:
 
 
 BILLING = {
-    "KR": {"MONTHLY": "월", "ONE_TIME": "1회", "PER_TRIP": "여행 1건"},
-    "US": {"MONTHLY": "month", "ONE_TIME": "one-time", "PER_TRIP": "trip"},
+    "ko": {"MONTHLY": "월", "ONE_TIME": "1회", "PER_TRIP": "여행 1건"},
+    "en": {"MONTHLY": "month", "ONE_TIME": "one-time", "PER_TRIP": "trip"},
 }
 
 
-def price_label(market: str, premium_minor: int, currency: str, billing_period: str) -> str:
-    unit = BILLING.get(market, BILLING["US"]).get(billing_period, billing_period)
+def price_label(locale: str, premium_minor: int, currency: str, billing_period: str) -> str:
+    unit = BILLING.get(locale, BILLING["en"]).get(billing_period, billing_period)
     return f"{money(premium_minor, currency)}/{unit}"
 
 
@@ -87,8 +93,8 @@ FIELD_LABELS: dict[str, tuple[str, str]] = {
 }
 
 
-def field_list(market: str, fields: list[str]) -> str:
-    labels = [FIELD_LABELS.get(f, (f, f))[0 if market == "KR" else 1] for f in fields]
+def field_list(locale: str, fields: list[str]) -> str:
+    labels = [FIELD_LABELS.get(f, (f, f))[0 if locale == "ko" else 1] for f in fields]
     return ", ".join(labels)
 
 

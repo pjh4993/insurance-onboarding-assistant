@@ -102,6 +102,37 @@ def test_customer_full_flow_customer_a(client):
     assert CUSTOMERS["A"]["id_document_number"] not in str(detail)
 
 
+def test_session_locale_defaults_to_market_and_switches_the_next_reply(client):
+    body, h = new_session(client, "KR")
+    view = client.get("/api/customer/session", headers=h).json()
+    assert view["session"]["locale"] == "ko"
+    assert view["messages"][0]["text"].startswith("안녕하세요")
+
+    r = client.put("/api/customer/session/locale", headers=h, json={"locale": "en"})
+    assert r.status_code == 200, r.text
+    assert r.json()["locale"] == "en" and r.json()["market"] == "KR"
+    assert client.put("/api/customer/session/locale", headers=h, json={"locale": "fr"}).status_code == 422
+    assert client.put("/api/customer/session/locale", json={"locale": "en"}).status_code == 401
+
+    # messages already sent stay in Korean; the next reply follows the new language, the market stays KR
+    post_input(client, h, "IDENTITY_INFO", identity_input("A", consent=True))
+    view = wait_for(client, h, "NEEDS")
+    assert view["messages"][0]["text"].startswith("안녕하세요")
+    assert view["prompt"]["message"].isascii(), view["prompt"]["message"]
+
+    # an agent can set it too
+    r = client.put(f"/api/agent/sessions/{body['session_id']}/locale", headers=AGENT, json={"locale": "ko"})
+    assert r.status_code == 200 and r.json()["locale"] == "ko"
+
+
+def test_session_locale_can_be_chosen_at_creation(client):
+    r = client.post("/api/sessions", json={"market": "US", "locale": "ko"})
+    assert r.status_code == 201, r.text
+    view = client.get("/api/customer/session", headers={"X-Session-Token": r.json()["token"]}).json()
+    assert view["session"]["locale"] == "ko" and view["session"]["market"] == "US"
+    assert view["messages"][0]["text"].startswith("안녕하세요")
+
+
 def test_input_validation_and_auth(client):
     _, h = new_session(client, "US")
     assert client.get("/api/customer/session").status_code == 401

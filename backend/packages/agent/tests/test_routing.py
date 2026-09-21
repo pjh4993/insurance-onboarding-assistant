@@ -107,3 +107,11 @@ def test_retry_predicate():
     assert not should_retry(status(403)) and not should_retry(status(404))
     assert should_retry(httpx.ConnectTimeout("t")) and should_retry(ValueError("bad llm json"))
     assert not should_retry(KeyError("bug"))
+
+
+def test_locale_of_falls_back_to_the_market_for_old_checkpoints():
+    from onboarding_agent.texts import locale_of
+
+    assert locale_of({"market": "KR"}) == "ko"
+    assert locale_of({"market": "US"}) == "en"
+    assert locale_of({"market": "KR", "locale": "en"}) == "en"

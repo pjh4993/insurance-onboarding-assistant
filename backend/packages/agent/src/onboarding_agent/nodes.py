@@ -31,7 +31,7 @@ from onboarding_agent.llm.schemas import (
     PartiesExtraction,
     RecommendationRationale,
 )
-from onboarding_agent.texts import field_list, human, mask_phone, note, price_label, say, t
+from onboarding_agent.texts import field_list, human, locale_of, mask_phone, note, price_label, say, t
 from onboarding_core.application.models import Application
 from onboarding_core.catalog.eligibility import (
     RuleSpec,
@@ -284,7 +284,7 @@ class Nodes:
 
     def _system(self, state: dict[str, Any], party: Party, instructions: str) -> SystemMessage:
         market = state["market"]
-        language = "Korean" if market == "KR" else "English"
+        language = "Korean" if locale_of(state) == "ko" else "English"
         return SystemMessage(
             content=(
                 "You are the onboarding assistant of an insurance company.\n"
@@ -298,9 +298,9 @@ class Nodes:
     # ------------------------------------------------------------------------------------ nodes
 
     async def greet(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m = state["market"]
+        lang = locale_of(state)
         text = t(
-            m,
+            lang,
             "안녕하세요! 보험 가입을 도와드릴게요. 먼저 본인 확인을 위해 이름, 이메일, 휴대폰 번호, "
             "신분증 종류와 번호를 알려 주세요. 파트너사 구매 기록 조회(제3자 제공)에 동의하시면 "
             "확인이 더 빨라집니다.",
@@ -320,7 +320,7 @@ class Nodes:
         kind = state.get("waiting_for")
         value = interrupt({"waiting_for": kind})
         actor = state.get("actor") or "CUSTOMER"
-        m, now = state["market"], self.now()
+        lang, now = locale_of(state), self.now()
         out: dict[str, Any] = {"waiting_for": None, "last_input": kind}
 
         if kind == "IDENTITY_INFO":
@@ -340,12 +340,12 @@ class Nodes:
                 party.verification_status = "PENDING"
             await self._touch(state, "party", state["party_id"])
             consent = t(
-                m,
+                lang,
                 "동의" if value.get("third_party_consent") else "동의 안 함",
                 "yes" if value.get("third_party_consent") else "no",
             )
             text = t(
-                m,
+                lang,
                 f"본인 정보를 입력했습니다 — {party.full_name} (파트너 조회 {consent})",
                 f"Identity details submitted — {party.full_name} (partner lookup consent: {consent})",
             )
@@ -354,14 +354,14 @@ class Nodes:
             # Wrapped in a dict so it lands in an encrypted blob: the saver stores primitive
             # channel values inline in the plaintext `checkpoints.checkpoint` JSONB.
             out["otp_code"] = {"code": str(value.get("code", "")).strip()}
-            text = t(m, "인증번호를 입력했습니다.", "Entered the verification code.")
+            text = t(lang, "인증번호를 입력했습니다.", "Entered the verification code.")
         else:
             text = str(value.get("text") or "").strip() or "-"
         out["messages"] = [human(text, now, actor=actor, input_type=kind or "")]
         return out
 
     async def verify_identity(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m = state["market"]
+        lang = locale_of(state)
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
             if party.third_party_consent_at is not None:
@@ -379,7 +379,7 @@ class Nodes:
                     party.verification_method = "PARTNER_MATCH"
                     party.verified_at = self.now()
                     text = t(
-                        m,
+                        lang,
                         "파트너사 고객 정보로 본인 확인이 끝났습니다.",
                         "You're verified through your partner account.",
                     )
@@ -389,7 +389,7 @@ class Nodes:
             party.verification_status = "PENDING"
         await self._touch(state, "party", state["party_id"])
         text = t(
-            m,
+            lang,
             f"{mask_phone(party.phone)} 번호로 인증번호를 보냈습니다. 받은 6자리 번호를 입력해 주세요.",
             f"We sent a verification code to {mask_phone(party.phone)}. Please enter the 6-digit code.",
         )
@@ -401,7 +401,7 @@ class Nodes:
         }
 
     async def check_otp(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m = state["market"]
+        lang = locale_of(state)
         verified = False
         code = (state.get("otp_code") or {}).get("code")
         if state.get("otp_request_id") and code:
@@ -418,17 +418,17 @@ class Nodes:
                 party.verification_attempts = max(party.verification_attempts or 0, 1)
         await self._touch(state, "party", state["party_id"])
         if verified:
-            text = t(m, "인증번호가 확인됐습니다.", "Code verified — thank you.")
+            text = t(lang, "인증번호가 확인됐습니다.", "Code verified — thank you.")
             return {"identity_result": "OTP_OK", "otp_code": None, "messages": [say(text, self.now())]}
         text = t(
-            m,
+            lang,
             "인증번호가 맞지 않아 입력하신 신분증으로 확인해 볼게요.",
             "That code didn't work, so I'll verify the ID document you gave instead.",
         )
         return {"identity_result": "OTP_FAILED", "otp_code": None, "messages": [say(text, self.now())]}
 
     async def check_document(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m = state["market"]
+        lang = locale_of(state)
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
         verified = False
@@ -452,10 +452,10 @@ class Nodes:
                 party.verification_status = "FAILED"
         await self._touch(state, "party", state["party_id"])
         if verified:
-            text = t(m, "신분증으로 본인 확인이 끝났습니다.", "Your ID document is verified.")
+            text = t(lang, "신분증으로 본인 확인이 끝났습니다.", "Your ID document is verified.")
             return {"identity_result": "DOC_OK", "messages": [say(text, self.now())]}
         text = t(
-            m,
+            lang,
             "본인 확인을 마치지 못했습니다. 상담원을 연결해 드릴게요.",
             "I couldn't verify your identity, so I'm connecting you with an agent.",
         )
@@ -468,7 +468,7 @@ class Nodes:
     async def fetch_purchases(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         """Loads partner purchases as InsurableObjects. Without consent it does nothing — consent is a
         precondition of the node, not a branch (state-model.md §3)."""
-        m, ids = state["market"], list(state.get("insurable_object_ids") or [])
+        lang, ids = locale_of(state), list(state.get("insurable_object_ids") or [])
         found: list[str] = []
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
@@ -519,7 +519,7 @@ class Nodes:
         }
         if found:
             text = t(
-                m,
+                lang,
                 f"파트너사 구매 기록에서 {', '.join(found)} 구매를 찾았습니다.",
                 f"I found your recent purchase: {', '.join(found)}.",
             )
@@ -528,6 +528,7 @@ class Nodes:
 
     async def assess_needs(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m, now, actor = state["market"], self.now(), state.get("actor") or "CUSTOMER"
+        lang = locale_of(state)
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
             current = (
@@ -540,19 +541,19 @@ class Nodes:
             # Nothing new to assess yet: ask (first visit, after a CHANGE without text, after handoff).
             if current is not None and current.completed_at is None and current.missing_fields:
                 text = t(
-                    m,
-                    f"추천을 위해 {field_list(m, current.missing_fields)}을(를) 알려 주세요.",
-                    f"To recommend cover, please tell me {field_list(m, current.missing_fields)}.",
+                    lang,
+                    f"추천을 위해 {field_list(lang, current.missing_fields)}을(를) 알려 주세요.",
+                    f"To recommend cover, please tell me {field_list(lang, current.missing_fields)}.",
                 )
             elif current is not None and current.completed_at is not None:
                 text = t(
-                    m,
+                    lang,
                     "어떤 점을 바꾸고 싶으신가요? 달라진 내용을 알려 주세요.",
                     "What would you like to change? Tell me what's different.",
                 )
             else:
                 text = t(
-                    m,
+                    lang,
                     "이제 맞는 보험을 찾아볼게요. 나이, 직업, 거주 국가와 무엇을 보장받고 싶은지(기기, 여행 등) "
                     "알려 주세요. 기존에 가입한 보험이 있다면 함께 알려 주세요.",
                     "Now let's find the right cover. Tell me your age, occupation, where you live, and "
@@ -660,7 +661,7 @@ class Nodes:
             }
         if rounds >= MAX_NEEDS_ROUNDS:
             text = t(
-                m,
+                lang,
                 "필요한 정보를 다 받지 못해 상담원을 연결해 드릴게요.",
                 "I still don't have everything I need, so I'm bringing in an agent to help.",
             )
@@ -673,9 +674,9 @@ class Nodes:
                 "messages": [say(text, now)],
             }
         text = t(
-            m,
-            f"추천을 위해 {field_list(m, missing)}을(를) 더 알려 주세요.",
-            f"Thanks! To recommend cover I also need {field_list(m, missing)}.",
+            lang,
+            f"추천을 위해 {field_list(lang, missing)}을(를) 더 알려 주세요.",
+            f"Thanks! To recommend cover I also need {field_list(lang, missing)}.",
         )
         return {
             "needs_assessment_id": na_id,
@@ -689,6 +690,7 @@ class Nodes:
 
     async def check_eligibility(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         m, today, step = state["market"], self.now().date(), _step(config)
+        lang = locale_of(state)
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
             na = await uow.needs.get(_uuid(state["needs_assessment_id"]))
@@ -771,7 +773,7 @@ class Nodes:
         }
         if eligible == 0:
             text = t(
-                m,
+                lang,
                 "지금 알려 주신 내용으로는 가입할 수 있는 상품이 없습니다. 상담원이 이어서 도와드릴게요.\n",
                 "Based on what you told me, none of our products fit right now. An agent will follow up with you.\n",
             ) + "\n".join(f"- {r}" for r in reasons)
@@ -862,7 +864,7 @@ class Nodes:
         return sorted(await uow.recommendations.list(ids), key=lambda r: (r.rank or 0, r.product_code))
 
     async def explain_recommendation(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m = state["market"]
+        lang = locale_of(state)
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
             na = await uow.needs.get(_uuid(state["needs_assessment_id"]))
@@ -886,7 +888,7 @@ class Nodes:
             lines.append(
                 f"- recommendation_id: {r.recommendation_id}\n"
                 f"  product: {p.marketing_name} ({p.product_type}), rank {r.rank}\n"
-                f"  price: {price_label(m, q.premium_minor, q.currency, q.billing_period)}, "
+                f"  price: {price_label(lang, q.premium_minor, q.currency, q.billing_period)}, "
                 f"cover {q.term_start_date} to {q.term_end_date}\n"
                 f"  grounds: {json.dumps(grounds, ensure_ascii=False)}"
             )
@@ -911,15 +913,15 @@ class Nodes:
                 q = quotes[str(r.recommendation_id)]
                 out_lines.append(
                     f"{rec.rank}. {products[r.product_code].marketing_name} — "
-                    f"{price_label(m, q.premium_minor, q.currency, q.billing_period)}\n   {rec.rationale}"
+                    f"{price_label(lang, q.premium_minor, q.currency, q.billing_period)}\n   {rec.rationale}"
                 )
         for r in recs:
             await self._touch(state, "recommendation", r.recommendation_id)
         text = (
-            t(m, "추천 상품입니다:\n", "Here's what I recommend:\n")
+            t(lang, "추천 상품입니다:\n", "Here's what I recommend:\n")
             + "\n".join(out_lines)
             + t(
-                m,
+                lang,
                 "\n\n가입할 상품을 고르시거나, 답을 바꾸거나, 가입하지 않을 수 있어요.",
                 "\n\nChoose one to apply, change your answers, or decline.",
             )
@@ -928,7 +930,7 @@ class Nodes:
 
     async def await_decision(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         value = interrupt({"waiting_for": "DECISION"})
-        m, now, actor = state["market"], self.now(), state.get("actor") or "CUSTOMER"
+        lang, now, actor = locale_of(state), self.now(), state.get("actor") or "CUSTOMER"
         decision = value.get("decision")
         chosen_id = value.get("recommendation_id")
         extra_text = str(value.get("text") or "").strip()
@@ -946,12 +948,12 @@ class Nodes:
                 if quote is not None:
                     quote.status = "ACCEPTED"
                 product = await uow.catalog.product(rec.product_code)
-                text = t(m, f"{product.marketing_name}에 가입할게요.", f"I'd like {product.marketing_name}.")
+                text = t(lang, f"{product.marketing_name}에 가입할게요.", f"I'd like {product.marketing_name}.")
                 touched = [("recommendation", rec.recommendation_id)]
             elif decision == "DECLINE":
                 for r in eligible:
                     r.status, r.decided_by, r.decided_at = "DECLINED", actor, now
-                text = t(m, "가입하지 않을게요.", "No thanks, I'll pass.")
+                text = t(lang, "가입하지 않을게요.", "No thanks, I'll pass.")
                 touched = [("recommendation", r.recommendation_id) for r in eligible]
             else:  # CHANGE
                 for r in recs:
@@ -960,7 +962,7 @@ class Nodes:
                 for q in quotes.values():
                     if q is not None:
                         q.status = "EXPIRED"
-                text = extra_text or t(m, "답을 바꾸고 싶어요.", "I'd like to change my answers.")
+                text = extra_text or t(lang, "답을 바꾸고 싶어요.", "I'd like to change my answers.")
                 touched = [("recommendation", r.recommendation_id) for r in recs]
         for entity_type, entity_id in touched:
             await self._touch(state, entity_type, entity_id)
@@ -981,7 +983,7 @@ class Nodes:
         if decision == "DECLINE":
             out["stage"] = "DECLINED"
             out["messages"].append(
-                say(t(m, "알겠습니다. 언제든 다시 찾아 주세요.", "Understood. You're welcome back any time."), now)
+                say(t(lang, "알겠습니다. 언제든 다시 찾아 주세요.", "Understood. You're welcome back any time."), now)
             )
         elif decision == "CHANGE":
             out.update(
@@ -996,7 +998,7 @@ class Nodes:
         return out
 
     async def open_application(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m, now, step, actor = state["market"], self.now(), _step(config), state.get("actor") or "CUSTOMER"
+        lang, now, step, actor = locale_of(state), self.now(), _step(config), state.get("actor") or "CUSTOMER"
         app_id = node_uuid(_thread(config), "open_application", step)
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
@@ -1032,7 +1034,7 @@ class Nodes:
             quote_ids = {**state["quote_ids"], str(rec.recommendation_id): str(quote.quote_id)}
             name = product.marketing_name
         await self._touch(state, "application", app_id)
-        text = t(m, f"{name} 청약서를 작성할게요.", f"Great choice. Let's complete your {name} application.")
+        text = t(lang, f"{name} 청약서를 작성할게요.", f"Great choice. Let's complete your {name} application.")
         return {
             "stage": "APPLICATION",
             "application_id": str(app_id),
@@ -1045,10 +1047,10 @@ class Nodes:
         }
 
     async def collect_parties(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m, now, step = state["market"], self.now(), _step(config)
+        lang, now, step = locale_of(state), self.now(), _step(config)
         if state.get("last_input") != "PARTIES":
             text = t(
-                m,
+                lang,
                 "피보험자(보장받는 분)와 보험료를 내는 분이 모두 본인인가요? 다른 분이 있다면 그분의 역할"
                 "(피보험자/납입자), 이름, 생년월일을 알려 주세요.",
                 "Are you both the insured person and the payer? If someone else is, tell me their role "
@@ -1071,7 +1073,7 @@ class Nodes:
         others = [] if ext.all_self else [p for p in ext.parties if p.get("role") in ("INSURED", "PAYER")]
         if any(not str(p.get("full_name") or "").strip() for p in others):
             text = t(
-                m,
+                lang,
                 "다른 분의 이름과 생년월일을 알려 주세요.",
                 "Please tell me the other person's full name and date of birth.",
             )
@@ -1119,14 +1121,14 @@ class Nodes:
             application.missing_fields = missing_answers(product.required_application_fields, answers)
         await self._touch(state, "application", app_id)
         text = t(
-            m,
+            lang,
             "당사자 정보를 확인했습니다" + (f" ({', '.join(names)})." if names else " — 모두 본인입니다."),
             "Got it" + (f" ({', '.join(names)})." if names else " — you're the insured and the payer."),
         )
         return {"parties_complete": True, "last_input": None, "messages": [say(text, now)]}
 
     async def collect_answers(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m, now, actor = state["market"], self.now(), state.get("actor") or "CUSTOMER"
+        lang, now, actor = locale_of(state), self.now(), state.get("actor") or "CUSTOMER"
         app_id = _uuid(state["application_id"])
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
@@ -1171,7 +1173,7 @@ class Nodes:
         }
         if missing and rounds >= MAX_ANSWERS_ROUNDS:
             text = t(
-                m,
+                lang,
                 "청약에 필요한 정보를 다 받지 못해 상담원을 연결해 드릴게요.",
                 "I still can't complete the application, so I'm bringing in an agent to help.",
             )
@@ -1183,18 +1185,18 @@ class Nodes:
             }
         if missing:
             text = t(
-                m,
-                f"청약을 위해 {field_list(m, missing)}을(를) 알려 주세요.",
-                f"To complete the application, please provide {field_list(m, missing)}.",
+                lang,
+                f"청약을 위해 {field_list(lang, missing)}을(를) 알려 주세요.",
+                f"To complete the application, please provide {field_list(lang, missing)}.",
             )
             return {**base, "answers_complete": False, "waiting_for": "ANSWERS", "messages": [say(text, now)]}
         if state.get("confirmed") is False and not got_input:
-            text = t(m, "어떤 내용을 고칠까요?", "What would you like to change?")
+            text = t(lang, "어떤 내용을 고칠까요?", "What would you like to change?")
             return {**base, "answers_complete": False, "waiting_for": "ANSWERS", "messages": [say(text, now)]}
         return {**base, "answers_complete": True, "answers_rounds": 0}
 
     async def summarize_application(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m, now = state["market"], self.now()
+        lang, now = locale_of(state), self.now()
         app_id = _uuid(state["application_id"])
         async with self.d.uow() as uow:
             party = await self._party(uow, state)
@@ -1204,7 +1206,7 @@ class Nodes:
             parties = await self._application_parties(uow, app_id)
         facts = {
             "product": product.marketing_name,
-            "price": price_label(m, quote.premium_minor, quote.currency, quote.billing_period),
+            "price": price_label(lang, quote.premium_minor, quote.currency, quote.billing_period),
             "cover": f"{quote.term_start_date} to {quote.term_end_date}",
             "parties": parties,
             "answers": application.answers,
@@ -1223,7 +1225,7 @@ class Nodes:
             application.summary = ext.summary
             application.status = "COMPLETE"
         await self._touch(state, "application", app_id)
-        text = ext.summary + t(m, "\n\n이대로 제출할까요?", "\n\nShall I submit this application?")
+        text = ext.summary + t(lang, "\n\n이대로 제출할까요?", "\n\nShall I submit this application?")
         return {"waiting_for": "CONFIRM", "confirmed": None, "messages": [say(text, now)]}
 
     async def _application_parties(self, uow: UnitOfWork, app_id: uuid.UUID) -> list[dict[str, Any]]:
@@ -1234,16 +1236,16 @@ class Nodes:
 
     async def confirm_summary(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         value = interrupt({"waiting_for": "CONFIRM"})
-        m, now, actor = state["market"], self.now(), state.get("actor") or "CUSTOMER"
+        lang, now, actor = locale_of(state), self.now(), state.get("actor") or "CUSTOMER"
         confirmed = bool(value.get("confirmed"))
         extra = str(value.get("text") or "").strip()
         if confirmed:
             msg = human(
-                extra or t(m, "네, 제출해 주세요.", "Yes, please submit."), now, actor=actor, input_type="CONFIRM"
+                extra or t(lang, "네, 제출해 주세요.", "Yes, please submit."), now, actor=actor, input_type="CONFIRM"
             )
             return {"confirmed": True, "waiting_for": None, "messages": [msg]}
         msg = human(
-            extra or t(m, "고칠 내용이 있어요.", "I need to change something."),
+            extra or t(lang, "고칠 내용이 있어요.", "I need to change something."),
             now,
             actor=actor,
             input_type="ANSWERS" if extra else "CONFIRM",
@@ -1257,7 +1259,7 @@ class Nodes:
         }
 
     async def submit_application(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
-        m, now = state["market"], self.now()
+        lang, now = locale_of(state), self.now()
         app_id = _uuid(state["application_id"])
         async with self.d.uow() as uow:
             application = await uow.applications.get(app_id)
@@ -1294,7 +1296,7 @@ class Nodes:
                 application.submitted_at = now
         await self._touch(state, "application", app_id)
         text = t(
-            m,
+            lang,
             f"청약을 제출했습니다. 접수번호는 {ref}입니다. 심사 결과는 따로 안내해 드릴게요.",
             f"Your application is submitted. Your reference number is {ref}. We'll be in touch "
             "with the underwriting decision.",
@@ -1313,12 +1315,12 @@ class Nodes:
             "resume_node": err["node"] if err else None,
         }
         if err:
-            m = state["market"]
+            lang = locale_of(state)
             out["messages"] = [
                 note(f"Handoff: {err['node']} failed after {err['attempts']} attempts ({err['kind']}).", self.now()),
                 say(
                     t(
-                        m,
+                        lang,
                         "처리 중 문제가 생겨 상담원을 연결해 드릴게요. 입력하신 내용은 저장돼 있습니다.",
                         "Something went wrong on our side, so I'm connecting you with an agent. "
                         "Everything you've entered is saved.",
@@ -1330,7 +1332,7 @@ class Nodes:
 
     async def await_agent(self, state: dict[str, Any], config: RunnableConfig) -> dict[str, Any]:
         value = interrupt({"waiting_for": "AGENT", "reason": state.get("handoff_reason")})
-        m, now = state["market"], self.now()
+        lang, now = locale_of(state), self.now()
         resolution = value.get("resolution")
         reason = state.get("handoff_reason")
         agent_note = str(value.get("note") or "").strip()
@@ -1347,7 +1349,7 @@ class Nodes:
             out["last_input"] = None
         if resolution == "END":
             out["stage"] = "WITHDRAWN"
-            msgs.append(say(t(m, "상담원이 상담을 종료했습니다.", "The agent has closed this session."), now))
+            msgs.append(say(t(lang, "상담원이 상담을 종료했습니다.", "The agent has closed this session."), now))
         elif reason == "IDENTITY_FAILED":
             async with self.d.uow() as uow:
                 party = await self._party(uow, state)
@@ -1360,7 +1362,9 @@ class Nodes:
                     party.verification_attempts = 0
             await self._touch(state, "party", state["party_id"])
             if resolution == "VERIFIED":
-                msgs.append(say(t(m, "상담원이 본인 확인을 마쳤습니다.", "An agent has verified your identity."), now))
+                msgs.append(
+                    say(t(lang, "상담원이 본인 확인을 마쳤습니다.", "An agent has verified your identity."), now)
+                )
         elif reason in ("NO_ELIGIBLE_PRODUCT", "NEEDS_INCOMPLETE"):
             out.update(stage="PROFILING", needs_complete=False, needs_rounds=0)
         elif reason == "ANSWERS_INCOMPLETE":

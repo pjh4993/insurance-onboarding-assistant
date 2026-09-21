@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 
-from app.api.schemas import CreateSessionBody, InputBody, validate_data
+from app.api.schemas import CreateSessionBody, InputBody, LocaleBody, validate_data
 from app.db.models import OnboardingSession
 from app.services.pubsub import Broker, sse_frame
 from app.services.runtime import InputError, Runtime
@@ -64,6 +64,12 @@ async def _accept_input(rt: Runtime, session: OnboardingSession, body: InputBody
     return JSONResponse({"accepted": True}, status_code=202)
 
 
+async def _set_locale(rt: Runtime, session: OnboardingSession, locale: str) -> dict[str, Any]:
+    updated = await rt.set_locale(str(session.session_id), locale)
+    view = await rt.session_view(updated)
+    return view["session"]
+
+
 def _stream(request: Request, session_id: str | None, initial: list[str]) -> StreamingResponse:
     b: Broker = request.app.state.broker
     ping = request.app.state.settings.sse_ping_seconds
@@ -80,7 +86,7 @@ async def healthz() -> dict[str, str]:
 
 @router.post("/api/sessions", status_code=201)
 async def create_session(body: CreateSessionBody, rt: RuntimeDep) -> dict[str, Any]:
-    session, token = await rt.create_session(body.market)
+    session, token = await rt.create_session(body.market, body.locale)
     return {"session_id": str(session.session_id), "token": token, "customer_path": f"/s/{token}"}
 
 
@@ -99,6 +105,13 @@ async def customer_input(
     if body.type == "AGENT":
         raise HTTPException(403, "AGENT input is for agents only")
     return await _accept_input(rt, session, body, "CUSTOMER")
+
+
+@router.put("/api/customer/session/locale")
+async def customer_locale(
+    body: LocaleBody, rt: RuntimeDep, session: Annotated[OnboardingSession, Depends(customer_session)]
+):
+    return await _set_locale(rt, session, body.locale)
 
 
 @router.get("/api/customer/session/stream")
@@ -141,6 +154,11 @@ async def agent_assign(
 @router.post("/api/agent/sessions/{session_id}/input", status_code=202)
 async def agent_input(body: InputBody, rt: RuntimeDep, session: Annotated[OnboardingSession, Depends(agent_session)]):
     return await _accept_input(rt, session, body, "AGENT")
+
+
+@router.put("/api/agent/sessions/{session_id}/locale")
+async def agent_locale(body: LocaleBody, rt: RuntimeDep, session: Annotated[OnboardingSession, Depends(agent_session)]):
+    return await _set_locale(rt, session, body.locale)
 
 
 @router.get("/api/agent/sessions/{session_id}/stream")

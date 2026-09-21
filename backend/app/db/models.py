@@ -145,6 +145,7 @@ class OnboardingSession(Base):
     thread_id: Mapped[str] = mapped_column(String(64), unique=True)
     party_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("domain.party.party_id"))
     market: Mapped[str] = mapped_column(String(2))
+    locale: Mapped[str] = mapped_column(String(5))
     token_hmac: Mapped[str] = mapped_column(String(64), unique=True)
     token_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(16), default="ACTIVE")

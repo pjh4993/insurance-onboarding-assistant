@@ -31,10 +31,11 @@ class OnboardingState(TypedDict, total=False):
     actor: Literal["CUSTOMER", "AGENT"]
     mode: Literal["AUTO", "ASSIST"]
 
-    # session context (ids and market only)
+    # session context (ids, market and language only)
     session_id: str
     party_id: str
     market: Literal["KR", "US"]
+    locale: Literal["ko", "en"]  # copy and LLM replies; mirrors OnboardingSession.locale on every resume
 
     # progress
     stage: Stage
@@ -69,7 +70,7 @@ class OnboardingState(TypedDict, total=False):
     last_error: ErrorInfo | None
 
 
-def initial_state(*, session_id: str, party_id: str, market: str) -> dict[str, Any]:
+def initial_state(*, session_id: str, party_id: str, market: str, locale: str) -> dict[str, Any]:
     return {
         "messages": [],
         "actor": "CUSTOMER",
@@ -77,6 +78,7 @@ def initial_state(*, session_id: str, party_id: str, market: str) -> dict[str, A
         "session_id": session_id,
         "party_id": party_id,
         "market": market,
+        "locale": locale,
         "stage": "IDENTITY",
         "waiting_for": None,
         "last_input": None,

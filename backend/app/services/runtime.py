@@ -28,6 +28,7 @@ from app.services import views
 from app.services.pubsub import Broker, Event
 from onboarding_agent import AgentRunner, AgentSnapshot, MessageSink
 from onboarding_core.crypto import hmac_hex
+from onboarding_core.locale import default_locale
 from onboarding_core.ports import EntityListener
 from onboarding_core.util import Clock, utcnow
 
@@ -95,8 +96,9 @@ class Runtime:
 
     # ------------------------------------------------------------------------------- sessions
 
-    async def create_session(self, market: str) -> tuple[OnboardingSession, str]:
+    async def create_session(self, market: str, locale: str | None = None) -> tuple[OnboardingSession, str]:
         now = self.clock()
+        locale = locale or default_locale(market)
         token = secrets.token_urlsafe(32)
         session_id, party_id = uuid.uuid4(), uuid.uuid4()
         async with self.sessionmaker() as s, s.begin():
@@ -109,6 +111,7 @@ class Runtime:
                 thread_id=str(session_id),
                 party_id=party_id,
                 market=market,
+                locale=locale,
                 token_hmac=hmac_hex(self.settings.session_hmac_key, token),
                 token_expires_at=now + timedelta(hours=self.settings.session_link_ttl_hours),
                 status="ACTIVE",
@@ -118,7 +121,7 @@ class Runtime:
                 last_activity_at=now,
             )
             s.add(session)
-        log.info("session created", extra={"session_id": str(session_id), "market": market})
+        log.info("session created", extra={"session_id": str(session_id), "market": market, "locale": locale})
         await self._run(
             session,
             lambda sink, extra: self.agent.start(
@@ -126,6 +129,7 @@ class Runtime:
                 session_id=str(session_id),
                 party_id=str(party_id),
                 market=market,
+                locale=locale,
                 on_message=sink,
                 log_extra=extra,
             ),
@@ -146,12 +150,12 @@ class Runtime:
             state = (await self.agent.snapshot(session.thread_id)).values
             if str(data["recommendation_id"]) not in (state.get("quote_ids") or {}):
                 raise InputError(422, "recommendation_id is not one of the offered recommendations")
-        mode = session.mode
+        mode, locale = session.mode, session.locale
         self._tasks[sid] = asyncio.create_task(
             self._run(
                 session,
                 lambda sink, extra: self.agent.resume(
-                    session.thread_id, data, actor=actor, mode=mode, on_message=sink, log_extra=extra
+                    session.thread_id, data, actor=actor, mode=mode, locale=locale, on_message=sink, log_extra=extra
                 ),
             )
         )
@@ -169,6 +173,17 @@ class Runtime:
             session.assigned_agent_id = agent_id
             session.mode = "ASSIST"
             session.last_activity_at = self.clock()
+        await self._publish_summary(session)
+        return session
+
+    async def set_locale(self, session_id: str, locale: str) -> OnboardingSession | None:
+        """Only the session row changes here. The graph picks the new language up on its next resume, so a
+        node that is running finishes in the old one and messages already sent are left as they were."""
+        async with self.sessionmaker() as s, s.begin():
+            session = await s.get(OnboardingSession, uuid.UUID(session_id))
+            if session is None:
+                return None
+            session.locale = locale
         await self._publish_summary(session)
         return session
 

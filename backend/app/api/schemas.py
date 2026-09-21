@@ -9,8 +9,16 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 InputType = Literal["IDENTITY_INFO", "OTP_CODE", "NEEDS", "DECISION", "PARTIES", "ANSWERS", "CONFIRM", "AGENT"]
 
 
+Locale = Literal["ko", "en"]
+
+
 class CreateSessionBody(BaseModel):
     market: Literal["KR", "US"]
+    locale: Locale | None = None  # defaults to the market's language
+
+
+class LocaleBody(BaseModel):
+    locale: Locale
 
 
 class InputBody(BaseModel):
@@ -74,4 +82,4 @@ def validate_data(input_type: str, data: dict[str, Any]) -> dict[str, Any]:
     return DATA_MODELS[input_type].model_validate(data).model_dump(exclude_none=True)
 
 
-__all__ = ["DATA_MODELS", "CreateSessionBody", "InputBody", "ValidationError", "validate_data"]
+__all__ = ["DATA_MODELS", "CreateSessionBody", "InputBody", "LocaleBody", "ValidationError", "validate_data"]

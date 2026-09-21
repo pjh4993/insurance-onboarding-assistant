@@ -62,10 +62,11 @@ class AgentRunner:
         session_id: str,
         party_id: str,
         market: str,
+        locale: str,
         on_message: MessageSink,
         log_extra: Mapping[str, Any] | None = None,
     ) -> None:
-        state = initial_state(session_id=session_id, party_id=party_id, market=market)
+        state = initial_state(session_id=session_id, party_id=party_id, market=market, locale=locale)
         await self._run(thread_id, state, on_message, log_extra)
 
     async def resume(
@@ -75,10 +76,12 @@ class AgentRunner:
         *,
         actor: str,
         mode: str,
+        locale: str,
         on_message: MessageSink,
         log_extra: Mapping[str, Any] | None = None,
     ) -> None:
-        command = Command(resume=data, update={"actor": actor, "mode": mode})
+        # The session's current language rides on every resume, so a change applies from the next step on.
+        command = Command(resume=data, update={"actor": actor, "mode": mode, "locale": locale})
         await self._run(thread_id, command, on_message, log_extra)
 
     async def snapshot(self, thread_id: str) -> AgentSnapshot:
