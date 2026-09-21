@@ -1,0 +1,423 @@
+{
+ "turns": [
+  {
+   "input": "(start)",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "IDENTITY_INFO",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "assistant",
+     "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "IDENTITY_INFO",
+    "message": "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+   }
+  },
+  {
+   "input": "IDENTITY_INFO",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "OTP_CODE",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "Identity details submitted — John Roe (partner lookup consent: yes)"
+    ],
+    [
+     "assistant",
+     "We sent a verification code to ********0102. Please enter the 6-digit code."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "OTP_CODE",
+    "message": "We sent a verification code to ********0102. Please enter the 6-digit code."
+   }
+  },
+  {
+   "input": "OTP_CODE",
+   "session": {
+    "status": "HANDOFF",
+    "last_stage": "HANDOFF",
+    "waiting_for": "AGENT",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "await_agent"
+   },
+   "messages": [
+    [
+     "customer",
+     "Entered the verification code."
+    ],
+    [
+     "assistant",
+     "That code didn't work, so I'll verify the ID document you gave instead."
+    ],
+    [
+     "assistant",
+     "I couldn't verify your identity, so I'm connecting you with an agent."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "AGENT",
+    "message": "I couldn't verify your identity, so I'm connecting you with an agent."
+   }
+  },
+  {
+   "input": "AGENT",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "PROFILING",
+    "waiting_for": "NEEDS",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "agent",
+     "Checked ID in person."
+    ],
+    [
+     "assistant",
+     "An agent has verified your identity."
+    ],
+    [
+     "assistant",
+     "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "NEEDS",
+    "message": "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+   }
+  },
+  {
+   "input": "NEEDS",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "PROFILING",
+    "waiting_for": "NEEDS",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "I need phone insurance."
+    ],
+    [
+     "assistant",
+     "Thanks! To recommend cover I also need your age, the device purchase price."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "NEEDS",
+    "message": "Thanks! To recommend cover I also need your age, the device purchase price."
+   }
+  },
+  {
+   "input": "NEEDS",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "PROFILING",
+    "waiting_for": "NEEDS",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "I need phone insurance."
+    ],
+    [
+     "assistant",
+     "Thanks! To recommend cover I also need your age, the device purchase price."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "NEEDS",
+    "message": "Thanks! To recommend cover I also need your age, the device purchase price."
+   }
+  },
+  {
+   "input": "NEEDS",
+   "session": {
+    "status": "HANDOFF",
+    "last_stage": "HANDOFF",
+    "waiting_for": "AGENT",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "await_agent"
+   },
+   "messages": [
+    [
+     "customer",
+     "I need phone insurance."
+    ],
+    [
+     "assistant",
+     "I still don't have everything I need, so I'm bringing in an agent to help."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "AGENT",
+    "message": "I still don't have everything I need, so I'm bringing in an agent to help."
+   }
+  },
+  {
+   "input": "AGENT",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "PROFILING",
+    "waiting_for": "NEEDS",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "agent",
+     "Agent resolution: CONTINUE"
+    ],
+    [
+     "assistant",
+     "To recommend cover, please tell me your age, the device purchase price."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "NEEDS",
+    "message": "To recommend cover, please tell me your age, the device purchase price."
+   }
+  },
+  {
+   "input": "NEEDS",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "PROFILING",
+    "waiting_for": "NEEDS",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "I need phone insurance."
+    ],
+    [
+     "assistant",
+     "Thanks! To recommend cover I also need your age, the device purchase price."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "NEEDS",
+    "message": "Thanks! To recommend cover I also need your age, the device purchase price."
+   }
+  },
+  {
+   "input": "NEEDS",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "PROFILING",
+    "waiting_for": "NEEDS",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "I need phone insurance."
+    ],
+    [
+     "assistant",
+     "Thanks! To recommend cover I also need your age, the device purchase price."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "NEEDS",
+    "message": "Thanks! To recommend cover I also need your age, the device purchase price."
+   }
+  },
+  {
+   "input": "NEEDS",
+   "session": {
+    "status": "HANDOFF",
+    "last_stage": "HANDOFF",
+    "waiting_for": "AGENT",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "await_agent"
+   },
+   "messages": [
+    [
+     "customer",
+     "I need phone insurance."
+    ],
+    [
+     "assistant",
+     "I still don't have everything I need, so I'm bringing in an agent to help."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "AGENT",
+    "message": "I still don't have everything I need, so I'm bringing in an agent to help."
+   }
+  },
+  {
+   "input": "AGENT",
+   "session": {
+    "status": "WITHDRAWN",
+    "last_stage": "WITHDRAWN",
+    "waiting_for": null,
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": null
+   },
+   "messages": [
+    [
+     "agent",
+     "Agent resolution: END"
+    ],
+    [
+     "assistant",
+     "The agent has closed this session."
+    ]
+   ],
+   "prompt": null
+  }
+ ],
+ "node_path": [
+  "__start__",
+  "greet",
+  "ask_customer",
+  "verify_identity",
+  "ask_customer",
+  "check_otp",
+  "check_document",
+  "human_handoff",
+  "await_agent",
+  "fetch_purchases",
+  "assess_needs",
+  "ask_customer",
+  "assess_needs",
+  "ask_customer",
+  "assess_needs",
+  "ask_customer",
+  "assess_needs",
+  "human_handoff",
+  "await_agent",
+  "assess_needs",
+  "ask_customer",
+  "assess_needs",
+  "ask_customer",
+  "assess_needs",
+  "ask_customer",
+  "assess_needs",
+  "human_handoff",
+  "await_agent",
+  "(end)"
+ ],
+ "entities": {
+  "party": {
+   "party_id": "<uuid>",
+   "party_type": "PERSON",
+   "full_name": "John Roe",
+   "email": "john.roe@example.com",
+   "phone": "+12065550102",
+   "date_of_birth": null,
+   "id_document_type": "DRIVER_LICENSE",
+   "third_party_consent_at": "2026-09-21T03:00:00Z",
+   "partner_customer_ref": null,
+   "verification_status": "VERIFIED",
+   "verification_method": "AGENT",
+   "verification_attempts": 2,
+   "verified_at": "2026-09-21T03:00:00Z"
+  },
+  "needs_assessment": {
+   "needs_assessment_id": "<uuid>",
+   "version": 1,
+   "age_range": null,
+   "occupation": null,
+   "residence_country": "US",
+   "existing_coverage": [],
+   "objectives": [
+    "PROTECT_DEVICE"
+   ],
+   "device": {
+    "device_category": "SMARTPHONE"
+   },
+   "trip": null,
+   "captured_by": "CUSTOMER",
+   "missing_fields": [
+    "age_range",
+    "device.purchase_price_minor"
+   ],
+   "completed_at": null,
+   "created_at": "2026-09-21T03:00:00Z"
+  },
+  "insurable_objects": [],
+  "recommendations": [],
+  "application": null,
+  "application_parties": []
+ },
+ "llm_calls": [
+  [
+   "assess_needs",
+   "NeedsExtraction",
+   "D",
+   "English"
+  ],
+  [
+   "assess_needs",
+   "NeedsExtraction",
+   "D",
+   "English"
+  ],
+  [
+   "assess_needs",
+   "NeedsExtraction",
+   "D",
+   "English"
+  ],
+  [
+   "assess_needs",
+   "NeedsExtraction",
+   "D",
+   "English"
+  ],
+  [
+   "assess_needs",
+   "NeedsExtraction",
+   "D",
+   "English"
+  ],
+  [
+   "assess_needs",
+   "NeedsExtraction",
+   "D",
+   "English"
+  ]
+ ],
+ "external_calls": [
+  "POST /partner/v1/customers/match",
+  "POST /identity/v1/otp",
+  "POST /identity/v1/otp/otp-1/verify",
+  "POST /identity/v1/documents/verify"
+ ]
+}

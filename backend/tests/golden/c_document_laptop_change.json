@@ -1,0 +1,587 @@
+{
+ "turns": [
+  {
+   "input": "(start)",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "IDENTITY_INFO",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "assistant",
+     "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "IDENTITY_INFO",
+    "message": "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+   }
+  },
+  {
+   "input": "IDENTITY_INFO",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "OTP_CODE",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "Identity details submitted — Jane Doe (partner lookup consent: no)"
+    ],
+    [
+     "assistant",
+     "We sent a verification code to ********0101. Please enter the 6-digit code."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "OTP_CODE",
+    "message": "We sent a verification code to ********0101. Please enter the 6-digit code."
+   }
+  },
+  {
+   "input": "OTP_CODE",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "PROFILING",
+    "waiting_for": "NEEDS",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "Entered the verification code."
+    ],
+    [
+     "assistant",
+     "That code didn't work, so I'll verify the ID document you gave instead."
+    ],
+    [
+     "assistant",
+     "Your ID document is verified."
+    ],
+    [
+     "assistant",
+     "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "NEEDS",
+    "message": "Now let's find the right cover. Tell me your age, occupation, where you live, and what you'd like to protect (a device, a trip, ...). Mention any insurance you already have."
+   }
+  },
+  {
+   "input": "NEEDS",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "RECOMMENDATION",
+    "waiting_for": "DECISION",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "await_decision"
+   },
+   "messages": [
+    [
+     "customer",
+     "I'm 36, a nurse in Seattle. I just bought a $1,299 laptop and want accident cover."
+    ],
+    [
+     "assistant",
+     "Thanks — let me check which products fit you."
+    ],
+    [
+     "assistant",
+     "Here's what I recommend:\n1. 2-Year Laptop Protection with Accidents — $130.00/one-time\n   Fits you (C).\n\nChoose one to apply, change your answers, or decline."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "DECISION",
+    "message": "Here's what I recommend:\n1. 2-Year Laptop Protection with Accidents — $130.00/one-time\n   Fits you (C).\n\nChoose one to apply, change your answers, or decline.",
+    "options": [
+     {
+      "recommendation_id": "<uuid>",
+      "product_code": "US-DEV-LAPTOP-2Y",
+      "marketing_name": "2-Year Laptop Protection with Accidents",
+      "product_type": "DEVICE_PROTECTION",
+      "rank": 1,
+      "eligibility_result": "ELIGIBLE",
+      "failed_reasons": [],
+      "rationale": "Fits you (C).",
+      "status": "PROPOSED",
+      "quote": {
+       "quote_id": "<uuid>",
+       "premium_minor": 13000,
+       "currency": "USD",
+       "billing_period": "ONE_TIME",
+       "term_start_date": "2026-09-21",
+       "term_end_date": "2028-09-20",
+       "valid_until": "2026-09-22T03:00:00Z"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "input": "DECISION",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "RECOMMENDATION",
+    "waiting_for": "DECISION",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "await_decision"
+   },
+   "messages": [
+    [
+     "customer",
+     "Actually the laptop cost $1,499."
+    ],
+    [
+     "assistant",
+     "Thanks — let me check which products fit you."
+    ],
+    [
+     "assistant",
+     "Here's what I recommend:\n1. 2-Year Laptop Protection with Accidents — $130.00/one-time\n   Fits you (C).\n\nChoose one to apply, change your answers, or decline."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "DECISION",
+    "message": "Here's what I recommend:\n1. 2-Year Laptop Protection with Accidents — $130.00/one-time\n   Fits you (C).\n\nChoose one to apply, change your answers, or decline.",
+    "options": [
+     {
+      "recommendation_id": "<uuid>",
+      "product_code": "US-DEV-LAPTOP-2Y",
+      "marketing_name": "2-Year Laptop Protection with Accidents",
+      "product_type": "DEVICE_PROTECTION",
+      "rank": 1,
+      "eligibility_result": "ELIGIBLE",
+      "failed_reasons": [],
+      "rationale": "Fits you (C).",
+      "status": "PROPOSED",
+      "quote": {
+       "quote_id": "<uuid>",
+       "premium_minor": 13000,
+       "currency": "USD",
+       "billing_period": "ONE_TIME",
+       "term_start_date": "2026-09-21",
+       "term_end_date": "2028-09-20",
+       "valid_until": "2026-09-22T03:00:00Z"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "input": "DECISION",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "APPLICATION",
+    "waiting_for": "PARTIES",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "I'd like 2-Year Laptop Protection with Accidents."
+    ],
+    [
+     "assistant",
+     "Great choice. Let's complete your 2-Year Laptop Protection with Accidents application."
+    ],
+    [
+     "assistant",
+     "Are you both the insured person and the payer? If someone else is, tell me their role (insured or payer), full name and date of birth."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "PARTIES",
+    "message": "Are you both the insured person and the payer? If someone else is, tell me their role (insured or payer), full name and date of birth."
+   }
+  },
+  {
+   "input": "PARTIES",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "APPLICATION",
+    "waiting_for": "ANSWERS",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "My wife Mary Doe (born 1988-02-02) pays."
+    ],
+    [
+     "assistant",
+     "Got it (PAYER: Mary Doe)."
+    ],
+    [
+     "assistant",
+     "To complete the application, please provide the purchase date, the serial number, the order number."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "ANSWERS",
+    "message": "To complete the application, please provide the purchase date, the serial number, the order number."
+   }
+  },
+  {
+   "input": "ANSWERS",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "APPLICATION",
+    "waiting_for": "CONFIRM",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "confirm_summary"
+   },
+   "messages": [
+    [
+     "customer",
+     "Serial SN-C-0001, order ORD-C-42, bought on Sept 10."
+    ],
+    [
+     "assistant",
+     "Application summary for C.\n\nShall I submit this application?"
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "CONFIRM",
+    "message": "Application summary for C.\n\nShall I submit this application?",
+    "summary": "Application summary for C."
+   }
+  },
+  {
+   "input": "CONFIRM",
+   "session": {
+    "status": "SUBMITTED",
+    "last_stage": "SUBMITTED",
+    "waiting_for": null,
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": null
+   },
+   "messages": [
+    [
+     "customer",
+     "Yes, please submit."
+    ],
+    [
+     "assistant",
+     "Your application is submitted. Your reference number is SUB-2026-000001. We'll be in touch with the underwriting decision."
+    ]
+   ],
+   "prompt": null
+  }
+ ],
+ "node_path": [
+  "__start__",
+  "greet",
+  "ask_customer",
+  "verify_identity",
+  "ask_customer",
+  "check_otp",
+  "check_document",
+  "fetch_purchases",
+  "assess_needs",
+  "ask_customer",
+  "assess_needs",
+  "check_eligibility",
+  "rank_products",
+  "quote_premium",
+  "explain_recommendation",
+  "await_decision",
+  "assess_needs",
+  "check_eligibility",
+  "rank_products",
+  "quote_premium",
+  "explain_recommendation",
+  "await_decision",
+  "open_application",
+  "collect_parties",
+  "ask_customer",
+  "collect_parties",
+  "collect_answers",
+  "ask_customer",
+  "collect_answers",
+  "summarize_application",
+  "confirm_summary",
+  "submit_application",
+  "(end)"
+ ],
+ "entities": {
+  "party": {
+   "party_id": "<uuid>",
+   "party_type": "PERSON",
+   "full_name": "Jane Doe",
+   "email": "jane.doe@example.com",
+   "phone": "+12065550101",
+   "date_of_birth": "1990-06-01",
+   "id_document_type": "PASSPORT",
+   "third_party_consent_at": null,
+   "partner_customer_ref": null,
+   "verification_status": "VERIFIED",
+   "verification_method": "DOCUMENT",
+   "verification_attempts": 1,
+   "verified_at": "2026-09-21T03:00:00Z"
+  },
+  "needs_assessment": {
+   "needs_assessment_id": "<uuid>",
+   "version": 2,
+   "age_range": "AGE_30_39",
+   "occupation": "Nurse",
+   "residence_country": "US",
+   "existing_coverage": [],
+   "objectives": [
+    "PROTECT_DEVICE"
+   ],
+   "device": {
+    "device_category": "NOTEBOOK",
+    "purchase_price_minor": 129900
+   },
+   "trip": null,
+   "captured_by": "CUSTOMER",
+   "missing_fields": [],
+   "completed_at": "2026-09-21T03:00:00Z",
+   "created_at": "2026-09-21T03:00:00Z"
+  },
+  "insurable_objects": [
+   {
+    "insurable_object_id": "<uuid>",
+    "object_type": "DEVICE",
+    "source": "CUSTOMER",
+    "attributes": {
+     "condition": "NEW",
+     "purchase_date": "2026-09-21",
+     "assumed_fields": [
+      "condition",
+      "has_existing_damage",
+      "purchase_date"
+     ],
+     "device_category": "NOTEBOOK",
+     "has_existing_damage": false,
+     "purchase_price_minor": 129900
+    }
+   }
+  ],
+  "recommendations": [
+   {
+    "recommendation_id": "<uuid>",
+    "product_code": "US-DEV-LAPTOP-2Y",
+    "marketing_name": "2-Year Laptop Protection with Accidents",
+    "product_type": "DEVICE_PROTECTION",
+    "rank": 1,
+    "eligibility_result": "ELIGIBLE",
+    "failed_reasons": [],
+    "rationale": "Fits you (C).",
+    "status": "ACCEPTED",
+    "quote": {
+     "quote_id": "<uuid>",
+     "premium_minor": 13000,
+     "currency": "USD",
+     "billing_period": "ONE_TIME",
+     "term_start_date": "2026-09-21",
+     "term_end_date": "2028-09-20",
+     "valid_until": "2026-09-22T03:00:00Z"
+    }
+   },
+   {
+    "recommendation_id": "<uuid>",
+    "product_code": "US-DEV-LAPTOP-2Y",
+    "marketing_name": "2-Year Laptop Protection with Accidents",
+    "product_type": "DEVICE_PROTECTION",
+    "rank": 1,
+    "eligibility_result": "ELIGIBLE",
+    "failed_reasons": [],
+    "rationale": "Fits you (C).",
+    "status": "EXPIRED",
+    "quote": {
+     "quote_id": "<uuid>",
+     "premium_minor": 13000,
+     "currency": "USD",
+     "billing_period": "ONE_TIME",
+     "term_start_date": "2026-09-21",
+     "term_end_date": "2028-09-20",
+     "valid_until": "2026-09-22T03:00:00Z"
+    }
+   },
+   {
+    "recommendation_id": "<uuid>",
+    "product_code": "US-MOB-BOLT",
+    "marketing_name": "bolt Mobile Handset Protection",
+    "product_type": "MOBILE_INSURANCE",
+    "rank": 2,
+    "eligibility_result": "INELIGIBLE",
+    "failed_reasons": [
+     "DEVICE_NOT_SMARTPHONE: Smartphones only"
+    ],
+    "rationale": null,
+    "status": "EXPIRED",
+    "quote": null
+   },
+   {
+    "recommendation_id": "<uuid>",
+    "product_code": "US-MOB-BOLT",
+    "marketing_name": "bolt Mobile Handset Protection",
+    "product_type": "MOBILE_INSURANCE",
+    "rank": 2,
+    "eligibility_result": "INELIGIBLE",
+    "failed_reasons": [
+     "DEVICE_NOT_SMARTPHONE: Smartphones only"
+    ],
+    "rationale": null,
+    "status": "PROPOSED",
+    "quote": null
+   },
+   {
+    "recommendation_id": "<uuid>",
+    "product_code": "US-EW-TV-3Y",
+    "marketing_name": "3-Year TV Protection",
+    "product_type": "EXTENDED_WARRANTY",
+    "rank": 3,
+    "eligibility_result": "INELIGIBLE",
+    "failed_reasons": [
+     "DEVICE_NOT_TV: TVs only"
+    ],
+    "rationale": null,
+    "status": "EXPIRED",
+    "quote": null
+   },
+   {
+    "recommendation_id": "<uuid>",
+    "product_code": "US-EW-TV-3Y",
+    "marketing_name": "3-Year TV Protection",
+    "product_type": "EXTENDED_WARRANTY",
+    "rank": 3,
+    "eligibility_result": "INELIGIBLE",
+    "failed_reasons": [
+     "DEVICE_NOT_TV: TVs only"
+    ],
+    "rationale": null,
+    "status": "PROPOSED",
+    "quote": null
+   },
+   {
+    "recommendation_id": "<uuid>",
+    "product_code": "US-TRV-SINGLE",
+    "marketing_name": "Single Trip Protection",
+    "product_type": "TRAVEL_PROTECTION",
+    "rank": 4,
+    "eligibility_result": "INELIGIBLE",
+    "failed_reasons": [
+     "NO_INSURABLE_OBJECT: no trip to insure"
+    ],
+    "rationale": null,
+    "status": "EXPIRED",
+    "quote": null
+   },
+   {
+    "recommendation_id": "<uuid>",
+    "product_code": "US-TRV-SINGLE",
+    "marketing_name": "Single Trip Protection",
+    "product_type": "TRAVEL_PROTECTION",
+    "rank": 4,
+    "eligibility_result": "INELIGIBLE",
+    "failed_reasons": [
+     "NO_INSURABLE_OBJECT: no trip to insure"
+    ],
+    "rationale": null,
+    "status": "PROPOSED",
+    "quote": null
+   }
+  ],
+  "application": {
+   "application_id": "<uuid>",
+   "status": "SUBMITTED",
+   "product_code": "US-DEV-LAPTOP-2Y",
+   "answers": {
+    "order_id": "ORD-C-42",
+    "order_number": "ORD-C-42",
+    "purchase_date": "2026-09-10",
+    "serial_number": "SN-C-0001",
+    "purchase_price": 129900
+   },
+   "missing_fields": [],
+   "summary": "Application summary for C.",
+   "submission_ref": "SUB-2026-000001"
+  },
+  "application_parties": [
+   {
+    "role": "INSURED",
+    "full_name": "Jane Doe"
+   },
+   {
+    "role": "POLICYHOLDER",
+    "full_name": "Jane Doe"
+   },
+   {
+    "role": "PAYER",
+    "full_name": "Mary Doe"
+   }
+  ]
+ },
+ "llm_calls": [
+  [
+   "assess_needs",
+   "NeedsExtraction",
+   "C",
+   "English"
+  ],
+  [
+   "explain_recommendation",
+   "RecommendationRationale",
+   "C",
+   "English"
+  ],
+  [
+   "assess_needs",
+   "NeedsExtraction",
+   "C",
+   "English"
+  ],
+  [
+   "explain_recommendation",
+   "RecommendationRationale",
+   "C",
+   "English"
+  ],
+  [
+   "collect_parties",
+   "PartiesExtraction",
+   "C",
+   "English"
+  ],
+  [
+   "collect_answers",
+   "AnswersExtraction",
+   "C",
+   "English"
+  ],
+  [
+   "summarize_application",
+   "ApplicationSummary",
+   "C",
+   "English"
+  ]
+ ],
+ "external_calls": [
+  "POST /identity/v1/otp",
+  "POST /identity/v1/otp/otp-1/verify",
+  "POST /identity/v1/documents/verify",
+  "POST /contract/v1/applications"
+ ]
+}

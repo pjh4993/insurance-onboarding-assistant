@@ -1,0 +1,145 @@
+{
+ "turns": [
+  {
+   "input": "(start)",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "IDENTITY_INFO",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "assistant",
+     "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "IDENTITY_INFO",
+    "message": "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+   }
+  },
+  {
+   "input": "IDENTITY_INFO",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "OTP_CODE",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "customer",
+     "Identity details submitted — John Roe (partner lookup consent: no)"
+    ],
+    [
+     "assistant",
+     "We sent a verification code to ********0102. Please enter the 6-digit code."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "OTP_CODE",
+    "message": "We sent a verification code to ********0102. Please enter the 6-digit code."
+   }
+  },
+  {
+   "input": "OTP_CODE",
+   "session": {
+    "status": "HANDOFF",
+    "last_stage": "HANDOFF",
+    "waiting_for": "AGENT",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "await_agent"
+   },
+   "messages": [
+    [
+     "customer",
+     "Entered the verification code."
+    ],
+    [
+     "assistant",
+     "That code didn't work, so I'll verify the ID document you gave instead."
+    ],
+    [
+     "assistant",
+     "I couldn't verify your identity, so I'm connecting you with an agent."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "AGENT",
+    "message": "I couldn't verify your identity, so I'm connecting you with an agent."
+   }
+  },
+  {
+   "input": "AGENT",
+   "session": {
+    "status": "ACTIVE",
+    "last_stage": "IDENTITY",
+    "waiting_for": "IDENTITY_INFO",
+    "mode": "AUTO",
+    "locale": "en",
+    "current_node": "ask_customer"
+   },
+   "messages": [
+    [
+     "agent",
+     "Agent resolution: CONTINUE"
+    ],
+    [
+     "assistant",
+     "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+    ]
+   ],
+   "prompt": {
+    "waiting_for": "IDENTITY_INFO",
+    "message": "Hi! I'll help you find the right cover. First, to verify your identity, please share your full name, email, phone number and an ID document. If you consent to us checking your purchase history with our partner, verification is faster."
+   }
+  }
+ ],
+ "node_path": [
+  "__start__",
+  "greet",
+  "ask_customer",
+  "verify_identity",
+  "ask_customer",
+  "check_otp",
+  "check_document",
+  "human_handoff",
+  "await_agent",
+  "greet",
+  "ask_customer"
+ ],
+ "entities": {
+  "party": {
+   "party_id": "<uuid>",
+   "party_type": "PERSON",
+   "full_name": "John Roe",
+   "email": "john.roe@example.com",
+   "phone": "+12065550102",
+   "date_of_birth": null,
+   "id_document_type": "DRIVER_LICENSE",
+   "third_party_consent_at": null,
+   "partner_customer_ref": null,
+   "verification_status": "UNVERIFIED",
+   "verification_method": null,
+   "verification_attempts": 0,
+   "verified_at": null
+  },
+  "needs_assessment": null,
+  "insurable_objects": [],
+  "recommendations": [],
+  "application": null,
+  "application_parties": []
+ },
+ "llm_calls": [],
+ "external_calls": [
+  "POST /identity/v1/otp",
+  "POST /identity/v1/otp/otp-1/verify",
+  "POST /identity/v1/documents/verify"
+ ]
+}

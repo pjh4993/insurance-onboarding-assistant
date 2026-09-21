@@ -115,3 +115,17 @@ def test_locale_of_falls_back_to_the_market_for_old_checkpoints():
     assert locale_of({"market": "KR"}) == "ko"
     assert locale_of({"market": "US"}) == "en"
     assert locale_of({"market": "KR", "locale": "en"}) == "en"
+
+
+# In-flight sessions resume from checkpoints that name these nodes (`next`, `resume_node`), and the agent
+# console shows them as `current_node`. Renaming or removing one breaks those sessions: migrate on purpose.
+CHECKPOINTED_NODES = {
+    "greet", "ask_customer", "verify_identity", "check_otp", "check_document", "fetch_purchases",
+    "assess_needs", "check_eligibility", "rank_products", "quote_premium", "explain_recommendation",
+    "await_decision", "open_application", "collect_parties", "collect_answers", "summarize_application",
+    "confirm_summary", "submit_application", "human_handoff", "await_agent",
+}  # fmt: skip
+
+
+def test_node_names_are_stable():
+    assert set(ALL_NODES) == CHECKPOINTED_NODES
