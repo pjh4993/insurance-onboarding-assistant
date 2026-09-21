@@ -72,9 +72,10 @@ variable "agent_dev_auth" {
   default     = true
 }
 
-variable "bedrock_model_id" {
-  type    = string
-  default = "global.anthropic.claude-sonnet-4-6"
+variable "agent_config_version" {
+  description = "Agent config bundle to load: exact (1.2.0) or a prefix (1, 1.2) meaning the highest published match. Takes effect when backend tasks restart."
+  type        = string
+  default     = "1"
 }
 
 variable "bedrock_foundation_models" {

@@ -197,7 +197,7 @@ resource "aws_vpc_security_group_ingress_rule" "endpoints_from_tasks" {
 # ---------------------------------------------------------------------------
 
 resource "aws_kms_key" "this" {
-  description             = "${var.name}: RDS storage and Secrets Manager secrets"
+  description             = "${var.name}: RDS storage, Secrets Manager secrets and the agent config bucket"
   enable_key_rotation     = true
   deletion_window_in_days = var.kms_deletion_window_days
   tags                    = var.tags

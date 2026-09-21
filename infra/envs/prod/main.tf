@@ -56,6 +56,14 @@ module "security" {
   enable_mocks                = var.enable_mocks
 }
 
+module "agent_config" {
+  source = "../../modules/agent_config"
+
+  name         = local.name
+  kms_key_arn  = module.security.kms_key_arn
+  baseline_dir = "${path.root}/../../../backend/packages/agent/src/onboarding_agent/config/bundled"
+}
+
 module "data" {
   source = "../../modules/data"
 
@@ -174,6 +182,24 @@ data "aws_iam_policy_document" "backend_task" {
     actions   = ["kms:Decrypt"]
     resources = [module.security.kms_key_arn]
   }
+
+  # The agent config bundle (read once at startup): list its versions, read their files.
+  statement {
+    sid       = "ListAgentConfigVersions"
+    actions   = ["s3:ListBucket"]
+    resources = [module.agent_config.bucket_arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values   = ["${module.agent_config.prefix}/", "${module.agent_config.prefix}/*"]
+    }
+  }
+
+  statement {
+    sid       = "ReadAgentConfig"
+    actions   = ["s3:GetObject"]
+    resources = ["${module.agent_config.bucket_arn}/${module.agent_config.prefix}/*"]
+  }
 }
 
 module "backend" {
@@ -200,10 +226,14 @@ module "backend" {
   environment = merge(local.external_urls, local.otel_common_env, {
     OTEL_SERVICE_NAME = "onboarding-backend"
     # No password in the URL: libpq reads PGPASSWORD (injected below).
-    DATABASE_URL     = "postgresql+psycopg://${module.data.db_username}@${module.data.db_address}:${module.data.db_port}/${module.data.db_name}?sslmode=require"
-    BEDROCK_MODEL_ID = var.bedrock_model_id
-    AWS_REGION       = var.region
-    SSE_BROKER       = "postgres"
+    DATABASE_URL = "postgresql+psycopg://${module.data.db_username}@${module.data.db_address}:${module.data.db_port}/${module.data.db_name}?sslmode=require"
+    AWS_REGION   = var.region
+    SSE_BROKER   = "postgres"
+    # Models, prompts and copy: the highest published bundle matching the version (see onboarding_agent.config).
+    AGENT_CONFIG_URI     = module.agent_config.uri
+    AGENT_CONFIG_VERSION = var.agent_config_version
+    # The model ids the IAM policy lets the backend invoke; a bundle naming another one is refused at startup.
+    LLM_ALLOWED_MODEL_IDS = join(",", flatten([for m in var.bedrock_foundation_models : ["global.${m}", m]]))
   })
 
   secrets = merge(local.otel_secrets, {
