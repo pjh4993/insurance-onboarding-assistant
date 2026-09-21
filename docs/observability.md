@@ -13,7 +13,7 @@ is off or failing.
 | Setup | `backend/app/telemetry.py` | `frontend/instrumentation.ts` |
 
 The frontend passes `traceparent` to the backend, so a relayed call and the API call it causes are one trace.
-Logs written inside a span carry its trace id (in the OTLP record, and as `trace=` in the stdout line).
+Logs written inside a span carry its trace and span ids (in the OTLP record, and as `trace_id`/`span_id` in the stdout JSON).
 
 ## 2. Log format
 
