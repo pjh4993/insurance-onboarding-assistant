@@ -10,10 +10,28 @@ The design documents for the onboarding assistant, grouped by what they answer. 
 | [`design/`](design/01-solution-architecture.md) | How the application works | Solution architecture, LangGraph design, state management, data model, observability |
 | [`infra/`](infra/01-aws-architecture.md) | How it runs on AWS and gets there | AWS architecture, networking, Terraform, CI/CD |
 | [`decisions/`](decisions/tradeoffs.md) | Why it is built this way, and what is left | Assumptions, tradeoffs, future improvements |
-| [`guides/`](guides/demo.md) | How to try it | Demo walkthrough with the four seed customers |
+| [`guides/`](guides/demo.md) | How to try it and work on it | Demo walkthrough with the four seed customers, local development and tests |
 | [`research/`](research/README.md) | What was found before designing | Insurance journey models, competitor onboarding flows, embedded insurance, product catalog research |
 
 The numbers in `design/` and `infra/` are a reading order: each document assumes the ones before it.
+
+## What is built
+
+- The full four-stage LangGraph graph with wait nodes (`interrupt`), conditional edges after every node, retries,
+  3-round loop guards and human handoff (`human_handoff` + `await_agent`), on `AsyncPostgresSaver` with
+  compress-then-AES encryption.
+- Eligibility, ranking and pricing in code over an eight-product KR/US catalog.
+- Claude Sonnet 4.6 through `ChatBedrockConverse`, with a per-node model override setting.
+- One mock service for partner, identity, contract admin and Bedrock, with seed customers A–D and fault injection.
+- A frontend with the customer app and an agent console: session list, conversation, progress and application
+  views, new session links, take over, answer as agent, handoff resolution.
+- Terraform for both environments (develop has a domain, HTTPS and Cognito for the agent paths), a bootstrap
+  stack for remote state, CI checks, a develop deploy and a prod promotion.
+- Traces and structured logs to Grafana Cloud, and this documentation site at `/docs`.
+
+What is known to be limited, and what was designed but not built, is in
+[future improvements](decisions/future-improvements.md). How to run and test it locally is in
+[guides/development.md](guides/development.md).
 
 ## Where each required item is
 
