@@ -1,0 +1,49 @@
+name: e2e-dev
+
+# The deployed develop hosts: read-only smoke checks and the page-load SLA (e2e/tests/smoke, e2e/tests/perf).
+# Runs after every successful develop deploy and once a day, so a slowdown shows even when nothing is deployed.
+on:
+  workflow_run:
+    workflows: [deploy-develop]
+    types: [completed]
+  schedule:
+    - cron: "0 0 * * *" # 09:00 KST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-dev
+  cancel-in-progress: true
+
+jobs:
+  smoke-and-sla:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: e2e
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Smoke
+        run: pnpm test:smoke
+      - name: Page-load SLA
+        if: ${{ !cancelled() }} # measure even when a smoke check failed
+        run: pnpm test:perf
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: e2e-dev-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 30

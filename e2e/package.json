@@ -1,0 +1,21 @@
+{
+  "name": "onboarding-e2e",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "test": "playwright test --project=local",
+    "test:smoke": "playwright test --project=dev-smoke",
+    "test:perf": "playwright test --project=dev-perf --workers=1",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit",
+    "browsers": "playwright install chromium",
+    "qa:browser": "agent-browser install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.0.0",
+    "agent-browser": "^0.38.1",
+    "typescript": "^5.9.0"
+  }
+}

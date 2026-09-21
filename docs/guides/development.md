@@ -37,6 +37,8 @@ docker-compose.yml  local stack: postgres, mock, backend, frontend
 Makefile            make docs / make docs-build: the documents as a local site (mkdocs, via uvx)
 docs-site/          nginx image serving that site at https://dev.docs.onboardassist.click
 tools/diagrams/     generators for the SVG diagrams in docs/
+e2e/                browser tests (Playwright) and the exploratory QA checklist (agent-browser)
+.claude/skills/     frontend-qa: the exploratory QA skill for Claude Code, driving agent-browser
 ```
 
 ## 3. Tests
@@ -57,11 +59,42 @@ cd infra/envs/develop && terraform init -backend=false && terraform validate
 
 # docs: strict site build, fails on a broken link
 make docs-build
+
+# end to end (e2e/): once `make e2e-setup`, then
+make e2e       # customer and agent flows in the browser against the compose stack
+make e2e-dev   # read-only smoke checks and the page-load SLA of the develop hosts
 ```
+
+### Browser tests (`e2e/`)
+
+Playwright drives the real UI; labels come from `frontend/messages/*.json`, so copy changes do not break selectors.
+
+| Project | Target | What it checks |
+|---|---|---|
+| `local` | compose stack, `E2E_BASE_URL` (default `http://localhost:13000`) | Landing (both languages, language switch saved on the session, product pre-fill, resume), the public landing's self-serve start, seed customers A–D end to end, and the agent console (create a link, take over a handoff and end it) |
+| `dev-smoke` | `dev.app.`, `dev.agent.`, `dev.docs.onboardassist.click` | Landing renders, the frontend reaches the backend, the agent host redirects to Cognito, agent APIs are not reachable from the customer host, the docs are public. Read-only |
+| `dev-perf` | same hosts | The page-load SLA below |
+
+**Page-load SLA** (develop, desktop Chrome, cold cache, 75th percentile of 8 loads):
+
+| Page | TTFB | LCP | CLS |
+|---|---|---|---|
+| Customer landing `/` | ≤ 600 ms | ≤ 1.5 s | ≤ 0.1 |
+| Docs pages | ≤ 600 ms | ≤ 2.0 s | ≤ 0.1 |
+| Agent login redirect | whole load, ending on Cognito's page, ≤ 2.0 s | | |
+
+Measured from Seoul on 2026-09-22 the landing was at TTFB 176 ms and LCP 308 ms, the docs at LCP 0.8 s and CLS
+0.07. The budgets leave room for CI runners outside Korea, so a miss means a real slowdown.
+
+**Exploratory QA** is not scripted: the `frontend-qa` skill (`.claude/skills/frontend-qa/SKILL.md`) has Claude Code
+walk the app with [agent-browser](https://github.com/vercel-labs/agent-browser) through
+`e2e/agent-qa/checklist.md` and write a report with screenshots to `e2e/qa-reports/`. Reproducible findings become
+`local` tests.
 
 Tests never call AWS. Backend graph tests run the seed customers against in-process fakes of the external
 systems and the LLM, built from the same seed file as the mock (`backend/tests/fixtures/seed-customers.json`).
-CI runs all of the above on every push; see [CI/CD design](../infra/04-cicd.md).
+CI runs all of the above on every push, and the develop checks after every develop deploy and daily; see
+[CI/CD design](../infra/04-cicd.md).
 
 ## 4. Diagrams
 

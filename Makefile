@@ -20,3 +20,23 @@ docs-build:
 
 docs-clean:
 	rm -rf .site
+
+# ---- End-to-end tests (e2e/). `make e2e-setup` once: installs the package, Chromium and agent-browser's Chrome.
+E2E = pnpm --dir e2e
+
+.PHONY: e2e-setup e2e e2e-dev
+
+e2e-setup:
+	$(E2E) install
+	$(E2E) exec playwright install chromium
+	$(E2E) exec agent-browser install
+
+## Full customer and agent flows against the compose stack (started if it is not running).
+e2e:
+	docker compose up -d --build --wait
+	$(E2E) test
+
+## Read-only smoke checks and the page-load SLA of the deployed develop hosts.
+e2e-dev:
+	$(E2E) test:smoke
+	$(E2E) test:perf
