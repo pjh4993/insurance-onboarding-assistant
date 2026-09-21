@@ -1,0 +1,286 @@
+{
+  "common": {
+    "appName": "Cover Assistant",
+    "reconnecting": "다시 연결 중…",
+    "loading": "불러오는 중…",
+    "back": "뒤로",
+    "close": "닫기",
+    "yes": "예",
+    "no": "아니요",
+    "none": "없음",
+    "empty": "비어 있음",
+    "dash": "—",
+    "languageLabel": "언어",
+    "localeName": { "ko": "한국어", "en": "English" },
+    "localeShort": { "ko": "KO", "en": "EN" }
+  },
+  "home": {
+    "body": "고객은 상담 링크(<code>/s/…</code>)로 들어오고, 상담원은 콘솔에서 일해요.",
+    "openConsole": "상담원 콘솔 열기"
+  },
+  "stage": {
+    "IDENTITY": "본인 확인",
+    "PROFILING": "맞춤 질문",
+    "RECOMMENDATION": "상품 추천",
+    "APPLICATION": "가입 신청",
+    "SUBMITTED": "신청 완료",
+    "HANDOFF": "상담원 연결",
+    "DECLINED": "거절",
+    "WITHDRAWN": "중단"
+  },
+  "stageStrip": { "label": "가입 진행 단계" },
+  "waiting": {
+    "IDENTITY_INFO": "본인 정보",
+    "OTP_CODE": "인증번호",
+    "NEEDS": "니즈",
+    "DECISION": "상품 선택",
+    "PARTIES": "가입자 정보",
+    "ANSWERS": "청약 답변",
+    "CONFIRM": "최종 확인",
+    "AGENT": "상담원",
+    "nothing": "없음"
+  },
+  "status": {
+    "ACTIVE": "진행 중",
+    "SUBMITTED": "신청 완료",
+    "DECLINED": "거절",
+    "WITHDRAWN": "중단",
+    "HANDOFF": "상담원 연결",
+    "EXPIRED": "만료"
+  },
+  "period": {
+    "MONTHLY": "월",
+    "ONE_TIME": "일시납",
+    "PER_TRIP": "여행 1회"
+  },
+  "ago": {
+    "seconds": "{n}초 전",
+    "minutes": "{n}분 전",
+    "hours": "{n}시간 전",
+    "days": "{n}일 전"
+  },
+  "enum": {
+    "productType": {
+      "MOBILE_INSURANCE": "휴대폰 보험",
+      "DEVICE_PROTECTION": "기기 보장",
+      "EXTENDED_WARRANTY": "연장 보증",
+      "TRAVEL_PROTECTION": "여행 보험"
+    },
+    "recStatus": {
+      "PROPOSED": "제안",
+      "ACCEPTED": "선택함",
+      "DECLINED": "거절",
+      "EXPIRED": "만료"
+    },
+    "verification": {
+      "VERIFIED": "확인 완료",
+      "PENDING": "확인 중",
+      "FAILED": "실패",
+      "UNVERIFIED": "미확인"
+    },
+    "verificationMethod": {
+      "PARTNER_MATCH": "파트너 대조",
+      "OTP": "인증번호",
+      "DOCUMENT": "신분증"
+    },
+    "partyRole": {
+      "POLICYHOLDER": "계약자",
+      "INSURED": "피보험자",
+      "PAYER": "납입자",
+      "BENEFICIARY": "수익자"
+    }
+  },
+  "idType": {
+    "KR": { "NATIONAL_ID": "주민등록증", "DRIVER_LICENSE": "운전면허증", "PASSPORT": "여권" },
+    "US": { "NATIONAL_ID": "주 신분증(State ID)", "DRIVER_LICENSE": "운전면허증", "PASSPORT": "여권" }
+  },
+  "role": {
+    "customer": "고객",
+    "assistant": "어시스턴트",
+    "agent": "상담원",
+    "system": "시스템"
+  },
+  "messages": {
+    "empty": "아직 메시지가 없어요.",
+    "working": "어시스턴트가 답변을 준비하고 있어요"
+  },
+  "input": {
+    "sendFailed": "보내지 못했어요. 다시 시도해 주세요.",
+    "closed": "이 상담은 {status} 상태예요.",
+    "waitAgent": "곧 상담원이 대화에 참여해요. 이 페이지를 열어 두세요.",
+    "waitCustomer": "고객이 본인 정보나 인증번호를 입력하길 기다리는 중이에요.",
+    "working": "처리하고 있어요…",
+    "nothing": "지금은 답할 내용이 없어요.",
+    "agentPlaceholder": "상담원으로 답하기 ({kind})…",
+    "placeholder": {
+      "NEEDS": "본인 소개와 보장받고 싶은 것을 알려 주세요…",
+      "PARTIES": "누가 보험에 가입하고 누가 내나요? 예) “저 혼자요”",
+      "ANSWERS": "위 질문에 답해 주세요…"
+    },
+    "send": "보내기"
+  },
+  "identity": {
+    "fullName": "이름",
+    "email": "이메일",
+    "phone": "휴대폰 번호",
+    "idType": "신분증 종류",
+    "idNumber": "신분증 번호",
+    "consent": "구매한 판매처(파트너사)와 제 정보를 대조해 구매 내역을 미리 채우는 데 동의합니다.",
+    "consentNote": "선택 사항이에요. 동의하지 않으면 문자 인증번호로 확인해요.",
+    "submit": "본인 확인하기"
+  },
+  "otp": {
+    "label": "인증번호",
+    "placeholder": "6자리 숫자",
+    "submit": "확인"
+  },
+  "decision": {
+    "accept": "이 상품으로 할게요",
+    "noProducts": "보여 드릴 상품이 없어요.",
+    "noneFit": "지금은 가입할 수 있는 상품이 없어요.",
+    "change": "답변 고치기",
+    "decline": "거절하기",
+    "changePlaceholder": "무엇이 달라졌나요? 예) “여행은 5일이 아니라 10일이에요.”",
+    "update": "고치기",
+    "declineAsk": "모든 제안을 거절할까요? 이유를 알려 주셔도 돼요(선택).",
+    "declineAll": "모두 거절하기",
+    "reasonPlaceholder": "이유 (선택)",
+    "declineWithReason": "이유와 함께 거절하기"
+  },
+  "confirm": {
+    "title": "신청 내용 요약",
+    "fallback": "위 내용을 확인해 주세요.",
+    "fixPlaceholder": "무엇을 고칠까요? 예) “납입자는 배우자 김민지예요.”",
+    "sendFix": "수정 요청 보내기",
+    "submit": "확인하고 신청하기",
+    "fix": "고칠 내용이 있어요"
+  },
+  "handoff": {
+    "title": "상담원 연결 — 처리하면 상담이 원래 흐름으로 돌아가요",
+    "notePlaceholder": "메모 (선택) — 예) “영상 통화로 여권 확인함”",
+    "verified": "본인 확인 완료",
+    "continue": "계속 진행",
+    "end": "상담 종료"
+  },
+  "rec": {
+    "rank": "{rank}순위",
+    "notEligible": "가입할 수 없어요",
+    "noReason": "사유 없음",
+    "quotePending": "견적 준비 중",
+    "cover": "보장 기간",
+    "validUntil": "견적 유효 기간"
+  },
+  "customer": {
+    "title": "보험 가입 상담",
+    "sub": "보험 가입 상담 · {market, select, KR {한국} US {미국} other {{market}}}",
+    "eyebrow": "AI 보험 가입 상담",
+    "headline1": "보험도",
+    "headline2": "대화로 쉽게",
+    "lede": "궁금한 걸 말씀해 주시면, 확인부터 추천과 가입까지 한 대화로 도와드려요.",
+    "placeholder": "무엇을 보장받고 싶으세요? 예) 다음 달 일본 여행",
+    "start": "시작하기",
+    "startPlain": "상품을 정하지 않고 시작하기",
+    "go": "상담 시작",
+    "stepsTitle": "이렇게 진행돼요",
+    "steps": {
+      "verify": { "title": "본인 확인", "body": "이름과 연락처, 신분증으로 확인해요" },
+      "questions": { "title": "맞춤 질문", "body": "필요한 것만 몇 가지 여쭤봐요" },
+      "recommend": { "title": "상품 추천", "body": "가입할 수 있는 상품과 보험료를 비교해요" },
+      "apply": { "title": "가입 신청", "body": "내용을 확인하고 바로 신청해요" }
+    },
+    "duration": "보통 5분 안에 끝나요",
+    "privacy": "입력하신 정보는 가입 상담에만 쓰이고, 상담원이 필요하면 언제든 이어받아요.",
+    "errorTitle": "문제가 생겼어요",
+    "expired": "링크가 만료되었거나 올바르지 않아요. 상담원에게 새 링크를 요청해 주세요.",
+    "loadFailed": "상담을 불러오지 못했어요. 페이지를 새로고침해 주세요.",
+    "localeFailed": "언어를 바꾸지 못했어요. 다시 시도해 주세요."
+  },
+  "products": {
+    "KR": {
+      "travel": { "name": "해외여행 보험", "blurb": "해외 의료비부터 휴대품, 항공기 지연까지", "ask": "해외여행 보험이 궁금해요." },
+      "phone": { "name": "폰교체 패스", "blurb": "새 폰 샀다면? 파손·고장 나도 교체까지", "ask": "새로 산 휴대폰을 보장받고 싶어요." },
+      "laptop": { "name": "노트북·태블릿 파손 보장", "blurb": "떨어뜨려도 수리비 걱정 없이", "ask": "노트북이나 태블릿 파손 보장이 궁금해요." },
+      "appliance": { "name": "가전 연장 보증", "blurb": "제조사 보증이 끝난 뒤의 고장까지", "ask": "가전제품 연장 보증이 궁금해요." }
+    },
+    "US": {
+      "travel": { "name": "Single Trip Protection", "blurb": "여행 취소, 의료비, 수하물까지 여행 한 번 단위로", "ask": "다가오는 여행에 쓸 보험이 필요해요." },
+      "phone": { "name": "Mobile Handset Protection", "blurb": "새 폰 샀다면? 수리나 교체까지", "ask": "새로 산 휴대폰을 보장받고 싶어요." },
+      "laptop": { "name": "2-Year Laptop Protection", "blurb": "떨어뜨림, 액체 침수, 화면 파손까지", "ask": "노트북 보장을 찾고 있어요." },
+      "appliance": { "name": "3-Year TV Protection", "blurb": "제조사 보증 뒤의 고장과 마모까지", "ask": "TV 연장 보증이 필요해요." }
+    }
+  },
+  "agent": {
+    "title": "상담원 콘솔",
+    "sub": "온보딩 상담",
+    "panels": "패널",
+    "sessionsTab": "상담{count, plural, =0 {} other { (#)}}",
+    "chatTab": "대화",
+    "detailsTab": "상세",
+    "signedInAs": "로그인:",
+    "loadSessionsFailed": "상담 목록을 불러오지 못했어요",
+    "loadSessionFailed": "상담을 불러오지 못했어요",
+    "assignFailed": "상담을 맡지 못했어요",
+    "selectSession": "상담을 고르면 대화가 보여요.",
+    "noSession": "선택한 상담이 없어요.",
+    "newSession": {
+      "open": "+ 새 상담",
+      "title": "새 고객 상담",
+      "market": "시장",
+      "marketName": { "KR": "한국 (KR)", "US": "미국 (US)" },
+      "language": "고객 언어",
+      "languageAuto": "시장 기본값",
+      "creating": "만드는 중…",
+      "create": "링크 만들기",
+      "createFailed": "상담을 만들지 못했어요",
+      "link": "고객 링크",
+      "copy": "복사",
+      "copied": "복사됨",
+      "openLink": "열기 ↗",
+      "hint": "고객 쿠키가 섞이지 않도록 시크릿 창에서 여세요."
+    },
+    "list": {
+      "empty": "아직 상담이 없어요. 새로 만들면 고객 링크가 생겨요.",
+      "handoffs": "상담원 연결 요청 · {count}",
+      "sessions": "상담 · {count}",
+      "handoff": "연결 요청",
+      "waits": "대기: {what}",
+      "mine": "내 상담"
+    },
+    "conversation": {
+      "waits": "대기: {what}",
+      "assignedTo": "{agent} 담당",
+      "assignedToYou": "내가 담당",
+      "assigning": "맡는 중…",
+      "assign": "내가 맡기"
+    },
+    "artifacts": {
+      "progress": "진행",
+      "application": "청약",
+      "handedOff": "상담원에게 넘어온 상담",
+      "sessionEnded": "상담 {status}",
+      "currentNode": "현재 노드",
+      "waitingFor": "기다리는 입력",
+      "status": "상태",
+      "mode": "모드",
+      "assigned": "담당",
+      "lastActivity": "마지막 활동",
+      "language": "고객 언어",
+      "languageFailed": "상담 언어를 바꾸지 못했어요",
+      "identity": "본인 확인",
+      "via": "{method}(으)로",
+      "failedAttempts": "{count}번 실패",
+      "needs": "니즈 평가",
+      "objects": "보험 대상",
+      "recommendations": "추천",
+      "noRecommendations": "아직 추천이 없어요.",
+      "noApplication": "아직 청약이 없어요.",
+      "submitted": "신청 완료",
+      "applicationId": "청약 ID",
+      "missing": "빠진 항목",
+      "answers": "답변",
+      "summary": "요약",
+      "parties": "관계자",
+      "noParties": "아직 관계자가 없어요."
+    }
+  }
+}

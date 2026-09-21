@@ -3,6 +3,7 @@
 import type {
   CreateSessionResponse,
   InputBody,
+  Locale,
   Market,
   SessionDetail,
   SessionSummary,
@@ -39,21 +40,26 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
+const put = <T>(path: string, body: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(body) });
 
 export const customerApi = {
   getSession: () => request<SessionView>("/api/customer/session"),
   sendInput: (body: InputBody) => post<{ accepted: boolean }>("/api/customer/session/input", body),
+  setLocale: (locale: Locale) => put<SessionSummary>("/api/customer/session/locale", { locale }),
   streamUrl: "/api/customer/session/stream",
 };
 
 export const agentApi = {
   me: () => request<{ agent_id: string }>("/api/agent/me"),
-  createSession: (market: Market) => post<CreateSessionResponse>("/api/agent/sessions", { market }),
+  createSession: (market: Market, locale?: Locale) =>
+    post<CreateSessionResponse>("/api/agent/sessions", locale ? { market, locale } : { market }),
   listSessions: () => request<{ sessions: SessionSummary[] }>("/api/agent/sessions"),
   getSession: (id: string) => request<SessionDetail>(`/api/agent/sessions/${encodeURIComponent(id)}`),
   assign: (id: string) => post<SessionSummary>(`/api/agent/sessions/${encodeURIComponent(id)}/assign`),
   sendInput: (id: string, body: InputBody) =>
     post<{ accepted: boolean }>(`/api/agent/sessions/${encodeURIComponent(id)}/input`, body),
+  setLocale: (id: string, locale: Locale) =>
+    put<SessionSummary>(`/api/agent/sessions/${encodeURIComponent(id)}/locale`, { locale }),
   streamUrl: "/api/agent/stream",
   sessionStreamUrl: (id: string) => `/api/agent/sessions/${encodeURIComponent(id)}/stream`,
 };

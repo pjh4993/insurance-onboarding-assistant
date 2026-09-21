@@ -1,15 +1,30 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import type { Market } from "@/lib/types";
-import { customerCopy, landingProducts, type ProductIcon } from "./copy";
+import { landingProducts, type ProductIcon } from "./copy";
+
+const STEPS = ["verify", "questions", "recommend", "apply"] as const;
 
 /**
  * First screen of /s/{token}: what the assistant does, the four steps, and a chat-style box to start.
  * Whatever the customer types or picks here becomes their first profiling answer (see lib/landing.ts).
  */
-export function Landing({ market, onStart }: { market: Market; onStart: (interest: string) => void }) {
-  const c = customerCopy(market);
+export function Landing({
+  market,
+  onStart,
+  localeSwitch,
+  notice,
+}: {
+  market: Market;
+  onStart: (interest: string) => void;
+  localeSwitch?: React.ReactNode;
+  notice?: React.ReactNode;
+}) {
+  const t = useTranslations("customer");
+  const tp = useTranslations(`products.${market}`);
+  const tc = useTranslations("common");
   const products = landingProducts(market);
   const [text, setText] = useState("");
 
@@ -18,26 +33,30 @@ export function Landing({ market, onStart }: { market: Market; onStart: (interes
   }
 
   return (
-    <div className="landing" lang={c.lang}>
+    <div className="landing">
       <header className="landing__nav">
         <div className="landing__logo">
           <span className="landing__mark" aria-hidden>
             ◆
           </span>
-          Cover Assistant
+          {tc("appName")}
         </div>
-        <span className="landing__market">{c.sub(market)}</span>
+        <div className="landing__tools">
+          <span className="landing__market">{t("sub", { market })}</span>
+          {localeSwitch}
+        </div>
       </header>
+      {notice}
 
       <section className="landing__hero">
         <div className="landing__intro">
-          <p className="landing__eyebrow">{c.eyebrow}</p>
+          <p className="landing__eyebrow">{t("eyebrow")}</p>
           <h1 className="landing__headline">
-            {c.headline[0]}
+            {t("headline1")}
             <br />
-            {c.headline[1]}
+            {t("headline2")}
           </h1>
-          <p className="landing__lede">{c.lede}</p>
+          <p className="landing__lede">{t("lede")}</p>
 
           <form
             className="ask"
@@ -50,9 +69,9 @@ export function Landing({ market, onStart }: { market: Market; onStart: (interes
               className="ask__input"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={c.placeholder}
+              placeholder={t("placeholder")}
               rows={2}
-              aria-label={c.placeholder}
+              aria-label={t("placeholder")}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
@@ -62,9 +81,9 @@ export function Landing({ market, onStart }: { market: Market; onStart: (interes
             />
             <div className="ask__bar">
               <button type="button" className="ask__plain" onClick={() => onStart("")}>
-                {c.startPlain}
+                {t("startPlain")}
               </button>
-              <button className="ask__send" aria-label={c.start} title={c.start}>
+              <button className="ask__send" aria-label={t("start")} title={t("start")}>
                 <Arrow />
               </button>
             </div>
@@ -73,17 +92,17 @@ export function Landing({ market, onStart }: { market: Market; onStart: (interes
 
         <ul className="bento">
           {products.map((p, i) => (
-            <li key={p.name} className={`bento__item ${i < 2 ? "bento__item--big" : ""}`}>
-              <button className={`product product--${p.icon}`} onClick={() => onStart(p.ask)}>
+            <li key={p.key} className={`bento__item ${i < 2 ? "bento__item--big" : ""}`}>
+              <button className={`product product--${p.icon}`} onClick={() => onStart(tp(`${p.key}.ask`))}>
                 <span className="product__text">
                   <span className="product__name">
-                    {p.name}
+                    {tp(`${p.key}.name`)}
                     {p.badge && <span className={`product__badge product__badge--${p.badge.toLowerCase()}`}>{p.badge}</span>}
                   </span>
-                  <span className="product__blurb">{p.blurb}</span>
+                  <span className="product__blurb">{tp(`${p.key}.blurb`)}</span>
                   {i < 2 && (
                     <span className="product__go">
-                      {c.go} <span aria-hidden>↗</span>
+                      {t("go")} <span aria-hidden>↗</span>
                     </span>
                   )}
                 </span>
@@ -98,21 +117,21 @@ export function Landing({ market, onStart }: { market: Market; onStart: (interes
 
       <section className="steps" aria-labelledby="steps-title">
         <div className="steps__head">
-          <h2 id="steps-title">{c.stepsTitle}</h2>
-          <span className="steps__time">{c.duration}</span>
+          <h2 id="steps-title">{t("stepsTitle")}</h2>
+          <span className="steps__time">{t("duration")}</span>
         </div>
         <ol className="steps__list">
-          {c.steps.map((s, i) => (
-            <li key={s.title} className="steps__item">
+          {STEPS.map((s, i) => (
+            <li key={s} className="steps__item">
               <span className="steps__num">{i + 1}</span>
-              <strong>{s.title}</strong>
-              <span>{s.body}</span>
+              <strong>{t(`steps.${s}.title`)}</strong>
+              <span>{t(`steps.${s}.body`)}</span>
             </li>
           ))}
         </ol>
       </section>
 
-      <footer className="landing__foot">{c.privacy}</footer>
+      <footer className="landing__foot">{t("privacy")}</footer>
     </div>
   );
 }

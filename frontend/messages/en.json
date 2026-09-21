@@ -1,0 +1,286 @@
+{
+  "common": {
+    "appName": "Cover Assistant",
+    "reconnecting": "Reconnecting…",
+    "loading": "Loading…",
+    "back": "Back",
+    "close": "Close",
+    "yes": "Yes",
+    "no": "No",
+    "none": "none",
+    "empty": "Empty",
+    "dash": "—",
+    "languageLabel": "Language",
+    "localeName": { "ko": "한국어", "en": "English" },
+    "localeShort": { "ko": "KO", "en": "EN" }
+  },
+  "home": {
+    "body": "Customers open a session link (<code>/s/…</code>). Agents work in the console.",
+    "openConsole": "Open the agent console"
+  },
+  "stage": {
+    "IDENTITY": "Identity",
+    "PROFILING": "Profiling",
+    "RECOMMENDATION": "Recommendation",
+    "APPLICATION": "Application",
+    "SUBMITTED": "Submitted",
+    "HANDOFF": "Handoff",
+    "DECLINED": "Declined",
+    "WITHDRAWN": "Withdrawn"
+  },
+  "stageStrip": { "label": "Onboarding progress" },
+  "waiting": {
+    "IDENTITY_INFO": "Identity details",
+    "OTP_CODE": "OTP code",
+    "NEEDS": "Needs",
+    "DECISION": "Decision",
+    "PARTIES": "Parties",
+    "ANSWERS": "Answers",
+    "CONFIRM": "Confirmation",
+    "AGENT": "Agent",
+    "nothing": "Nothing"
+  },
+  "status": {
+    "ACTIVE": "Active",
+    "SUBMITTED": "Submitted",
+    "DECLINED": "Declined",
+    "WITHDRAWN": "Withdrawn",
+    "HANDOFF": "Handoff",
+    "EXPIRED": "Expired"
+  },
+  "period": {
+    "MONTHLY": "per month",
+    "ONE_TIME": "one-time",
+    "PER_TRIP": "per trip"
+  },
+  "ago": {
+    "seconds": "{n}s ago",
+    "minutes": "{n}m ago",
+    "hours": "{n}h ago",
+    "days": "{n}d ago"
+  },
+  "enum": {
+    "productType": {
+      "MOBILE_INSURANCE": "Mobile insurance",
+      "DEVICE_PROTECTION": "Device protection",
+      "EXTENDED_WARRANTY": "Extended warranty",
+      "TRAVEL_PROTECTION": "Travel protection"
+    },
+    "recStatus": {
+      "PROPOSED": "Proposed",
+      "ACCEPTED": "Accepted",
+      "DECLINED": "Declined",
+      "EXPIRED": "Expired"
+    },
+    "verification": {
+      "VERIFIED": "Verified",
+      "PENDING": "Pending",
+      "FAILED": "Failed",
+      "UNVERIFIED": "Unverified"
+    },
+    "verificationMethod": {
+      "PARTNER_MATCH": "partner match",
+      "OTP": "OTP",
+      "DOCUMENT": "ID document"
+    },
+    "partyRole": {
+      "POLICYHOLDER": "Policyholder",
+      "INSURED": "Insured",
+      "PAYER": "Payer",
+      "BENEFICIARY": "Beneficiary"
+    }
+  },
+  "idType": {
+    "KR": { "NATIONAL_ID": "Resident registration card", "DRIVER_LICENSE": "Driver's license", "PASSPORT": "Passport" },
+    "US": { "NATIONAL_ID": "State ID", "DRIVER_LICENSE": "Driver's license", "PASSPORT": "Passport" }
+  },
+  "role": {
+    "customer": "Customer",
+    "assistant": "Assistant",
+    "agent": "Agent",
+    "system": "System"
+  },
+  "messages": {
+    "empty": "No messages yet.",
+    "working": "Assistant is working"
+  },
+  "input": {
+    "sendFailed": "Could not send. Please try again.",
+    "closed": "This session is {status}.",
+    "waitAgent": "An agent will join this conversation shortly. You can keep this page open.",
+    "waitCustomer": "Waiting for the customer to enter their identity details or code.",
+    "working": "Working on it…",
+    "nothing": "Nothing to answer right now.",
+    "agentPlaceholder": "Answer as agent ({kind})…",
+    "placeholder": {
+      "NEEDS": "Tell us about yourself and what you want to protect…",
+      "PARTIES": "Who is insured, and who pays? e.g. “Just me”",
+      "ANSWERS": "Answer the questions above…"
+    },
+    "send": "Send"
+  },
+  "identity": {
+    "fullName": "Full name",
+    "email": "Email",
+    "phone": "Mobile phone",
+    "idType": "ID type",
+    "idNumber": "ID number",
+    "consent": "I agree that my details may be checked with the retail partner I bought from, so my purchase can be pre-filled.",
+    "consentNote": "Optional — without it we verify you by SMS code.",
+    "submit": "Verify my identity"
+  },
+  "otp": {
+    "label": "Verification code",
+    "placeholder": "6-digit code",
+    "submit": "Verify"
+  },
+  "decision": {
+    "accept": "Accept this plan",
+    "noProducts": "No products to show.",
+    "noneFit": "None of the products fit right now.",
+    "change": "Change my answers",
+    "decline": "Decline",
+    "changePlaceholder": "What changed? e.g. “The trip is 10 days, not 5.”",
+    "update": "Update",
+    "declineAsk": "Decline all offers? You can tell us why (optional).",
+    "declineAll": "Decline all offers",
+    "reasonPlaceholder": "Reason (optional)",
+    "declineWithReason": "Decline with reason"
+  },
+  "confirm": {
+    "title": "Application summary",
+    "fallback": "Please review the details above.",
+    "fixPlaceholder": "What should we fix? e.g. “The payer is my spouse, Kim Minji.”",
+    "sendFix": "Send fix",
+    "submit": "Confirm and submit",
+    "fix": "Fix something"
+  },
+  "handoff": {
+    "title": "Handoff — resolve to hand the session back to the flow",
+    "notePlaceholder": "Note (optional) — e.g. “Verified by video call, passport checked.”",
+    "verified": "Verified",
+    "continue": "Continue",
+    "end": "End session"
+  },
+  "rec": {
+    "rank": "Rank {rank}",
+    "notEligible": "Not eligible",
+    "noReason": "No reason given",
+    "quotePending": "Quote pending",
+    "cover": "Cover",
+    "validUntil": "Quote valid until"
+  },
+  "customer": {
+    "title": "Your cover",
+    "sub": "Insurance onboarding · {market, select, KR {Korea} US {United States} other {{market}}}",
+    "eyebrow": "AI insurance onboarding",
+    "headline1": "Insurance,",
+    "headline2": "just a conversation",
+    "lede": "Tell us what you want to protect. We'll verify you, recommend cover and apply, all in one chat.",
+    "placeholder": "What would you like to protect? e.g. a trip to Tokyo next month",
+    "start": "Start",
+    "startPlain": "Start without picking a product",
+    "go": "Get started",
+    "stepsTitle": "How it works",
+    "steps": {
+      "verify": { "title": "Verify", "body": "Your name, contact details and an ID" },
+      "questions": { "title": "A few questions", "body": "Only what we need to know" },
+      "recommend": { "title": "Recommendation", "body": "Compare the cover you qualify for" },
+      "apply": { "title": "Apply", "body": "Review the details and submit" }
+    },
+    "duration": "Usually takes under 5 minutes",
+    "privacy": "What you share is used only for this application, and a human agent can step in at any time.",
+    "errorTitle": "Something went wrong",
+    "expired": "This link has expired or is not valid. Please ask for a new link.",
+    "loadFailed": "We could not load your session. Please refresh the page.",
+    "localeFailed": "Could not change the language. Please try again."
+  },
+  "products": {
+    "KR": {
+      "travel": { "name": "Overseas travel insurance", "blurb": "Medical costs abroad, belongings and flight delays", "ask": "I'd like to know about overseas travel insurance." },
+      "phone": { "name": "Phone Swap Pass", "blurb": "New phone? Get it replaced if it breaks", "ask": "I want cover for the phone I just bought." },
+      "laptop": { "name": "Laptop & tablet damage cover", "blurb": "Drop it without worrying about the repair bill", "ask": "I'd like to know about laptop or tablet damage cover." },
+      "appliance": { "name": "Appliance extended warranty", "blurb": "Breakdowns after the maker's warranty ends", "ask": "I'd like to know about an extended warranty for an appliance." }
+    },
+    "US": {
+      "travel": { "name": "Single Trip Protection", "blurb": "Cancellation, medical and baggage, one trip at a time", "ask": "I'd like cover for an upcoming trip." },
+      "phone": { "name": "Mobile Handset Protection", "blurb": "Just got a new phone? Repair or replace it", "ask": "I want to protect my new phone." },
+      "laptop": { "name": "2-Year Laptop Protection", "blurb": "Drops, spills and cracked screens", "ask": "I'm looking for laptop protection." },
+      "appliance": { "name": "3-Year TV Protection", "blurb": "Failures and wear after the maker's warranty", "ask": "I'd like an extended warranty for my TV." }
+    }
+  },
+  "agent": {
+    "title": "Agent console",
+    "sub": "Onboarding sessions",
+    "panels": "Panels",
+    "sessionsTab": "Sessions{count, plural, =0 {} other { (#)}}",
+    "chatTab": "Chat",
+    "detailsTab": "Details",
+    "signedInAs": "Signed in as",
+    "loadSessionsFailed": "Could not load sessions",
+    "loadSessionFailed": "Could not load the session",
+    "assignFailed": "Could not assign the session",
+    "selectSession": "Select a session to see the conversation.",
+    "noSession": "No session selected.",
+    "newSession": {
+      "open": "+ New session",
+      "title": "New customer session",
+      "market": "Market",
+      "marketName": { "KR": "Korea (KR)", "US": "United States (US)" },
+      "language": "Customer language",
+      "languageAuto": "Market default",
+      "creating": "Creating…",
+      "create": "Create link",
+      "createFailed": "Could not create a session",
+      "link": "Customer link",
+      "copy": "Copy",
+      "copied": "Copied",
+      "openLink": "Open ↗",
+      "hint": "Open it in a private window to keep the customer cookie separate."
+    },
+    "list": {
+      "empty": "No sessions yet. Create one to get a customer link.",
+      "handoffs": "Handoff requests · {count}",
+      "sessions": "Sessions · {count}",
+      "handoff": "Handoff",
+      "waits": "Waits: {what}",
+      "mine": "Mine"
+    },
+    "conversation": {
+      "waits": "Waits: {what}",
+      "assignedTo": "Assigned to {agent}",
+      "assignedToYou": "Assigned to you",
+      "assigning": "Assigning…",
+      "assign": "Assign to me"
+    },
+    "artifacts": {
+      "progress": "Progress",
+      "application": "Application",
+      "handedOff": "Handed off to an agent",
+      "sessionEnded": "Session {status}",
+      "currentNode": "Current node",
+      "waitingFor": "Waiting for",
+      "status": "Status",
+      "mode": "Mode",
+      "assigned": "Assigned",
+      "lastActivity": "Last activity",
+      "language": "Customer language",
+      "languageFailed": "Could not change the session language",
+      "identity": "Identity",
+      "via": "via {method}",
+      "failedAttempts": "{count, plural, one {# failed attempt} other {# failed attempts}}",
+      "needs": "Needs assessment",
+      "objects": "Insurable objects",
+      "recommendations": "Recommendations",
+      "noRecommendations": "No recommendations yet.",
+      "noApplication": "No application yet.",
+      "submitted": "Submitted",
+      "applicationId": "Application ID",
+      "missing": "Missing",
+      "answers": "Answers",
+      "summary": "Summary",
+      "parties": "Parties",
+      "noParties": "No parties yet."
+    }
+  }
+}

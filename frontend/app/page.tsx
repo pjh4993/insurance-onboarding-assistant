@@ -1,15 +1,15 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
-export default function Home() {
+export default async function Home() {
+  const t = await getTranslations();
   return (
     <main className="home">
       <div className="notice">
-        <h1>Cover Assistant</h1>
-        <p>
-          Customers open a session link (<code>/s/…</code>). Agents work in the console.
-        </p>
+        <h1>{t("common.appName")}</h1>
+        <p>{t.rich("home.body", { code: (chunks) => <code>{chunks}</code> })}</p>
         <Link className="btn btn--primary" href="/agent">
-          Open the agent console
+          {t("home.openConsole")}
         </Link>
       </div>
     </main>

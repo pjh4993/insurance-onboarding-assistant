@@ -70,6 +70,12 @@
   color: #fff;
   font-size: 12px;
 }
+.landing__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .landing__market {
   font-size: 13px;
   color: var(--c-ink-2);
@@ -373,9 +379,9 @@
   .landing__nav {
     padding: 16px 0;
   }
+  /* the switch matters more than the market label on a phone */
   .landing__market {
-    font-size: 12px;
-    padding: 3px 10px;
+    display: none;
   }
   .bento {
     grid-template-columns: 1fr;
@@ -414,6 +420,27 @@
   gap: 12px;
   padding: 12px 20px;
   background: var(--c-bg);
+}
+.customer__tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+/* a floating notice, so the chat's three-row grid is untouched */
+.locale-error {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  max-width: calc(100vw - 32px);
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13.5px;
+  box-shadow: 0 6px 20px rgb(25 31 40 / 0.1);
 }
 .customer__header .stages {
   flex: 0 1 420px;

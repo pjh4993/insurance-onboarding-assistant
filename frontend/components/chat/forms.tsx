@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState, type FormEvent } from "react";
 import type { InputBody, Market, RecommendationCard } from "@/lib/types";
 import { RecommendationCardView } from "../RecommendationCardView";
@@ -7,20 +8,14 @@ import { RecommendationCardView } from "../RecommendationCardView";
 /** Resolves true when the backend accepted the input; the caller shows any error. */
 export type Submit = (body: InputBody) => Promise<boolean>;
 
-const ID_TYPES: Record<Market, { value: string; label: string }[]> = {
-  KR: [
-    { value: "NATIONAL_ID", label: "Resident registration card" },
-    { value: "DRIVER_LICENSE", label: "Driver's license" },
-    { value: "PASSPORT", label: "Passport" },
-  ],
-  US: [
-    { value: "DRIVER_LICENSE", label: "Driver's license" },
-    { value: "PASSPORT", label: "Passport" },
-    { value: "NATIONAL_ID", label: "State ID" },
-  ],
+// Order per market; labels are in messages (idType.<market>.<type>).
+const ID_TYPES: Record<Market, ("NATIONAL_ID" | "DRIVER_LICENSE" | "PASSPORT")[]> = {
+  KR: ["NATIONAL_ID", "DRIVER_LICENSE", "PASSPORT"],
+  US: ["DRIVER_LICENSE", "PASSPORT", "NATIONAL_ID"],
 };
 
 export function IdentityForm({ market, onSubmit, disabled }: { market: Market; onSubmit: Submit; disabled: boolean }) {
+  const t = useTranslations();
   const [consent, setConsent] = useState(false);
 
   async function handle(e: FormEvent<HTMLFormElement>) {
@@ -44,15 +39,15 @@ export function IdentityForm({ market, onSubmit, disabled }: { market: Market; o
     <form className="form" onSubmit={handle} autoComplete="on">
       <div className="form__grid">
         <label className="field field--wide">
-          <span>Full name</span>
+          <span>{t("identity.fullName")}</span>
           <input name="full_name" required autoComplete="name" />
         </label>
         <label className="field">
-          <span>Email</span>
+          <span>{t("identity.email")}</span>
           <input name="email" type="email" required autoComplete="email" />
         </label>
         <label className="field">
-          <span>Mobile phone</span>
+          <span>{t("identity.phone")}</span>
           <input
             name="phone"
             type="tel"
@@ -62,30 +57,29 @@ export function IdentityForm({ market, onSubmit, disabled }: { market: Market; o
           />
         </label>
         <label className="field">
-          <span>ID type</span>
-          <select name="id_document_type" required defaultValue={ID_TYPES[market][0].value}>
-            {ID_TYPES[market].map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
+          <span>{t("identity.idType")}</span>
+          <select name="id_document_type" required defaultValue={ID_TYPES[market][0]}>
+            {ID_TYPES[market].map((type) => (
+              <option key={type} value={type}>
+                {t(`idType.${market}.${type}`)}
               </option>
             ))}
           </select>
         </label>
         <label className="field">
-          <span>ID number</span>
+          <span>{t("identity.idNumber")}</span>
           <input name="id_document_number" required autoComplete="off" spellCheck={false} />
         </label>
       </div>
       <label className="check">
         <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>
-          I agree that my details may be checked with the retail partner I bought from, so my purchase can be
-          pre-filled. <em>Optional — without it we verify you by SMS code.</em>
+          {t("identity.consent")} <em>{t("identity.consentNote")}</em>
         </span>
       </label>
       <div className="form__actions">
         <button className="btn btn--primary" disabled={disabled}>
-          Verify my identity
+          {t("identity.submit")}
         </button>
       </div>
     </form>
@@ -93,6 +87,7 @@ export function IdentityForm({ market, onSubmit, disabled }: { market: Market; o
 }
 
 export function OtpForm({ onSubmit, disabled }: { onSubmit: Submit; disabled: boolean }) {
+  const t = useTranslations("otp");
   const [code, setCode] = useState("");
   return (
     <form
@@ -103,20 +98,20 @@ export function OtpForm({ onSubmit, disabled }: { onSubmit: Submit; disabled: bo
       }}
     >
       <label className="field">
-        <span>Verification code</span>
+        <span>{t("label")}</span>
         <input
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
           inputMode="numeric"
           autoComplete="one-time-code"
-          placeholder="6-digit code"
+          placeholder={t("placeholder")}
           className="otp"
           required
           minLength={4}
         />
       </label>
       <button className="btn btn--primary" disabled={disabled || code.length < 4}>
-        Verify
+        {t("submit")}
       </button>
     </form>
   );
@@ -126,7 +121,7 @@ export function TextComposer({
   onSend,
   disabled,
   placeholder,
-  cta = "Send",
+  cta,
   initialText = "",
 }: {
   onSend: (text: string) => Promise<boolean>;
@@ -135,11 +130,12 @@ export function TextComposer({
   cta?: string;
   initialText?: string;
 }) {
+  const t = useTranslations("input");
   const [text, setText] = useState(initialText);
   async function send() {
-    const t = text.trim();
-    if (!t) return;
-    if (await onSend(t)) setText("");
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (await onSend(trimmed)) setText("");
   }
   return (
     <form
@@ -162,7 +158,7 @@ export function TextComposer({
         }}
       />
       <button className="btn btn--primary" disabled={disabled || !text.trim()}>
-        {cta}
+        {cta ?? t("send")}
       </button>
     </form>
   );
@@ -177,6 +173,7 @@ export function DecisionPanel({
   onSubmit: Submit;
   disabled: boolean;
 }) {
+  const t = useTranslations();
   const [mode, setMode] = useState<"choose" | "change" | "decline">("choose");
   const sorted = [...options].sort((a, b) => {
     const ea = a.eligibility_result === "ELIGIBLE" ? 0 : 1;
@@ -204,23 +201,23 @@ export function DecisionPanel({
                     })
                   }
                 >
-                  Accept this plan
+                  {t("decision.accept")}
                 </button>
               ) : undefined
             }
           />
         ))}
-        {sorted.length === 0 && <p className="muted">No products to show.</p>}
+        {sorted.length === 0 && <p className="muted">{t("decision.noProducts")}</p>}
       </div>
 
       {mode === "choose" && (
         <div className="decision__alt">
-          {!anyEligible && <p className="muted">None of the products fit right now.</p>}
+          {!anyEligible && <p className="muted">{t("decision.noneFit")}</p>}
           <button className="btn btn--ghost" disabled={disabled} onClick={() => setMode("change")}>
-            Change my answers
+            {t("decision.change")}
           </button>
           <button className="btn btn--ghost btn--danger" disabled={disabled} onClick={() => setMode("decline")}>
-            Decline
+            {t("decision.decline")}
           </button>
         </div>
       )}
@@ -228,34 +225,34 @@ export function DecisionPanel({
         <div className="decision__followup">
           <TextComposer
             disabled={disabled}
-            placeholder="What changed? e.g. “The trip is 10 days, not 5.”"
-            cta="Update"
+            placeholder={t("decision.changePlaceholder")}
+            cta={t("decision.update")}
             onSend={(text) => onSubmit({ type: "DECISION", data: { decision: "CHANGE", text } })}
           />
           <button className="btn btn--link" onClick={() => setMode("choose")}>
-            Back
+            {t("common.back")}
           </button>
         </div>
       )}
       {mode === "decline" && (
         <div className="decision__followup">
-          <p className="muted">Decline all offers? You can tell us why (optional).</p>
+          <p className="muted">{t("decision.declineAsk")}</p>
           <div className="row">
             <button
               className="btn btn--danger"
               disabled={disabled}
               onClick={() => onSubmit({ type: "DECISION", data: { decision: "DECLINE" } })}
             >
-              Decline all offers
+              {t("decision.declineAll")}
             </button>
             <button className="btn btn--link" onClick={() => setMode("choose")}>
-              Back
+              {t("common.back")}
             </button>
           </div>
           <TextComposer
             disabled={disabled}
-            placeholder="Reason (optional)"
-            cta="Decline with reason"
+            placeholder={t("decision.reasonPlaceholder")}
+            cta={t("decision.declineWithReason")}
             onSend={(text) => onSubmit({ type: "DECISION", data: { decision: "DECLINE", text } })}
           />
         </div>
@@ -273,23 +270,24 @@ export function ConfirmPanel({
   onSubmit: Submit;
   disabled: boolean;
 }) {
+  const t = useTranslations();
   const [fixing, setFixing] = useState(false);
   return (
     <div className="confirm">
       <div className="confirm__summary">
-        <h4>Application summary</h4>
-        <p>{summary?.trim() || "Please review the details above."}</p>
+        <h4>{t("confirm.title")}</h4>
+        <p>{summary?.trim() || t("confirm.fallback")}</p>
       </div>
       {fixing ? (
         <div className="decision__followup">
           <TextComposer
             disabled={disabled}
-            placeholder="What should we fix? e.g. “The payer is my spouse, Kim Minji.”"
-            cta="Send fix"
+            placeholder={t("confirm.fixPlaceholder")}
+            cta={t("confirm.sendFix")}
             onSend={(text) => onSubmit({ type: "CONFIRM", data: { confirmed: false, text } })}
           />
           <button className="btn btn--link" onClick={() => setFixing(false)}>
-            Back
+            {t("common.back")}
           </button>
         </div>
       ) : (
@@ -299,10 +297,10 @@ export function ConfirmPanel({
             disabled={disabled}
             onClick={() => onSubmit({ type: "CONFIRM", data: { confirmed: true } })}
           >
-            Confirm and submit
+            {t("confirm.submit")}
           </button>
           <button className="btn btn--ghost" disabled={disabled} onClick={() => setFixing(true)}>
-            Fix something
+            {t("confirm.fix")}
           </button>
         </div>
       )}
@@ -311,27 +309,28 @@ export function ConfirmPanel({
 }
 
 export function HandoffPanel({ onSubmit, disabled }: { onSubmit: Submit; disabled: boolean }) {
+  const t = useTranslations("handoff");
   const [note, setNote] = useState("");
   const send = (resolution: "VERIFIED" | "CONTINUE" | "END") =>
     onSubmit({ type: "AGENT", data: { resolution, ...(note.trim() ? { note: note.trim() } : {}) } });
   return (
     <div className="handoff">
-      <p className="handoff__title">Handoff — resolve to hand the session back to the flow</p>
+      <p className="handoff__title">{t("title")}</p>
       <textarea
         value={note}
         onChange={(e) => setNote(e.target.value)}
         rows={2}
-        placeholder="Note (optional) — e.g. “Verified by video call, passport checked.”"
+        placeholder={t("notePlaceholder")}
       />
       <div className="row">
         <button className="btn btn--success" disabled={disabled} onClick={() => send("VERIFIED")}>
-          Verified
+          {t("verified")}
         </button>
         <button className="btn btn--primary" disabled={disabled} onClick={() => send("CONTINUE")}>
-          Continue
+          {t("continue")}
         </button>
         <button className="btn btn--danger" disabled={disabled} onClick={() => send("END")}>
-          End session
+          {t("end")}
         </button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { currencyDigits, formatAgo, formatBillingPeriod, formatMoney, humanize } from "./format";
+import { agoParts, currencyDigits, formatDate, formatMoney, humanize } from "./format";
 
 describe("formatMoney", () => {
   it("treats KRW minor units as whole won (0 decimals)", () => {
@@ -25,22 +25,23 @@ describe("formatMoney", () => {
 });
 
 describe("labels", () => {
-  it("formats billing periods", () => {
-    expect(formatBillingPeriod("MONTHLY")).toBe("per month");
-    expect(formatBillingPeriod("PER_TRIP")).toBe("per trip");
-    expect(formatBillingPeriod("ONE_TIME")).toBe("one-time");
-  });
-
   it("humanizes enum values", () => {
     expect(humanize("PROTECT_DEVICE")).toBe("Protect device");
     expect(humanize("OTP")).toBe("OTP");
     expect(humanize("device_imei")).toBe("Device IMEI");
   });
 
-  it("formats relative time", () => {
+  it("splits relative time into a unit and a count", () => {
     const now = Date.parse("2026-09-21T12:00:00Z");
-    expect(formatAgo("2026-09-21T11:59:30Z", now)).toBe("30s ago");
-    expect(formatAgo("2026-09-21T11:55:00Z", now)).toBe("5m ago");
-    expect(formatAgo("2026-09-21T09:00:00Z", now)).toBe("3h ago");
+    expect(agoParts("2026-09-21T11:59:30Z", now)).toEqual({ unit: "seconds", n: 30 });
+    expect(agoParts("2026-09-21T11:55:00Z", now)).toEqual({ unit: "minutes", n: 5 });
+    expect(agoParts("2026-09-21T09:00:00Z", now)).toEqual({ unit: "hours", n: 3 });
+    expect(agoParts("2026-09-18T12:00:00Z", now)).toEqual({ unit: "days", n: 3 });
+    expect(agoParts("not a date", now)).toBeNull();
+  });
+
+  it("formats dates in the given locale", () => {
+    expect(formatDate("2026-09-21T10:00:00Z", "en-US")).toBe("Sep 21, 2026");
+    expect(formatDate("2026-09-21T10:00:00Z", "ko-KR")).toMatch(/2026.*9.*21/);
   });
 });

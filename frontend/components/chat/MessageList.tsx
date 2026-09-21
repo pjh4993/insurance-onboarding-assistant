@@ -1,15 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
-import { formatTime } from "@/lib/format";
+import { useFormat } from "@/i18n/useFormat";
 import type { Message } from "@/lib/types";
-
-const ROLE_LABEL: Record<Message["role"], string> = {
-  customer: "Customer",
-  assistant: "Assistant",
-  agent: "Agent",
-  system: "System",
-};
 
 /**
  * `perspective` decides which side is "mine": the customer sees their own messages on the right;
@@ -24,6 +18,8 @@ export function MessageList({
   perspective: "customer" | "agent";
   busy?: boolean;
 }) {
+  const t = useTranslations();
+  const { time } = useFormat();
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -31,7 +27,7 @@ export function MessageList({
 
   return (
     <div className="messages" role="log" aria-live="polite">
-      {messages.length === 0 && !busy && <p className="messages__empty">No messages yet.</p>}
+      {messages.length === 0 && !busy && <p className="messages__empty">{t("messages.empty")}</p>}
       {messages.map((m) => {
         if (m.role === "system") {
           return (
@@ -41,12 +37,12 @@ export function MessageList({
           );
         }
         const mine = perspective === "customer" ? m.role === "customer" : m.role !== "customer";
-        const label = perspective === "customer" && m.role === "assistant" ? "Assistant" : ROLE_LABEL[m.role];
+        const label = t(`role.${m.role}`);
         return (
           <div key={m.id} className={`msg msg--${m.role} ${mine ? "msg--mine" : ""}`}>
             <div className="msg__meta">
               <span>{label}</span>
-              <time dateTime={m.created_at}>{formatTime(m.created_at)}</time>
+              <time dateTime={m.created_at}>{time(m.created_at)}</time>
             </div>
             <div className="msg__bubble">{m.text}</div>
           </div>
@@ -54,7 +50,7 @@ export function MessageList({
       })}
       {busy && (
         <div className="msg msg--assistant">
-          <div className="msg__bubble typing" aria-label="Assistant is working">
+          <div className="msg__bubble typing" aria-label={t("messages.working")}>
             <span />
             <span />
             <span />

@@ -22,6 +22,7 @@
     "@opentelemetry/sdk-trace-base": "^2",
     "@vercel/otel": "^2.1.3",
     "next": "16.3.5",
+    "next-intl": "^4.14.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "server-only": "^0.0.1"

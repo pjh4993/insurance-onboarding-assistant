@@ -757,3 +757,31 @@ textarea {
     align-items: stretch;
   }
 }
+
+/* ---- language switch (customer app and agent console) */
+.locale-switch {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  border: 1px solid var(--line-2);
+  border-radius: 99px;
+  background: var(--surface);
+}
+.locale-switch button {
+  border: none;
+  background: none;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.locale-switch button.is-on {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+}
+.locale-switch button:disabled {
+  cursor: progress;
+}

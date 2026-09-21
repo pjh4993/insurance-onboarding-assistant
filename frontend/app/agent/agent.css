@@ -163,6 +163,9 @@
   font-size: 13px;
   cursor: pointer;
 }
+.segmented--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
 .segmented button.is-on {
   background: var(--ink);
   color: #fff;
@@ -337,8 +340,13 @@
   .console__nav {
     display: flex;
   }
-  .console__who {
+  /* room for the panel tabs and the language switch: keep only the logo mark */
+  .console__me,
+  .console__bar .brand > div {
     display: none;
+  }
+  .console__nav button {
+    white-space: nowrap;
   }
   .col {
     grid-area: main;

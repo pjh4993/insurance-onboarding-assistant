@@ -1,10 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { agentApi, ApiError } from "@/lib/api";
 import { appendMessage, upsertSession, sortSessions } from "@/lib/session";
-import type { InputBody, SessionDetail, SessionSummary } from "@/lib/types";
+import type { InputBody, Locale, SessionDetail, SessionSummary } from "@/lib/types";
 import { useEventStream } from "@/lib/useEventStream";
+import { AgentLocaleSwitch } from "./AgentLocaleSwitch";
 import { ArtifactPanel } from "./ArtifactPanel";
 import { Conversation } from "./Conversation";
 import { NewSession } from "./NewSession";
@@ -22,6 +24,8 @@ function useNow(intervalMs = 30_000): number {
 }
 
 export function AgentConsole() {
+  const t = useTranslations("agent");
+  const tc = useTranslations("common");
   const [me, setMe] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [listError, setListError] = useState<string | null>(null);
@@ -42,8 +46,8 @@ export function AgentConsole() {
         setSessions(sortSessions(r.sessions));
         setListError(null);
       })
-      .catch((e: unknown) => setListError(e instanceof ApiError ? e.message : "Could not load sessions"));
-  }, []);
+      .catch((e: unknown) => setListError(e instanceof ApiError ? e.message : t("loadSessionsFailed")));
+  }, [t]);
 
   useEffect(() => {
     agentApi.me().then((r) => setMe(r.agent_id), () => setMe(null));
@@ -69,9 +73,9 @@ export function AgentConsole() {
       })
       .catch((e: unknown) => {
         if (selectedRef.current !== id) return;
-        setDetailError(e instanceof ApiError ? e.message : "Could not load the session");
+        setDetailError(e instanceof ApiError ? e.message : t("loadSessionFailed"));
       });
-  }, []);
+  }, [t]);
 
   function select(id: string) {
     selectedRef.current = id;
@@ -130,10 +134,18 @@ export function AgentConsole() {
       setSessions((prev) => upsertSession(prev, s));
       setDetail((d) => (d && d.session.session_id === s.session_id ? { ...d, session: s } : d));
     } catch (e) {
-      setDetailError(e instanceof ApiError ? e.message : "Could not assign the session");
+      setDetailError(e instanceof ApiError ? e.message : t("assignFailed"));
     } finally {
       setAssigning(false);
     }
+  }
+
+  /** Change the selected session's language. Throws so the panel can show its own error. */
+  async function setSessionLocale(locale: Locale) {
+    if (!selectedId) return;
+    const s = await agentApi.setLocale(selectedId, locale);
+    setSessions((prev) => upsertSession(prev, s));
+    setDetail((d) => (d && d.session.session_id === s.session_id ? { ...d, session: s } : d));
   }
 
   async function submit(body: InputBody) {
@@ -152,28 +164,31 @@ export function AgentConsole() {
             ◆
           </span>
           <div>
-            <strong>Agent console</strong>
-            <span className="brand__sub">Onboarding sessions</span>
+            <strong>{t("title")}</strong>
+            <span className="brand__sub">{t("sub")}</span>
           </div>
         </div>
-        <nav className="console__nav" aria-label="Panels">
+        <nav className="console__nav" aria-label={t("panels")}>
           <button className={view === "list" ? "is-on" : ""} onClick={() => setView("list")}>
-            Sessions{handoffCount ? ` (${handoffCount})` : ""}
+            {t("sessionsTab", { count: handoffCount })}
           </button>
           <button className={view === "chat" ? "is-on" : ""} onClick={() => setView("chat")} disabled={!selectedId}>
-            Chat
+            {t("chatTab")}
           </button>
           <button
             className={view === "artifacts" ? "is-on" : ""}
             onClick={() => setView("artifacts")}
             disabled={!selectedId}
           >
-            Details
+            {t("detailsTab")}
           </button>
         </nav>
         <div className="console__who">
-          {listStream === "reconnecting" && <span className="conn">Reconnecting…</span>}
-          <span className="muted">Signed in as</span> <strong>{me ?? "…"}</strong>
+          {listStream === "reconnecting" && <span className="conn">{tc("reconnecting")}</span>}
+          <AgentLocaleSwitch />
+          <span className="console__me">
+            <span className="muted">{t("signedInAs")}</span> <strong>{me ?? "…"}</strong>
+          </span>
         </div>
       </header>
 
@@ -185,11 +200,11 @@ export function AgentConsole() {
 
       <section className="col col--chat">
         {!selectedId ? (
-          <p className="empty">Select a session to see the conversation.</p>
+          <p className="empty">{t("selectSession")}</p>
         ) : detailError && !detail ? (
           <p className="empty">{detailError}</p>
         ) : !detail ? (
-          <p className="empty">Loading…</p>
+          <p className="empty">{tc("loading")}</p>
         ) : (
           <>
             {detailError && <p className="input-panel__error">{detailError}</p>}
@@ -206,7 +221,11 @@ export function AgentConsole() {
       </section>
 
       <aside className="col col--artifacts">
-        {detail ? <ArtifactPanel key={detail.session.session_id} detail={detail} now={now} /> : <p className="empty">No session selected.</p>}
+        {detail ? (
+          <ArtifactPanel key={detail.session.session_id} detail={detail} now={now} onLocale={setSessionLocale} />
+        ) : (
+          <p className="empty">{t("noSession")}</p>
+        )}
       </aside>
     </div>
   );

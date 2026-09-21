@@ -35,9 +35,3 @@ export function inputKindFor(waitingFor: WaitingFor | undefined, actor: Actor): 
       return "none";
   }
 }
-
-export const TEXT_PLACEHOLDER: Record<"NEEDS" | "PARTIES" | "ANSWERS", string> = {
-  NEEDS: "Tell us about yourself and what you want to protect…",
-  PARTIES: "Who is insured, and who pays? e.g. “Just me”",
-  ANSWERS: "Answer the questions above…",
-};

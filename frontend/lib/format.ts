@@ -1,5 +1,3 @@
-import type { BillingPeriod } from "./types";
-
 /** Number of minor-unit digits ISO 4217 assigns to a currency (KRW 0, USD 2, ...). */
 export function currencyDigits(currency: string): number {
   try {
@@ -26,16 +24,6 @@ export function formatMoney(minor: number, currency: string, locale = "en-US"): 
   }
 }
 
-const PERIOD_LABEL: Record<BillingPeriod, string> = {
-  MONTHLY: "per month",
-  ONE_TIME: "one-time",
-  PER_TRIP: "per trip",
-};
-
-export function formatBillingPeriod(period: BillingPeriod | string): string {
-  return PERIOD_LABEL[period as BillingPeriod] ?? period.toLowerCase().replace(/_/g, " ");
-}
-
 const ACRONYMS = new Set(["otp", "id", "imei", "kr", "us"]);
 
 /** "PROTECT_DEVICE" -> "Protect device", "OTP" -> "OTP" */
@@ -49,27 +37,29 @@ export function humanize(value: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function formatDate(iso: string): string {
+export function formatDate(iso: string, locale = "en-US"): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
 }
 
-export function formatTime(iso: string): string {
+export function formatTime(iso: string, locale = "en-US"): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
-/** "3m ago" style; `now` is injectable for tests. */
-export function formatAgo(iso: string, now: number = Date.now()): string {
+export type AgoUnit = "seconds" | "minutes" | "hours" | "days";
+
+/** How long ago, as a unit and a count for a translated "3m ago" message; `now` is injectable for tests. */
+export function agoParts(iso: string, now: number = Date.now()): { unit: AgoUnit; n: number } | null {
   const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return "";
+  if (Number.isNaN(t)) return null;
   const s = Math.max(0, Math.round((now - t) / 1000));
-  if (s < 60) return `${s}s ago`;
+  if (s < 60) return { unit: "seconds", n: s };
   const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
+  if (m < 60) return { unit: "minutes", n: m };
   const h = Math.round(m / 60);
-  if (h < 48) return `${h}h ago`;
-  return `${Math.round(h / 24)}d ago`;
+  if (h < 48) return { unit: "hours", n: h };
+  return { unit: "days", n: Math.round(h / 24) };
 }

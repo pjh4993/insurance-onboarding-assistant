@@ -1,11 +1,11 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { ApiError } from "@/lib/api";
-import { inputKindFor, TEXT_PLACEHOLDER, type Actor } from "@/lib/inputMode";
+import { inputKindFor, type Actor } from "@/lib/inputMode";
 import { isClosed } from "@/lib/session";
 import type { InputBody, Prompt, SessionSummary } from "@/lib/types";
-import { STATUS_LABEL } from "../labels";
 import { ConfirmPanel, DecisionPanel, HandoffPanel, IdentityForm, OtpForm, TextComposer } from "./forms";
 
 /**
@@ -30,6 +30,7 @@ export function InputPanel({
   /** Pre-fills the first profiling answer, e.g. what the customer picked on the landing screen. */
   needsDraft?: string;
 }) {
+  const t = useTranslations();
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const waitingFor = prompt ? prompt.waiting_for : session.waiting_for;
@@ -44,7 +45,7 @@ export function InputPanel({
       await onSubmit(body);
       return true;
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not send. Please try again.");
+      setError(e instanceof ApiError ? e.message : t("input.sendFailed"));
       return false;
     } finally {
       setSending(false);
@@ -54,7 +55,7 @@ export function InputPanel({
   if (isClosed(session.status) && kind === "none") {
     return (
       <div className="input-panel input-panel--closed">
-        Session {STATUS_LABEL[session.status].toLowerCase()}.
+        {t("input.closed", { status: t(`status.${session.status}`) })}
       </div>
     );
   }
@@ -72,7 +73,9 @@ export function InputPanel({
       body = (
         <TextComposer
           disabled={disabled}
-          placeholder={actor === "agent" ? `Answer as agent (${w.toLowerCase()})…` : TEXT_PLACEHOLDER[w]}
+          placeholder={
+            actor === "agent" ? t("input.agentPlaceholder", { kind: t(`waiting.${w}`) }) : t(`input.placeholder.${w}`)
+          }
           initialText={w === "NEEDS" ? needsDraft : undefined}
           onSend={(text) => safeSubmit({ type: w, data: { text } })}
         />
@@ -89,13 +92,13 @@ export function InputPanel({
       body = <HandoffPanel onSubmit={safeSubmit} disabled={disabled} />;
       break;
     case "wait-agent":
-      body = <p className="waiting">An agent will join this conversation shortly. You can keep this page open.</p>;
+      body = <p className="waiting">{t("input.waitAgent")}</p>;
       break;
     case "wait-customer":
-      body = <p className="waiting">Waiting for the customer to enter their identity details or code.</p>;
+      body = <p className="waiting">{t("input.waitCustomer")}</p>;
       break;
     case "none":
-      body = <p className="waiting">{busy ? "Working on it…" : "Nothing to answer right now."}</p>;
+      body = <p className="waiting">{busy ? t("input.working") : t("input.nothing")}</p>;
       break;
   }
 

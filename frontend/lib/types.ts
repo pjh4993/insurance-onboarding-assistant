@@ -2,6 +2,9 @@
 
 export type Market = "KR" | "US";
 
+/** The session's language: the customer UI, fixed copy and LLM replies. */
+export type Locale = "ko" | "en";
+
 export type Stage =
   | "IDENTITY"
   | "PROFILING"
@@ -29,6 +32,8 @@ export type SessionSummary = {
   session_id: string;
   display_name: string; // "Unverified #1a2b" until identity is verified
   market: Market;
+  /** Missing from backends older than the locale change; use i18n/locales sessionLocale(). */
+  locale?: Locale;
   status: SessionStatus;
   stage: Stage;
   waiting_for: WaitingFor;
