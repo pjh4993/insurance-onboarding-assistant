@@ -1,5 +1,9 @@
 """Graph state (wiki/state-model.md §2): conversation, progress, entity ids and routing signals.
 
+The state is what the checkpointer persists, so it stays in this one module, grouped by the domain in
+`onboarding_agent.flows` that writes each field. Field names are checkpoint channel names: renaming one
+is a migration, like renaming a node.
+
 Entity values live in the domain DB; the state never holds extracted PII (names, phone numbers,
 document numbers). Customer free text does sit in `messages`, which is why the checkpoint is
 encrypted."""
@@ -25,53 +29,66 @@ class ErrorInfo(TypedDict):
     attempts: int
 
 
-class OnboardingState(TypedDict, total=False):
-    # conversation
+class ConversationState(TypedDict, total=False):
     messages: Annotated[list[AnyMessage], add_messages]
     actor: Literal["CUSTOMER", "AGENT"]
     mode: Literal["AUTO", "ASSIST"]
-
     # session context (ids, market and language only)
     session_id: str
     party_id: str
     market: Literal["KR", "US"]
     locale: Literal["ko", "en"]  # copy and LLM replies; mirrors OnboardingSession.locale on every resume
-
     # progress
     stage: Stage
     waiting_for: WaitingFor | None
     last_input: WaitingFor | None  # which input ask_customer just received (routing signal)
 
-    # entity references — values are in the domain DB
-    needs_assessment_id: str | None
-    insurable_object_ids: list[str]
-    recommendation_ids: list[str]
-    quote_ids: dict[str, str]  # recommendation_id -> quote_id
-    application_id: str | None
+
+class IdentityState(TypedDict, total=False):
+    identity_result: IdentityResult | None
     otp_request_id: str | None
     otp_code: dict[str, str] | None  # {"code"}: transient, set by ask_customer, cleared by check_otp
 
-    # routing signals — the previous node's result
-    identity_result: IdentityResult | None
+
+class ProfilingState(TypedDict, total=False):
+    needs_assessment_id: str | None
+    insurable_object_ids: list[str]
     needs_complete: bool
     needs_rounds: int  # NEEDS answers since the last completed assessment (loop guard)
+
+
+class RecommendationState(TypedDict, total=False):
+    recommendation_ids: list[str]
+    quote_ids: dict[str, str]  # recommendation_id -> quote_id
     eligible_count: int
     decision: Literal["ACCEPT", "DECLINE", "CHANGE"] | None
+
+
+class ApplicationState(TypedDict, total=False):
+    application_id: str | None
     parties_complete: bool
     answers_complete: bool
     answers_rounds: int  # ANSWERS replies that left fields missing (loop guard)
     confirmed: bool | None
+
+
+class HandoffState(TypedDict, total=False):
     handoff_reason: HandoffReason | None
     handoff_resolution: Literal["VERIFIED", "CONTINUE", "END"] | None
     resume_node: str | None  # node to re-run after an ERROR handoff
     resume_stage: Stage | None
-
-    # errors
     last_error: ErrorInfo | None
+
+
+class OnboardingState(
+    ConversationState, IdentityState, ProfilingState, RecommendationState, ApplicationState, HandoffState, total=False
+):
+    pass
 
 
 def initial_state(*, session_id: str, party_id: str, market: str, locale: str) -> dict[str, Any]:
     return {
+        # conversation
         "messages": [],
         "actor": "CUSTOMER",
         "mode": "AUTO",
@@ -82,22 +99,27 @@ def initial_state(*, session_id: str, party_id: str, market: str, locale: str) -
         "stage": "IDENTITY",
         "waiting_for": None,
         "last_input": None,
-        "needs_assessment_id": None,
-        "insurable_object_ids": [],
-        "recommendation_ids": [],
-        "quote_ids": {},
-        "application_id": None,
+        # identity
+        "identity_result": None,
         "otp_request_id": None,
         "otp_code": None,
-        "identity_result": None,
+        # profiling
+        "needs_assessment_id": None,
+        "insurable_object_ids": [],
         "needs_complete": False,
         "needs_rounds": 0,
+        # recommendation
+        "recommendation_ids": [],
+        "quote_ids": {},
         "eligible_count": 0,
         "decision": None,
+        # application
+        "application_id": None,
         "parties_complete": False,
         "answers_complete": False,
         "answers_rounds": 0,
         "confirmed": None,
+        # handoff
         "handoff_reason": None,
         "handoff_resolution": None,
         "resume_node": None,

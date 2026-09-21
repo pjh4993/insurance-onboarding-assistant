@@ -163,3 +163,22 @@ def test_domain_registries_cover_the_state_vocabulary():
 
 def test_ask_customer_hands_off_an_unknown_kind_of_answer():
     assert EDGES["ask_customer"]({"last_input": "SOMETHING_ELSE"}) == "human_handoff"
+
+
+def test_state_fields_are_stable():
+    """State fields are checkpoint channels: like node names, renaming one strands in-flight sessions."""
+    from typing import get_type_hints
+
+    from onboarding_agent.state import OnboardingState, initial_state
+
+    fields = set(get_type_hints(OnboardingState))
+    assert fields == set(initial_state(session_id="s", party_id="p", market="KR", locale="ko"))
+    assert fields == {
+        "messages", "actor", "mode", "session_id", "party_id", "market", "locale", "stage", "waiting_for",
+        "last_input",
+        "identity_result", "otp_request_id", "otp_code",
+        "needs_assessment_id", "insurable_object_ids", "needs_complete", "needs_rounds",
+        "recommendation_ids", "quote_ids", "eligible_count", "decision",
+        "application_id", "parties_complete", "answers_complete", "answers_rounds", "confirmed",
+        "handoff_reason", "handoff_resolution", "resume_node", "resume_stage", "last_error",
+    }  # fmt: skip

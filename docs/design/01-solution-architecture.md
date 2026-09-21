@@ -64,8 +64,8 @@ agent and the domain are libraries; the API service depends on them, never the o
 
 | Package | Path | Owns | Must not import |
 |---|---|---|---|
-| `onboarding-core` | `backend/packages/core` | Domain entities as plain dataclasses, eligibility and pricing rules, the catalog seed, and the **ports** (`onboarding_core.ports`): the `UnitOfWork` with one repository per domain, the partner/identity/contract gateways | SQLAlchemy, LangGraph, FastAPI, `app` |
-| `onboarding-agent` | `backend/packages/agent` | The LangGraph graph, nodes, routing, copy, LLM access, the encrypted checkpointer, and `AgentRunner` (start, resume, snapshot, route a failed run to handoff) | SQLAlchemy, FastAPI, `app` |
+| `onboarding-core` | `backend/packages/core` | Domain entities as plain dataclasses, the profiling, eligibility, pricing and application rules, the product lines (device, travel), the catalog seed, and the **ports** (`onboarding_core.ports`): the `UnitOfWork` with one repository per domain, the partner/identity/contract gateways | SQLAlchemy, LangGraph, FastAPI, `app` |
+| `onboarding-agent` | `backend/packages/agent` | The LangGraph graph (one module per domain under `flows/`), copy, LLM access, the encrypted checkpointer, and `AgentRunner` (start, resume, snapshot, route a failed run to handoff) | SQLAlchemy, FastAPI, `app` |
 | API service | `backend/app` | HTTP API and SSE, session tokens and the `OnboardingSession` mirror, and the **adapters**: the SQLAlchemy mapping of the core entities (`app/db/models.py`) and unit of work (`app/db/uow.py`), the HTTP clients. `app/main.py` is the composition root that plugs the adapters into the agent | — |
 
 The agent reads and writes the domain DB only through `UnitOfWork`. Core entities are mapped onto the tables

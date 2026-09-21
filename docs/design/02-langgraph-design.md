@@ -4,10 +4,11 @@ The backend runs one LangGraph graph per onboarding session. One session is one 
 the four stages the brief lists and pauses whenever it needs a person.
 
 What the graph stores and how routing reads it is in [state-management.md](03-state-management.md). The code is in
-the `onboarding-agent` package (`backend/packages/agent/src/onboarding_agent/`): `build.py` wires the graph, `nodes.py` holds
-the nodes, `routing.py` the edge functions, and `runner.py` is the entry point the API service drives. Nodes
-reach the domain DB and external systems only through the ports in `onboarding_core.ports` (see
-[solution-architecture.md](01-solution-architecture.md#backend-packages)).
+the `onboarding-agent` package (`backend/packages/agent/src/onboarding_agent/`): one module per domain under
+`flows/` holds its nodes and their edge functions, `build.py` assembles them into the graph, and `runner.py` is
+the entry point the API service drives. Nodes reach the domain DB and external systems only through the ports
+in `onboarding_core.ports` (see [solution-architecture.md](01-solution-architecture.md#backend-packages)). How the
+code is split, and how to add to it, is in [§9](#9-code-by-domain).
 
 ## 1. The four stages
 
@@ -73,7 +74,7 @@ Blue is code, purple is LLM, orange is a wait node. Not drawn: every node routes
 ### Conditional edges
 
 Every node has a conditional edge. Every routing function reads **only the state**, never the database, so
-routing can be replayed from a checkpoint and tested without a database (`backend/tests/test_routing.py`).
+routing can be replayed from a checkpoint and tested without a database (`backend/packages/agent/tests/test_routing.py`).
 
 | After | Reads | Branches |
 |---|---|---|
@@ -211,3 +212,48 @@ reasons. If it returns nothing for a product, the matched rationale sentences ar
 | **Context awareness** | `assess_needs` reads all of the customer's needs answers plus the values captured so far; `collect_answers` reads the answers so far and what is still missing. A later answer fills gaps instead of starting over. Partner purchases pre-fill the device, and verified data pre-fills application answers, so the customer is not asked twice |
 | **Workflow transitions** | `stage` moves IDENTITY → PROFILING → RECOMMENDATION → APPLICATION → SUBMITTED, with exits to HANDOFF, DECLINED, WITHDRAWN. The `CHANGE` edge moves back from recommendation to profiling and expires old recommendations. Each transition is mirrored to `OnboardingSession` and pushed to the UI over SSE |
 | **Error handling** | Per-node retry with backoff, `last_error` → `human_handoff`, loop guards, idempotent writes and idempotent submission, fault injection in the mock to show all of this |
+
+## 9. Code by domain
+
+The graph is **one flat graph** assembled from domain modules. It is not built from LangGraph subgraphs. Node
+names and state fields are checkpoint data: a session paused today resumes against tomorrow's release only if
+they still exist. A flat graph keeps them stable while the code is split. It also keeps error recovery
+(`resume_node`), SSE streaming and the agent console's `current_node` working as they are.
+
+| Module (`onboarding_agent/flows/`) | Nodes | Declares |
+|---|---|---|
+| `conversation` | `greet`, `ask_customer` | built from the stages' `inputs` |
+| `identity` | `verify_identity`, `check_otp`, `check_document` | inputs `IDENTITY_INFO`, `OTP_CODE` (with recorders that store them); handoff `IDENTITY_FAILED` |
+| `profiling` | `fetch_purchases`, `assess_needs` | input `NEEDS`; handoff `NEEDS_INCOMPLETE` |
+| `recommendation` | `check_eligibility`, `rank_products`, `quote_premium`, `explain_recommendation`, `await_decision` | handoff `NO_ELIGIBLE_PRODUCT` (back to profiling) |
+| `application` | `open_application`, `collect_parties`, `collect_answers`, `summarize_application`, `confirm_summary`, `submit_application` | inputs `PARTIES`, `ANSWERS`; handoff `ANSWERS_INCOMPLETE` |
+| `handoff` | `human_handoff`, `await_agent` | built from the stages' `handoffs`, plus `ERROR` |
+
+Each module exports a `DomainModule`:
+- **Nodes and routing**: its nodes, one router per node, and which nodes retry.
+- **`inputs`**: the kinds of free-form answer it asks `ask_customer` for. Each kind names the node that handles it and, optionally, a recorder that stores it.
+- **`handoffs`**: the handoff reasons it raises. Each reason names where the session resumes and, optionally, a resolver that applies the agent's resolution.
+
+`ask_customer` and `await_agent` only dispatch through these registries, so they need no changes when a domain
+is added. A key can be claimed only once.
+
+Product differences are not in the flow. Device and travel are **product lines** in `onboarding-core`
+(`onboarding_core/product_lines/`). Each line declares:
+- the objectives that call for it and the needs it requires per market
+- how to build the insured object's attributes
+- the application answers it can prefill, the aliases the LLM may use, and its field labels
+
+The profiling and application rules loop over the registered lines.
+
+To add a product line:
+1. Write a `ProductLine` module and register it in `LINES`.
+2. Add its products to the catalog seed.
+3. Add a field for its needs to `NeedsAssessment` and to the LLM's `NeedsExtraction`. Both still have fixed `device` and `trip` fields.
+
+**What guards a refactor:**
+
+| Test | Checks |
+|---|---|
+| `tests/test_golden.py` | Eleven scripted flows, including a KR session in English and a language switch mid-session. Each records the node path, every turn's state, messages and prompt, the entities, the LLM calls with the language each was told to reply in, and the external calls, all pinned to `tests/golden/*.json`. Regenerate with `UPDATE_GOLDEN=1` only for an intended behavior change, and review the diff |
+| `test_node_names_are_stable`, `test_state_fields_are_stable` | Pin the checkpointed names. Renaming a node or a field is a migration, not a refactor |
+| `test_domain_registries_cover_the_state_vocabulary` | Every `WaitingFor` input has a handler node, and every `HandoffReason` has a resolution |

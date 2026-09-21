@@ -26,7 +26,10 @@ first question. The customer and the agent open the same thread.
 
 ## 3. State schema
 
-This is `onboarding_agent/state.py` (`backend/packages/agent`), shortened. IDs are strings.
+This is `onboarding_agent/state.py` (`backend/packages/agent`), shortened. IDs are strings. In the code,
+`OnboardingState` is composed of one `TypedDict` per domain that writes the fields (`IdentityState`,
+`ProfilingState`, ...). The state is still defined in this one module because it is the persisted checkpoint
+schema: field names are channel names, so renaming one is a migration.
 
 ```python
 class OnboardingState(TypedDict, total=False):
