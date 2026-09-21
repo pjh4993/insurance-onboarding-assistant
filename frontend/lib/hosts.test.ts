@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { agentHostRedirect, agentConsoleHref, baseUrl, customerLink, isAgentHost } from "./hosts";
+import {
+  agentHostRedirect,
+  agentConsoleHref,
+  baseUrl,
+  customerLink,
+  isAgentHost,
+  isOperatorHost,
+  operatorHostRedirect,
+} from "./hosts";
 
 const AGENT = "https://dev.agent.onboardassist.click";
 const APP = "https://dev.app.onboardassist.click";
@@ -67,5 +75,24 @@ describe("agentHostRedirect", () => {
     expect(agentHostRedirect("/agent", "", "localhost:13000", null)).toBeNull(); // no agent host: one origin
     expect(agentHostRedirect("/agentx", "", "dev.app.example", agent)).toBeNull();
     expect(agentHostRedirect("/chat", "", "dev.app.example", agent)).toBeNull();
+  });
+});
+
+
+describe("operator host", () => {
+  const operatorBase = "https://dev.operator.onboardassist.click";
+  it("recognizes the operator host", () => {
+    expect(isOperatorHost("dev.operator.onboardassist.click", operatorBase)).toBe(true);
+    expect(isOperatorHost("dev.agent.onboardassist.click", operatorBase)).toBe(false);
+    expect(isOperatorHost("dev.operator.onboardassist.click", null)).toBe(false);
+  });
+  it("sends operator pages to the operator host, with /operator as its root", () => {
+    expect(operatorHostRedirect("/operator", "", "dev.app.onboardassist.click", operatorBase)).toBe(`${operatorBase}/`);
+    expect(operatorHostRedirect("/operator/x", "?a=1", "dev.app.onboardassist.click", operatorBase)).toBe(
+      `${operatorBase}/operator/x?a=1`,
+    );
+    expect(operatorHostRedirect("/operator", "", "dev.operator.onboardassist.click", operatorBase)).toBeNull();
+    expect(operatorHostRedirect("/agent", "", "dev.app.onboardassist.click", operatorBase)).toBeNull();
+    expect(operatorHostRedirect("/operator", "", "localhost:3000", null)).toBeNull();
   });
 });

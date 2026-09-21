@@ -13,10 +13,20 @@ export function baseUrl(value: string | null | undefined): string | null {
   }
 }
 
+/** Whether a request's Host header names the host of `base`. Always false when that host is not set. */
+export function isHost(host: string | null | undefined, base: string | null): boolean {
+  if (!host || !base) return false;
+  return host.trim().toLowerCase() === new URL(base).host;
+}
+
 /** Whether a request's Host header names the agent host. Always false when no agent host is set. */
 export function isAgentHost(host: string | null | undefined, agentBase: string | null): boolean {
-  if (!host || !agentBase) return false;
-  return host.trim().toLowerCase() === new URL(agentBase).host;
+  return isHost(host, agentBase);
+}
+
+/** Whether a request's Host header names the operator host. Always false when no operator host is set. */
+export function isOperatorHost(host: string | null | undefined, operatorBase: string | null): boolean {
+  return isHost(host, operatorBase);
 }
 
 /** Where the landing's "For agents" link goes: the agent host's root (the console), else /agent. */
@@ -40,7 +50,27 @@ export function agentHostRedirect(
   host: string | null | undefined,
   agentBase: string | null,
 ): string | null {
-  if (!agentBase || isAgentHost(host, agentBase)) return null;
-  if (pathname !== "/agent" && !pathname.startsWith("/agent/")) return null;
-  return `${agentBase}${pathname === "/agent" ? "/" : pathname}${search}`;
+  return hostRedirect("/agent", pathname, search, host, agentBase);
+}
+
+/** The same for operator pages (/operator), which belong on the operator host. */
+export function operatorHostRedirect(
+  pathname: string,
+  search: string,
+  host: string | null | undefined,
+  operatorBase: string | null,
+): string | null {
+  return hostRedirect("/operator", pathname, search, host, operatorBase);
+}
+
+function hostRedirect(
+  prefix: string,
+  pathname: string,
+  search: string,
+  host: string | null | undefined,
+  base: string | null,
+): string | null {
+  if (!base || isHost(host, base)) return null;
+  if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) return null;
+  return `${base}${pathname === prefix ? "/" : pathname}${search}`;
 }

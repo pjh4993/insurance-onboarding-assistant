@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { resolveAgentId } from "./agentAuth";
+import { resolveOperator } from "./operatorAuth";
 import { SESSION_COOKIE } from "./config";
 import { forward, jsonError } from "./forward";
 
@@ -16,4 +17,11 @@ export async function forwardAgent(req: Request, path: string, opts?: { sse?: bo
   const agentId = resolveAgentId(req.headers);
   if (!agentId) return jsonError(401, "Agent sign-in required");
   return forward(req, path, { "X-Agent-Id": agentId }, opts);
+}
+
+/** Forward as an operator: X-Operator-Id once the operator's Cognito login is verified. */
+export async function forwardOperator(req: Request, path: string) {
+  const operator = await resolveOperator(req.headers);
+  if (!operator) return jsonError(401, "Operator sign-in required");
+  return forward(req, path, { "X-Operator-Id": operator.id });
 }
