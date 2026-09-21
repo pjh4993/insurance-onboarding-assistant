@@ -90,3 +90,15 @@ variable "docs_port" {
   type    = number
   default = 8080
 }
+
+variable "operator_domain_name" {
+  description = "The operator console's host (e.g. dev.operator.example.com); empty: none."
+  type        = string
+  default     = ""
+}
+
+variable "operator_client_id" {
+  description = "The Cognito app client the operator host logs in with."
+  type        = string
+  default     = ""
+}

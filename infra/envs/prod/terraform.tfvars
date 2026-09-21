@@ -18,10 +18,11 @@ identity_api_url = "https://identity.invalid"
 contract_api_url = "https://contract.invalid"
 
 # Hosts in the zone develop's domain registration created (develop: dev.app., dev.agent., dev.docs.).
-domain_name       = "app.onboardassist.click"
-agent_domain_name = "agent.onboardassist.click"
-docs_domain_name  = "docs.onboardassist.click"
-route53_zone_name = "onboardassist.click"
+domain_name          = "app.onboardassist.click"
+agent_domain_name    = "agent.onboardassist.click"
+docs_domain_name     = "docs.onboardassist.click"
+operator_domain_name = "operator.onboardassist.click"
+route53_zone_name    = "onboardassist.click"
 
 # develop owns the OIDC provider and ECR repositories; prod looks them up.
 create_shared_ci_resources = false

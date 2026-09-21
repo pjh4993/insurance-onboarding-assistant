@@ -16,3 +16,9 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+variable "operator_domain_name" {
+  description = "The operator console's host; empty: no operator console."
+  type        = string
+  default     = ""
+}

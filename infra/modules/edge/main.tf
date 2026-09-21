@@ -2,10 +2,13 @@ locals {
   https_enabled = var.domain_name != ""
   docs_enabled  = local.https_enabled && var.docs_domain_name != ""
   agent_enabled = local.https_enabled && var.agent_domain_name != ""
+  # The operator host needs its own Cognito client (its callback names that host).
+  operator_enabled = local.https_enabled && var.operator_domain_name != "" && var.operator_client_id != ""
   hostnames = compact([
     var.domain_name,
     local.docs_enabled ? var.docs_domain_name : "",
     local.agent_enabled ? var.agent_domain_name : "",
+    local.operator_enabled ? var.operator_domain_name : "",
   ])
   zone_name = var.route53_zone_name != "" ? var.route53_zone_name : var.domain_name
 }
@@ -297,3 +300,70 @@ moved {
   to   = aws_lb_listener_rule.docs[0]
 }
 
+
+# ---------------------------------------------------------------------------
+# Operator console: its own host, login through its own Cognito client
+# ---------------------------------------------------------------------------
+
+# The operator API answers 404 anywhere but the operator host, before the agent host's catch-all login rule.
+resource "aws_lb_listener_rule" "operator_api_off_other_hosts" {
+  count = local.operator_enabled ? 1 : 0
+
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 5
+
+  action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"error\":\"not_found\"}"
+      status_code  = "404"
+    }
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/operator/*"]
+    }
+  }
+
+  condition {
+    host_header {
+      values = compact([var.domain_name, local.agent_enabled ? var.agent_domain_name : ""])
+    }
+  }
+}
+
+# Every path on the operator host needs the login; the frontend serves the console at its root and verifies
+# the forwarded access token (the operator client, the operators group) before relaying to the backend.
+resource "aws_lb_listener_rule" "operator_cognito" {
+  count = local.operator_enabled ? 1 : 0
+
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 11
+
+  action {
+    type = "authenticate-cognito"
+
+    authenticate_cognito {
+      user_pool_arn              = var.cognito.user_pool_arn
+      user_pool_client_id        = var.operator_client_id
+      user_pool_domain           = var.cognito.user_pool_domain
+      on_unauthenticated_request = "authenticate"
+      scope                      = "openid email profile"
+      session_timeout            = 28800
+    }
+  }
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend.arn
+  }
+
+  condition {
+    host_header {
+      values = [var.operator_domain_name]
+    }
+  }
+}

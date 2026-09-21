@@ -55,3 +55,28 @@ resource "aws_cognito_user_pool_client" "alb" {
   logout_urls                          = ["https://${var.domain_name}/"]
   prevent_user_existence_errors        = "ENABLED"
 }
+
+# Operators maintain what the agent says (the agent config bundle) in the operator console. They are staff in
+# this pool, in the "operators" group; the console checks the group in the access token the ALB forwards.
+resource "aws_cognito_user_group" "operators" {
+  name         = "operators"
+  user_pool_id = aws_cognito_user_pool.agents.id
+  description  = "May publish agent config versions and restart the backend from the operator console"
+}
+
+# The operator host's own ALB client: its callback names that host, and the console accepts only access tokens
+# issued to this client.
+resource "aws_cognito_user_pool_client" "operator_alb" {
+  count        = var.operator_domain_name == "" ? 0 : 1
+  name         = "${var.name}-operator-alb"
+  user_pool_id = aws_cognito_user_pool.agents.id
+
+  generate_secret                      = true
+  allowed_oauth_flows_user_pool_client = true
+  allowed_oauth_flows                  = ["code"]
+  allowed_oauth_scopes                 = ["openid", "email", "profile"]
+  supported_identity_providers         = ["COGNITO"]
+  callback_urls                        = ["https://${var.operator_domain_name}/oauth2/idpresponse"]
+  logout_urls                          = ["https://${var.operator_domain_name}/"]
+  prevent_user_existence_errors        = "ENABLED"
+}

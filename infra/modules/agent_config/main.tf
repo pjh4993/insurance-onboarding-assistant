@@ -131,15 +131,11 @@ resource "aws_iam_role" "operator" {
 }
 
 data "aws_iam_policy_document" "operator" {
+  # The bucket holds only bundles; listing it lets S3 answer 404 (not 403) for a missing file.
   statement {
     sid       = "ListBundleVersions"
     actions   = ["s3:ListBucket"]
     resources = [aws_s3_bucket.this.arn]
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values   = ["${var.prefix}/", "${var.prefix}/*"]
-    }
   }
 
   statement {

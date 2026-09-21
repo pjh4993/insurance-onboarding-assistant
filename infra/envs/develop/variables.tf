@@ -178,3 +178,9 @@ variable "lock_table_name" {
   type    = string
   default = "onboarding-terraform-locks"
 }
+
+variable "operator_domain_name" {
+  description = "The operator console's host (in route53_zone_name); empty: no operator console."
+  type        = string
+  default     = ""
+}

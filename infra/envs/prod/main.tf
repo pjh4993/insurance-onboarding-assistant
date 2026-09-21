@@ -92,6 +92,7 @@ module "auth" {
 
   name                  = local.name
   domain_name           = local.agent_host # the ALB's Cognito callback runs on the host agents log in on
+  operator_domain_name  = var.operator_domain_name
   cognito_domain_prefix = "${local.name}-${local.account_id}"
 }
 
@@ -105,6 +106,8 @@ module "edge" {
   domain_name           = var.domain_name
   docs_domain_name      = var.docs_domain_name
   agent_domain_name     = var.agent_domain_name
+  operator_domain_name  = var.operator_domain_name
+  operator_client_id    = var.domain_name == "" ? "" : module.auth[0].operator_client_id
   route53_zone_name     = var.route53_zone_name
   deletion_protection   = var.environment == "prod"
 
@@ -188,16 +191,50 @@ data "aws_iam_policy_document" "backend_task" {
     resources = [module.security.kms_key_arn]
   }
 
-  # The agent config bundle (read once at startup): list its versions, read their files.
+  # The operator console publishes new bundle versions through the backend: create-only, like the operator
+  # role (a put without If-None-Match: * is refused, so a published version is never replaced; no delete).
+  statement {
+    sid       = "PublishAgentConfig"
+    actions   = ["s3:PutObject"]
+    resources = ["${module.agent_config.bucket_arn}/${module.agent_config.prefix}/*"]
+  }
+
+  statement {
+    sid       = "PublishAgentConfigCreateOnly"
+    effect    = "Deny"
+    actions   = ["s3:PutObject"]
+    resources = ["${module.agent_config.bucket_arn}/*"]
+    condition {
+      test     = "StringNotEquals"
+      variable = "s3:if-none-match"
+      values   = ["*"]
+    }
+  }
+
+  statement {
+    sid       = "EncryptAgentConfigThroughS3"
+    actions   = ["kms:GenerateDataKey"]
+    resources = [module.security.kms_key_arn]
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["s3.${var.region}.amazonaws.com"]
+    }
+  }
+
+  # ... and restarts its own service so new tasks load the new version.
+  statement {
+    sid       = "RestartOwnService"
+    actions   = ["ecs:UpdateService"]
+    resources = ["arn:aws:ecs:${var.region}:${local.account_id}:service/${aws_ecs_cluster.this.name}/${local.name}-backend"]
+  }
+
+  # The agent config bundle (read once at startup): list its versions, read their files. The bucket holds only
+  # bundles, and listing it lets S3 answer 404 (not 403) for a missing file, which version resolution relies on.
   statement {
     sid       = "ListAgentConfigVersions"
     actions   = ["s3:ListBucket"]
     resources = [module.agent_config.bucket_arn]
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values   = ["${module.agent_config.prefix}/", "${module.agent_config.prefix}/*"]
-    }
   }
 
   statement {
@@ -236,6 +273,8 @@ module "backend" {
     SSE_BROKER   = "postgres"
     # Models, prompts and copy: the highest published bundle matching the version (see onboarding_agent.config).
     AGENT_CONFIG_URI     = module.agent_config.uri
+    BACKEND_ECS_CLUSTER  = aws_ecs_cluster.this.name
+    BACKEND_ECS_SERVICE  = "${local.name}-backend"
     AGENT_CONFIG_VERSION = var.agent_config_version
     # The model ids the IAM policy lets the backend invoke; a bundle naming another one is refused at startup.
     LLM_ALLOWED_MODEL_IDS = join(",", flatten([for m in var.bedrock_foundation_models : ["global.${m}", m]]))
@@ -283,8 +322,14 @@ module "frontend" {
     CUSTOMER_BASE_URL = var.domain_name == "" ? "" : "https://${var.domain_name}"
     AGENT_BASE_URL    = var.domain_name == "" ? "" : "https://${local.agent_host}"
     AGENT_DEV_AUTH    = tostring(var.agent_dev_auth)
-    AWS_REGION        = var.region
-    OTEL_SERVICE_NAME = "onboarding-frontend"
+    # The operator console: its host, and the Cognito pool and client its access tokens are verified against.
+    # There is no dev auth for operators here.
+    OPERATOR_BASE_URL          = var.domain_name == "" || var.operator_domain_name == "" ? "" : "https://${var.operator_domain_name}"
+    COGNITO_REGION             = var.region
+    COGNITO_USER_POOL_ID       = var.domain_name == "" ? "" : module.auth[0].user_pool_id
+    COGNITO_OPERATOR_CLIENT_ID = var.domain_name == "" ? "" : module.auth[0].operator_client_id
+    AWS_REGION                 = var.region
+    OTEL_SERVICE_NAME          = "onboarding-frontend"
   })
   secrets      = local.otel_secrets
   secret_arns  = local.otel_secret_arns

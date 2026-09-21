@@ -14,10 +14,11 @@ db_deletion_protection = false
 # zone. Each environment gets a customer host, an agent host and a docs host in it
 # (develop: dev.app., dev.agent., dev.docs.; prod: app., agent., docs.); the apex
 # itself serves nothing.
-domain_name       = "dev.app.onboardassist.click"
-agent_domain_name = "dev.agent.onboardassist.click"
-docs_domain_name  = "dev.docs.onboardassist.click"
-route53_zone_name = "onboardassist.click"
+domain_name          = "dev.app.onboardassist.click"
+agent_domain_name    = "dev.agent.onboardassist.click"
+docs_domain_name     = "dev.docs.onboardassist.click"
+operator_domain_name = "dev.operator.onboardassist.click"
+route53_zone_name    = "onboardassist.click"
 
 create_shared_ci_resources = true
 github_oidc_subjects       = ["ref:refs/heads/develop"]
