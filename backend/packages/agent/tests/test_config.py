@@ -240,16 +240,16 @@ def test_push_to_hub_picks_the_next_version(tmp_path):
 
     repo = str(tmp_path / "hub")
     baseline = Bundle.from_pretrained()
-    assert baseline.push_to_hub(repo, notes="first") == "1.0.0"  # nothing published yet: its own version
-    assert baseline.push_to_hub(repo) == "1.0.1"
-    assert baseline.push_to_hub(repo, bump="minor", notes="new copy") == "1.1.0"
+    assert baseline.push_to_hub(repo, notes="first") == "1.2.0"  # nothing published yet: its own version
+    assert baseline.push_to_hub(repo) == "1.2.1"
+    assert baseline.push_to_hub(repo, bump="minor", notes="new copy") == "1.3.0"
     assert baseline.push_to_hub(repo, version="1.4.2") == "1.4.2"
-    assert published_versions(tmp_path / "hub") == ["1.0.0", "1.0.1", "1.1.0", "1.4.2"]
+    assert published_versions(tmp_path / "hub") == ["1.2.0", "1.2.1", "1.3.0", "1.4.2"]
 
     base = open_store(repo)
-    note = release_of(base, "1.1.0")
-    assert note["notes"] == "new copy" and note["via"] == "push_to_hub" and note["based_on"] == "1.0.0"
-    assert json.loads(base.sub("1.1.0").read("config.json"))["version"] == "1.1.0"
+    note = release_of(base, "1.3.0")
+    assert note["notes"] == "new copy" and note["via"] == "push_to_hub" and note["based_on"] == "1.2.0"
+    assert json.loads(base.sub("1.3.0").read("config.json"))["version"] == "1.3.0"
     with pytest.raises(ConfigError, match="bump must be one of"):
         baseline.push_to_hub(repo, bump="major")
 
@@ -266,14 +266,14 @@ def test_pull_edit_push_round_trip(tmp_path):
     (work / "flows" / "profiling.json").write_text(json.dumps(profiling, ensure_ascii=False))
 
     edited = Bundle.from_pretrained(str(work))
-    assert edited.push_to_hub(repo, bump="minor") == "1.1.0"
+    assert edited.push_to_hub(repo, bump="minor") == "1.3.0"
     assert Bundle.from_pretrained(repo).text("profiling.needs_complete", "en") == "Thanks! Checking what fits you now."
     # a broken edit is refused before anything is written
     profiling["copy"]["needs_complete"]["en"] = "Thanks {name}"
     (work / "flows" / "profiling.json").write_text(json.dumps(profiling, ensure_ascii=False))
     with pytest.raises(ConfigError, match="unknown placeholder"):
         Bundle.from_pretrained(str(work))
-    assert published_versions(tmp_path / "hub") == ["1.0.0", "1.1.0"]
+    assert published_versions(tmp_path / "hub") == ["1.2.0", "1.3.0"]
 
 
 def test_cli_push(tmp_path, capsys):
@@ -282,9 +282,9 @@ def test_cli_push(tmp_path, capsys):
     repo = str(tmp_path / "hub")
     assert main(["push", str(BASELINE), repo, "--notes", "baseline"]) == 0
     assert main(["push", str(BASELINE), repo, "--bump", "minor"]) == 0
-    assert "pushed 1.1.0 (from 1.0.0)" in capsys.readouterr().out
+    assert "pushed 1.3.0 (from 1.2.0)" in capsys.readouterr().out
     assert main(["versions", repo]) == 0
-    assert capsys.readouterr().out.split() == ["1.0.0", "1.1.0"]
+    assert capsys.readouterr().out.split() == ["1.2.0", "1.3.0"]
 
 
 def test_s3_stores_use_the_environment_region(monkeypatch):

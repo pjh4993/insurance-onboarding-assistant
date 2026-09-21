@@ -95,7 +95,7 @@ All JSON. Money is integer minor units + ISO 4217 currency. Times are ISO 8601 U
 ### Operator (header `X-Operator-Id: <id>`, set by the frontend after verifying the operator's login)
 - `GET /api/operator/config` → `{"live": {"version", "source"}, "version_spec", "next": string | null, "restart_needed", "publishable", "restartable", "base"}`
 - `GET /api/operator/config/versions` → `{"versions": [{"version", "release": Release, "live", "latest"}]}` newest first
-- `GET /api/operator/config/versions/{version}` → `{"version", "release", "live", "files": {path: text}, "summary": {"languages", "default_language", "models", "nodes": {node: profile}, "copy_keys"}}`; `404` if not published
+- `GET /api/operator/config/versions/{version}` → `{"version", "release", "live", "files": {path: text}, "summary": {"languages", "default_language", "models", "nodes": {node: profile}, "copy_keys"} | null, "problems": string[]}`; `summary` is `null` (and `problems` says why) for a version written for older agent code, which stays browsable; `404` if not published
 - `POST /api/operator/config/validate` body `{"files": {path: text}}` → `{"ok", "problems": string[], "summary" | null}`
 - `POST /api/operator/config/versions` body `{"files", "notes", "bump": "patch" | "minor"}` → `201 {"version", "release"}`; the version is one `bump` above the latest of the draft's major; `422 {"detail": {"message", "problems"}}` for an invalid draft, `409` when this backend cannot publish
 - `POST /api/operator/restart` → `202`; `409` when `BACKEND_ECS_*` is unset

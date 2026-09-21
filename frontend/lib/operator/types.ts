@@ -26,7 +26,9 @@ export type VersionDetail = {
   release: Release;
   live: boolean;
   files: Record<string, string>;
-  summary: Summary;
+  /** null when this agent's code cannot load the version (written for older code); `problems` says why */
+  summary: Summary | null;
+  problems: string[];
 };
 
 export type ConfigStatus = {

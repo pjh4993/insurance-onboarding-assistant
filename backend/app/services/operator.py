@@ -7,6 +7,7 @@ are blocking (S3, ECS) and are called from a worker thread."""
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -14,6 +15,7 @@ from typing import Any
 from app.config import Settings
 from onboarding_agent.config import (
     BUNDLED,
+    RELEASE_FILE,
     Bundle,
     ConfigError,
     Store,
@@ -21,11 +23,10 @@ from onboarding_agent.config import (
     draft_store,
     load_from,
     open_store,
-    publish_bundle,
     push_bundle,
     release_of,
 )
-from onboarding_agent.config.source import published, resolve
+from onboarding_agent.config.source import copy_bundle, published, resolve
 
 DRAFT_PATH = re.compile(r"^(config\.json|flows/[a-z][a-z0-9_-]*\.json)$")
 MAX_DRAFT_FILES = 32
@@ -55,14 +56,15 @@ def summary(bundle: Bundle) -> dict[str, Any]:
 
 
 def seed_baseline(base: Store) -> list[str]:
-    """Publish the baseline versions shipped with the agent that `base` lacks (a local, writable base)."""
+    """Copy the baseline versions shipped with the agent that `base` lacks (a local, writable base), as they are:
+    older ones were written for older agent code and need not validate against this one (the backend loads the
+    newest, which the agent's tests check)."""
     bundled = open_store(str(BUNDLED))
     seeded = []
     for version in published(bundled):
         if not base.sub(version).exists("config.json"):
-            publish_bundle(
-                bundled.sub(version), base, release={"published_by": "baseline", "notes": "Shipped with the agent"}
-            )
+            note = {"version": version, "published_by": "baseline", "notes": "Shipped with the agent"}
+            copy_bundle(bundled.sub(version), base, extra={RELEASE_FILE: (json.dumps(note, indent=2) + "\n").encode()})
             seeded.append(version)
     return seeded
 
@@ -119,12 +121,17 @@ class OperatorConsole:
         if version not in published(self.base):
             raise OperatorError(404, f"version {version} is not published")
         bundle_dir = self.base.sub(version)
+        try:  # a version written for older agent code is still browsable; it just does not load here
+            shown, problems = summary(load_from(bundle_dir, version=version)), []
+        except ConfigError as exc:
+            shown, problems = None, exc.problems
         return {
             "version": version,
             "release": release_of(self.base, version),
             "live": version == self.live.version,
             "files": bundle_files(bundle_dir),
-            "summary": summary(load_from(bundle_dir, version=version)),
+            "summary": shown,
+            "problems": problems,
         }
 
     # ------------------------------------------------------------------------------------ drafts

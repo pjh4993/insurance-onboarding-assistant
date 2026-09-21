@@ -9,7 +9,7 @@ type Props = { detail: VersionDetail; now: number; onRefs: HighlightRefs; onClea
 export function OverviewTab({ detail, now, onRefs, onClear }: Props) {
   const { release, summary } = detail;
   const byProfile = new Map<string, string[]>();
-  for (const [node, profile] of Object.entries(summary.nodes)) {
+  for (const [node, profile] of Object.entries(summary?.nodes ?? {})) {
     byProfile.set(profile, [...(byProfile.get(profile) ?? []), node]);
   }
   return (
@@ -36,13 +36,30 @@ export function OverviewTab({ detail, now, onRefs, onClear }: Props) {
             <dt>Via</dt>
             <dd>{release.via ?? "—"}</dd>
             <dt>Copy entries</dt>
-            <dd>{summary.copy_keys}</dd>
+            <dd>{summary?.copy_keys ?? "—"}</dd>
           </dl>
         </div>
       </section>
 
-      <section className="op-card">
-        <div className="op-card__title">Model profiles</div>
+      {summary ? null : (
+        <section className="op-card">
+          <div className="op-card__title">Not loadable by this agent</div>
+          <div className="op-card__body">
+            <div className="op-empty">
+              Written for older agent code. Browse its files, or edit it into a draft and fix what is listed here.
+            </div>
+            <ul className="op-problems">
+              {detail.problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {summary && (
+        <section className="op-card">
+          <div className="op-card__title">Model profiles</div>
         <table className="op-table">
           <thead>
             <tr>
@@ -68,6 +85,9 @@ export function OverviewTab({ detail, now, onRefs, onClear }: Props) {
         </table>
       </section>
 
+      )}
+
+      {summary && (
       <section className="op-card">
         <div className="op-card__title">LLM nodes</div>
         <table className="op-table">
@@ -93,6 +113,9 @@ export function OverviewTab({ detail, now, onRefs, onClear }: Props) {
         </table>
       </section>
 
+      )}
+
+      {summary && (
       <section className="op-card">
         <div className="op-card__title">Languages</div>
         <div className="op-card__body op-chips">
@@ -109,6 +132,7 @@ export function OverviewTab({ detail, now, onRefs, onClear }: Props) {
           ))}
         </div>
       </section>
+      )}
     </div>
   );
 }

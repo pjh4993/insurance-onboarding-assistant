@@ -107,7 +107,7 @@ export function OperatorConsole() {
   };
 
   const shownDetail = detail?.version === selected ? detail : null;
-  const nodeModels = useMemo(() => shownDetail?.summary.nodes ?? {}, [shownDetail]);
+  const nodeModels = useMemo(() => shownDetail?.summary?.nodes ?? {}, [shownDetail]);
   const highlightRefs = useCallback(
     (refs: string[], caption: string) =>
       outline ? setHover({ nodes: nodesForAll(refs, outline, nodeModels), caption }) : undefined,
