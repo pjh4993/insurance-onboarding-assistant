@@ -1,0 +1,5 @@
+# Site navigation (mkdocs-awesome-nav). docs/.nav.yml orders the folders inside docs/.
+nav:
+  - Overview: README.md
+  - Documentation: docs
+  - Contracts: CONTRACTS.md

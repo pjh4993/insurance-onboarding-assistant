@@ -1,6 +1,6 @@
 # Demo walkthrough
 
-Four seed customers (A–D) in [`contracts/seed-customers.json`](../contracts/seed-customers.json) cover the main
+Four seed customers (A–D) in [`contracts/seed-customers.json`](../../contracts/seed-customers.json) cover the main
 paths through the graph. The mock recognises each seed customer by name and returns the same partner, identity
 and LLM answers every time, so every run ends the same way. The outcomes below are from an end-to-end run
 through `docker compose`.

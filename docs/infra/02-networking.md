@@ -112,7 +112,7 @@ Locally the same relay runs in Docker Compose: `frontend` calls `http://backend:
 Each ECS service registers a short name in a Service Connect namespace (`backend`, `mock`). Callers use
 `http://backend:8000` and `http://mock:8080`, which are the same names as in Docker Compose, so configuration
 does not change between local and AWS. Traffic inside the VPC is plain HTTP; see
-[tradeoffs.md](tradeoffs.md).
+[tradeoffs.md](../decisions/tradeoffs.md).
 
 ## 3. Security groups
 
@@ -182,7 +182,7 @@ What is built today:
 Verifying the signature of `x-amzn-oidc-data` (ES256, with the ALB public key for the region) is a `TODO` in
 `agentAuth.ts`. Until it is done, `AGENT_DEV_AUTH` stays `true`: in develop, Cognito at the ALB decides who may
 open the console, but every signed-in agent acts as `agent-demo`. Prod has no domain yet, so it has neither
-HTTPS nor Cognito. See [future-improvements.md](future-improvements.md).
+HTTPS nor Cognito. See [future-improvements.md](../decisions/future-improvements.md).
 
 ### Customers: session links
 

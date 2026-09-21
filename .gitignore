@@ -11,3 +11,6 @@ node_modules/
 .DS_Store
 conversation.md
 *.tfplan
+
+# mkdocs build output
+.site/

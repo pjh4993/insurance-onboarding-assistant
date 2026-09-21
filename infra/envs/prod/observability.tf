@@ -1,6 +1,6 @@
 # OTLP export of traces and logs (Grafana Cloud). Identical in envs/develop and envs/prod.
 # Off until otlp_endpoint is set. The auth header lives in Secrets Manager and is set by hand
-# (see docs/observability.md), never in tfvars.
+# (see docs/design/05-observability.md), never in tfvars.
 
 variable "otlp_endpoint" {
   description = "OTLP/HTTP base URL, e.g. https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp. null = no export."

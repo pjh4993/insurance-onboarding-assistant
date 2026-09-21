@@ -66,6 +66,14 @@ jobs:
       - run: uv run ruff check .
       - run: uv run pytest
 
+  docs:
+    # Strict site build: fails on a broken relative link or a page left out of the nav.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: make docs-build
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

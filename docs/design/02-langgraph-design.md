@@ -3,7 +3,7 @@
 The backend runs one LangGraph graph per onboarding session. One session is one **thread**. The graph covers
 the four stages the brief lists and pauses whenever it needs a person.
 
-What the graph stores and how routing reads it is in [state-management.md](state-management.md). The code is in
+What the graph stores and how routing reads it is in [state-management.md](03-state-management.md). The code is in
 `backend/app/graph/`: `build.py` wires the graph, `nodes.py` holds the nodes, `routing.py` the edge functions.
 
 ## 1. The four stages
@@ -15,7 +15,7 @@ What the graph stores and how routing reads it is in [state-management.md](state
 | 3. Policy recommendation | Accepts, declines, or changes their answers | Code checks eligibility, ranks and prices products. LLM explains the ranked result | `Recommendation`, `Quote` | One recommendation is `ACCEPTED` |
 | 4. Policy application | Says who is insured and who pays, answers product questions, confirms the summary | Pre-fills answers it already knows, asks for the rest, writes a summary, submits | `Application`, `ApplicationParty`, other `Party` rows | `Application.status = SUBMITTED` with a submission reference |
 
-Identity comes first. No profiling happens until identity is verified. See [assumptions.md](assumptions.md).
+Identity comes first. No profiling happens until identity is verified. See [assumptions.md](../decisions/assumptions.md).
 
 ## 2. Nodes by type
 
@@ -226,11 +226,11 @@ not enforced: any signed-in agent can send input. Everything sent through the ag
 | LLM output does not match the schema | Raised as an error inside the node, so it is retried like any other |
 | Customer input is incomplete | Not an error. Code computes the missing fields (the LLM's own `missing_fields` is only advisory) and asks for just those, up to 3 rounds |
 | Quote expired (`valid_until` passed, for example after a long pause) | `open_application` re-prices the accepted product, marks the old quote `EXPIRED` and uses the new one |
-| Node crashes after writing but before its checkpoint | On resume the node runs again. All writes are idempotent (deterministic IDs, upserts, `Idempotency-Key` on submission). See [state-management.md](state-management.md#7-idempotent-writes) |
+| Node crashes after writing but before its checkpoint | On resume the node runs again. All writes are idempotent (deterministic IDs, upserts, `Idempotency-Key` on submission). See [state-management.md](03-state-management.md#7-idempotent-writes) |
 | Customer or agent stops | `DECLINE` ends the session as `DECLINED`. An agent's `END` ends it as `WITHDRAWN`. There is no customer "withdraw" button |
 
 Failures can be triggered on demand with the mock's `POST /_mock/faults {target, kind, count}` to show
-retries and handoff. See [demo.md](demo.md#3-error-handling).
+retries and handoff. See [demo.md](../guides/demo.md#3-error-handling).
 
 ## 7. LLM use
 
@@ -256,7 +256,7 @@ reasons. If it returns nothing for a product, the matched rationale sentences ar
 
 | Requirement | Where |
 |---|---|
-| **State management** | Typed `OnboardingState` with reducers, saved after every node by `AsyncPostgresSaver`. Entity values live in the domain DB, the state holds their IDs. See [state-management.md](state-management.md) |
+| **State management** | Typed `OnboardingState` with reducers, saved after every node by `AsyncPostgresSaver`. Entity values live in the domain DB, the state holds their IDs. See [state-management.md](03-state-management.md) |
 | **Conditional routing** | A conditional edge after every node, driven by routing signals in state (`last_input`, `identity_result`, `needs_complete`, `eligible_count`, `decision`, `parties_complete`, `answers_complete`, `confirmed`, `handoff_reason`, `handoff_resolution`, `last_error`) |
 | **Multi-turn workflows** | Wait nodes use `interrupt()`; each answer resumes the same thread. Loops ask again only for missing fields (profiling, parties, answers), capped at 3 rounds |
 | **Context awareness** | `assess_needs` reads all of the customer's needs answers plus the values captured so far; `collect_answers` reads the answers so far and what is still missing. A later answer fills gaps instead of starting over. Partner purchases pre-fill the device, and verified data pre-fills application answers, so the customer is not asked twice |

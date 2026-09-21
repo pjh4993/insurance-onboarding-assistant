@@ -1,0 +1,9 @@
+nav:
+  - README.md
+  - Design: design
+  - Infrastructure: infra
+  - Decisions:
+      - decisions/assumptions.md
+      - decisions/tradeoffs.md
+      - decisions/future-improvements.md
+  - Guides: guides

@@ -42,7 +42,7 @@ flowchart LR
 
 In AWS: ALB (HTTPS and Cognito for the agent paths once a domain is set; develop uses `onboardassist.click`) →
 frontend on ECS → backend on ECS via Service Connect → RDS PostgreSQL; Bedrock and other AWS APIs through VPC
-endpoints. See [docs/aws-architecture.md](docs/aws-architecture.md).
+endpoints. See [docs/infra/01-aws-architecture.md](docs/infra/01-aws-architecture.md).
 
 ## Quick start
 
@@ -62,7 +62,7 @@ docker compose up --build
 
 No AWS account is needed locally: the backend's Bedrock client points to the mock (`BEDROCK_ENDPOINT_URL`). The
 backend creates its tables and seeds the eight-product catalog when it starts. Walk through the four seed
-customers in [docs/demo.md](docs/demo.md).
+customers in [docs/guides/demo.md](docs/guides/demo.md).
 
 ## Repository layout
 
@@ -73,9 +73,10 @@ frontend/           Next.js 16 (App Router, TypeScript, pnpm): app/s, app/agent,
 infra/              Terraform: bootstrap/, modules/{network,security,data,auth,edge,service,ci}, envs/{develop,prod}
 .github/workflows/  CI and deploy workflows
 contracts/          seed customers shared by the mock, backend tests and the demo
-docs/               design documents
+docs/               design documents: design/, infra/, decisions/, guides/ (index: docs/README.md)
 CONTRACTS.md        API, mock and LLM-shape contracts between the services
 docker-compose.yml  local stack: postgres, mock, backend, frontend
+Makefile            make docs / make docs-build: the documents as a local site (mkdocs, via uvx)
 ```
 
 ## Running tests
@@ -100,25 +101,32 @@ systems and the LLM, built from the same seed file as the mock (`backend/tests/f
 
 Results at the time of writing: backend 111 passed, mock 75 passed, frontend 20 passed (vitest) with lint, type
 check and build clean. An end-to-end run through `docker compose` gave the outcomes listed in
-[docs/demo.md](docs/demo.md#2-seed-customers-and-expected-outcomes): A, B and C submitted; D handed off.
+[docs/guides/demo.md](docs/guides/demo.md#2-seed-customers-and-expected-outcomes): A, B and C submitted; D handed off.
 
 ## Documents
 
+Grouped by what they answer; [docs/README.md](docs/README.md) maps each item the brief asks for to its section.
+`make docs` serves them as a local site with the diagrams rendered.
+
 | Document | Contents |
 |---|---|
-| [Solution architecture](docs/solution-architecture.md) | C4 context and containers, frontend-to-backend communication, inside the backend |
-| [LangGraph design](docs/langgraph-design.md) | Four stages, nodes by type, graph and conditional edges, interrupt/resume, handoff, error handling, the six LangGraph requirements |
-| [State management](docs/state-management.md) | State schema, reducers, routing signals, encrypted Postgres checkpoints, idempotent writes, personal data |
-| [Data model](docs/data-model.md) | Entities, ER diagram, state transitions, product catalog seed |
-| [AWS architecture](docs/aws-architecture.md) | Services and why, Bedrock, IAM, storage, environments |
-| [Networking design](docs/networking.md) | VPC and subnets, endpoints and NAT, traffic flows, security groups, security boundaries, authentication |
-| [Terraform structure](docs/terraform.md) | Modules, environments, state backend, one-time setup |
-| [CI/CD design](docs/cicd.md) | GitHub Actions with OIDC, CI checks, develop deploy, prod promotion, smoke test, GitHub settings |
-| [Observability](docs/observability.md) | Traces and logs to Grafana Cloud over OTLP, log length caps, CloudWatch in Grafana |
-| [Assumptions](docs/assumptions.md) | How we read the open parts of the brief |
-| [Tradeoffs](docs/tradeoffs.md) | Infrastructure, LLM and checkpoint-store choices, with the evidence behind them |
-| [Future improvements](docs/future-improvements.md) | Known limits of what is built, and designed but deferred work |
-| [Demo walkthrough](docs/demo.md) | Seed customers A–D, what each one shows, and the expected outcomes |
+| **Design** | |
+| [Solution architecture](docs/design/01-solution-architecture.md) | C4 context and containers, frontend-to-backend communication, inside the backend |
+| [LangGraph design](docs/design/02-langgraph-design.md) | Four stages, nodes by type, graph and conditional edges, interrupt/resume, handoff, error handling, the six LangGraph requirements |
+| [State management](docs/design/03-state-management.md) | State schema, reducers, routing signals, encrypted Postgres checkpoints, idempotent writes, personal data |
+| [Data model](docs/design/04-data-model.md) | Entities, ER diagram, state transitions, product catalog seed |
+| [Observability](docs/design/05-observability.md) | Traces and structured logs to Grafana Cloud over OTLP, log length caps, CloudWatch in Grafana |
+| **Infrastructure** | |
+| [AWS architecture](docs/infra/01-aws-architecture.md) | Services and why, Bedrock, IAM, storage, environments |
+| [Networking design](docs/infra/02-networking.md) | VPC and subnets, endpoints and NAT, traffic flows, security groups, security boundaries, authentication |
+| [Terraform structure](docs/infra/03-terraform.md) | Modules, environments, state backend, one-time setup |
+| [CI/CD design](docs/infra/04-cicd.md) | GitHub Actions with OIDC, CI checks, develop deploy, prod promotion, smoke test, GitHub settings |
+| **Decisions** | |
+| [Assumptions](docs/decisions/assumptions.md) | How we read the open parts of the brief |
+| [Tradeoffs](docs/decisions/tradeoffs.md) | Infrastructure, LLM and checkpoint-store choices, with the evidence behind them |
+| [Future improvements](docs/decisions/future-improvements.md) | Known limits of what is built, and designed but deferred work |
+| **Guides** | |
+| [Demo walkthrough](docs/guides/demo.md) | Seed customers A–D, what each one shows, and the expected outcomes |
 
 ## Scope and what is deferred
 
@@ -135,7 +143,7 @@ Built for this submission:
 - Terraform for both environments (develop has a domain, HTTPS and Cognito at the ALB), a bootstrap stack for
   remote state, CI checks, a develop deploy workflow and a prod promotion workflow.
 
-Known limits (details in [docs/future-improvements.md](docs/future-improvements.md#1-known-limits-of-what-is-built)):
+Known limits (details in [docs/decisions/future-improvements.md](docs/decisions/future-improvements.md#1-known-limits-of-what-is-built)):
 
 - The per-session lock is in-process: run one backend replica (or keep sessions sticky). SSE events already cross replicas over Postgres `LISTEN/NOTIFY` (`SSE_BROKER=postgres` in AWS).
 - Session links store `token_expires_at` but do not enforce it.
@@ -143,7 +151,7 @@ Known limits (details in [docs/future-improvements.md](docs/future-improvements.
   exists, but verifying `x-amzn-oidc-data` is a TODO.
 - One customer session cookie per browser.
 
-Designed, not built (details in [docs/future-improvements.md](docs/future-improvements.md)):
+Designed, not built (details in [docs/decisions/future-improvements.md](docs/decisions/future-improvements.md)):
 
 - Returning-customer linking and the customer history tab.
 - ASSIST draft approval (AI messages held for agent review).

@@ -1,7 +1,7 @@
 # AWS architecture
 
-The containers from [solution-architecture.md](solution-architecture.md) mapped to AWS. Network details are in
-[networking.md](networking.md), the Terraform code layout in [terraform.md](terraform.md).
+The containers from [solution-architecture.md](../design/01-solution-architecture.md) mapped to AWS. Network details are in
+[networking.md](02-networking.md), the Terraform code layout in [terraform.md](03-terraform.md).
 
 Everything runs in one region: **ap-northeast-2 (Seoul)**. Users are close to it, and one region keeps the
 network simple.
@@ -53,7 +53,7 @@ flowchart LR
 | **Application Load Balancer** | Public entry. Routes everything to the frontend. With a domain: HTTPS (TLS 1.2/1.3 policy), HTTP → HTTPS redirect, and Cognito login on `/agent`, `/agent/*`, `/api/agent/*`. Without a domain: plain HTTP on port 80 | Built-in Cognito authentication, health checks, and SSE support with the idle timeout raised to 300 s |
 | **Route 53 + ACM** | develop's domain `onboardassist.click` (registered in Route 53, which created the hosted zone). Terraform issues a DNS-validated ACM certificate and an alias record to the ALB | HTTPS and Cognito both need a domain. Public ACM certificates are free |
 | **RDS for PostgreSQL** | One PostgreSQL 16 instance, three schemas: `checkpoint`, `domain`, `catalog`. gp3 storage, `rds.force_ssl = 1` | Entities are relational. `PostgresSaver` takes an encrypting serializer as a normal argument. One instance is the cheapest option |
-| **Amazon Bedrock** | LLM calls through the Converse API. Model `global.anthropic.claude-sonnet-4-6` with **global cross-region inference** from Seoul | The account has quota and accepted terms for this model, and it handles Korean extraction and summaries well. See [tradeoffs.md](tradeoffs.md#2-llm-claude-sonnet-46-on-bedrock) |
+| **Amazon Bedrock** | LLM calls through the Converse API. Model `global.anthropic.claude-sonnet-4-6` with **global cross-region inference** from Seoul | The account has quota and accepted terms for this model, and it handles Korean extraction and summaries well. See [tradeoffs.md](../decisions/tradeoffs.md#2-llm-claude-sonnet-46-on-bedrock) |
 | **Secrets Manager** | The RDS master password (managed by RDS), the checkpoint AES key, and the HMAC key for session tokens and ID numbers. Terraform generates the two application keys | ECS injects them into the backend container as environment variables; nothing sensitive is in images or task definitions |
 | **KMS** | One customer-managed key per environment for RDS storage and the secrets | Encryption at rest with a key the account controls |
 | **Cognito** | User pool for support agents, one per environment, created only when a domain is set. Admin-created accounts only, email as username, optional TOTP MFA | Agents are staff with accounts. ALB integrates with it directly |
@@ -63,7 +63,7 @@ flowchart LR
 | **S3 + DynamoDB** (Terraform state) | One state file per environment in an S3 bucket, locked through a DynamoDB table. Both created by `infra/bootstrap` | Standard remote backend. Terraform 1.5 needs DynamoDB for S3 state locking |
 
 Customers do not use Cognito. They have no account; the backend issues a random session token and the customer
-opens `/s/{token}`. See [networking.md](networking.md#5-authentication).
+opens `/s/{token}`. See [networking.md](02-networking.md#5-authentication).
 
 ## 3. Bedrock
 
@@ -92,7 +92,7 @@ opens `/s/{token}`. See [networking.md](networking.md#5-authentication).
 | Frontend task role | Nothing beyond the defaults. The frontend holds no secrets |
 | Mock task role | Nothing beyond the defaults |
 | Task execution role (one per service) | Pull the image from ECR, write logs; for the backend also read the three secrets and decrypt them, so ECS can inject `PGPASSWORD`, `CHECKPOINT_AES_KEY` and `SESSION_HMAC_KEY` |
-| GitHub deploy role (one per environment) | Assumed through GitHub OIDC. `PowerUserAccess`, plus IAM limited to `onboarding-*` roles and policies, the Terraform state bucket and lock table, and ECR push. See [cicd.md](cicd.md#2-oidc-and-roles) |
+| GitHub deploy role (one per environment) | Assumed through GitHub OIDC. `PowerUserAccess`, plus IAM limited to `onboarding-*` roles and policies, the Terraform state bucket and lock table, and ECR push. See [cicd.md](04-cicd.md#2-oidc-and-roles) |
 
 ## 5. Storage
 
@@ -107,7 +107,7 @@ opens `/s/{token}`. See [networking.md](networking.md#5-authentication).
 - develop: `db.t4g.micro`, single-AZ, no deletion protection. prod: `db.t4g.small`, Multi-AZ, deletion protection
   and a final snapshot.
 - Checkpoint contents are also compressed and AES-encrypted by the application
-  ([state-management.md](state-management.md#6-checkpointing)).
+  ([state-management.md](../design/03-state-management.md#6-checkpointing)).
 - **30-day cleanup (designed, not built).** PostgreSQL has no TTL. The plan is an EventBridge Scheduler rule that
   starts a daily ECS task (backend image, cleanup command). It finds threads whose session has been inactive for
   30 days in the `domain` schema and deletes them through the checkpointer's delete-thread API. A `TODO` in
@@ -134,4 +134,4 @@ Scope for this submission: `envs/develop` is the environment the deploy workflow
 same code with different variables, and applying it is deferred. Two things must change before prod: the
 backend's in-process session lock assumes one backend task (prod asks for two; SSE events already cross tasks over Postgres `LISTEN/NOTIFY`), and the frontend
 must verify the ALB's signed agent header before `AGENT_DEV_AUTH` can be turned off. See
-[future-improvements.md](future-improvements.md).
+[future-improvements.md](../decisions/future-improvements.md).

@@ -2,7 +2,7 @@
 
 This document describes the system at the two outer levels of the C4 model: **context** (who uses it and
 what it talks to) and **containers** (what is deployed and how the parts talk). The graph inside the backend
-is in [langgraph-design.md](langgraph-design.md). The AWS mapping is in [aws-architecture.md](aws-architecture.md).
+is in [langgraph-design.md](02-langgraph-design.md). The AWS mapping is in [aws-architecture.md](../infra/01-aws-architecture.md).
 
 ## 1. System context
 
@@ -37,7 +37,7 @@ Two kinds of people use the system.
 
 The brief says the assistant "helps support agents guide customers" and also asks for a "customer onboarding
 interface". We support both: the customer drives the chat, and an agent can step in at any point. See
-[assumptions.md](assumptions.md).
+[assumptions.md](../decisions/assumptions.md).
 
 There are four external systems.
 
@@ -126,10 +126,10 @@ deployment stays at two units.
 - Agent identity is resolved once at the frontend and passed to the backend as `X-Agent-Id`. Locally (and in
   develop for now) `AGENT_DEV_AUTH=true` makes every agent `agent-demo`. The customer's session token is read from
   the httpOnly cookie and passed as `X-Session-Token`. The backend checks the token against its stored HMAC and
-  trusts `X-Agent-Id` because only the frontend can reach it. See [networking.md](networking.md#5-authentication).
+  trusts `X-Agent-Id` because only the frontend can reach it. See [networking.md](../infra/02-networking.md#5-authentication).
 - Sending input returns `202 Accepted`. The graph runs in the background and the result arrives over SSE.
 
-The API contract is in [`CONTRACTS.md`](../CONTRACTS.md) §3. Main endpoints:
+The API contract is in [`CONTRACTS.md`](../../CONTRACTS.md) §3. Main endpoints:
 
 | Caller | Endpoint | Purpose |
 |---|---|---|
@@ -173,7 +173,7 @@ flowchart LR
 The left column is why sessions can be resumed: the API receives input, finds the thread for the session,
 and the checkpointer loads the paused state. SSE events reach every backend replica through Postgres `LISTEN/NOTIFY`
 (`SSE_BROKER=postgres`; local runs keep the in-memory broker). The per-session lock still lives in the backend
-process, so the backend runs as a single replica for now (see [tradeoffs.md](tradeoffs.md#4-application-design)).
+process, so the backend runs as a single replica for now (see [tradeoffs.md](../decisions/tradeoffs.md#4-application-design)).
 
 Eligibility, ranking and pricing are plain code, not LLM calls. An agent must be able to see **why** a product
 was excluded (`EligibilityRule.failure_reason_code`) and **why** a price is what it is (`Quote.rating_inputs`).

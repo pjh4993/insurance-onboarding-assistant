@@ -20,5 +20,5 @@ github_oidc_subjects       = ["ref:refs/heads/main"]
 state_bucket_name = "onboarding-tfstate-<ACCOUNT_ID>"
 
 # Grafana Cloud stack pjh4993 (region prod-ap-northeast-0). The auth header is set by hand in
-# the secret onboarding-develop/otlp-headers; see docs/observability.md.
+# the secret onboarding-develop/otlp-headers; see docs/design/05-observability.md.
 otlp_endpoint = "https://otlp-gateway-prod-ap-northeast-0.grafana.net/otlp"

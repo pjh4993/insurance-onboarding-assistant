@@ -2,7 +2,7 @@
 
 Domain entities in the `domain` and `catalog` schemas. Names follow ACORD where one exists (`Party`,
 `InsurableObject`, `Quote`, `Policy`) and IDD for suitability (`NeedsAssessment`, `TargetMarket`). Graph state is
-separate and described in [state-management.md](state-management.md).
+separate and described in [state-management.md](03-state-management.md).
 
 This page matches `backend/app/db/models.py`. The backend creates the schemas and tables at startup with
 SQLAlchemy `create_all` and then upserts the catalog seed. Both steps are idempotent and run under a Postgres

@@ -113,7 +113,7 @@ checkpoint is encrypted (§6).
 A routing signal is the **result** of the previous node. Failed identity attempts are counted in
 `Party.verification_attempts` in the database. The state keeps only the latest result, and the graph's shape
 decides what follows each result. The only counters in the state are the two loop guards (`needs_rounds`,
-`answers_rounds`). The full edge table is in [langgraph-design.md](langgraph-design.md#conditional-edges).
+`answers_rounds`). The full edge table is in [langgraph-design.md](02-langgraph-design.md#conditional-edges).
 
 ## 5. Session summary for the UI
 
@@ -152,13 +152,13 @@ flowchart LR
 - The key is a 256-bit AES key (`CHECKPOINT_AES_KEY`, 64 hex chars). In AWS, Terraform generates it, stores it in
   Secrets Manager (encrypted with the project KMS key), and ECS injects it into the backend task only.
 - `PostgresSaver` accepts the serializer as a constructor argument. That was the reason for choosing it over
-  the DynamoDB saver. See [tradeoffs.md](tradeoffs.md#3-checkpoint-store-dynamodb-vs-postgresql).
+  the DynamoDB saver. See [tradeoffs.md](../decisions/tradeoffs.md#3-checkpoint-store-dynamodb-vs-postgresql).
 - The key is not rotated. Reading with a different key fails. Rotation is in
-  [future-improvements.md](future-improvements.md).
+  [future-improvements.md](../decisions/future-improvements.md).
 
 **Retention.** Checkpoints are meant to be deleted after 30 days without activity: that is both the window in
 which a customer can resume and the window in which the conversation's personal data is kept. The daily cleanup
-job is designed but not built (see [future-improvements.md](future-improvements.md)). Domain entities outlive the
+job is designed but not built (see [future-improvements.md](../decisions/future-improvements.md)). Domain entities outlive the
 checkpoint, so a session's outcome (submission, decline, withdrawal) stays visible after its conversation is gone.
 
 ## 7. Idempotent writes

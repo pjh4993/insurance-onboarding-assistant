@@ -15,7 +15,7 @@ flowchart LR
 
 | Workflow | Trigger | Steps |
 |---|---|---|
-| `ci.yml` | Pull request; push to `main` | **backend**: `uv sync`, `ruff check`, `pytest` against a Postgres 16 service container (graph tests use in-process fakes built from the seed customers). **mock**: `ruff check`, `pytest`. **frontend**: `pnpm install`, `pnpm lint`, `tsc --noEmit`, `pnpm build`. **terraform** (1.5.7): `fmt -recursive -check`, then `init -backend=false` and `validate` for `envs/develop`, `envs/prod` and `bootstrap`. **docker**: build all three images (no push) |
+| `ci.yml` | Pull request; push to `main` | **backend**: `uv sync`, `ruff check`, `pytest` against a Postgres 16 service container (graph tests use in-process fakes built from the seed customers). **mock**: `ruff check`, `pytest`. **frontend**: `pnpm install`, `pnpm lint`, `tsc --noEmit`, `pnpm build`. **terraform** (1.5.7): `fmt -recursive -check`, then `init -backend=false` and `validate` for `envs/develop`, `envs/prod` and `bootstrap`. **docker**: build all three images (no push). **docs**: `make docs-build`, the strict mkdocs build that fails on a broken link |
 | `deploy-develop.yml` | Push to `main`; manual run | Runs only when the repository variable `AWS_DEPLOY_ROLE_ARN_DEVELOP` is set. **images**: assume the develop role, build and push `onboarding/{backend,mock,frontend}:<sha>` to ECR. **deploy**: `terraform init` with the state bucket, `terraform apply` on `envs/develop` with `image_tag=<sha>`, `.github/scripts/wait-for-rollout.sh`, then the smoke test |
 | `deploy-prod.yml` | Manual (`workflow_dispatch`) with a full 40-character SHA | Runs in the `prod` GitHub Environment, so its required reviewers must approve. Checks out that SHA, assumes the prod role, checks that the backend and frontend images for that SHA exist in ECR (no rebuild), `terraform apply` on `envs/prod`, waits for ECS, smoke test |
 
@@ -55,7 +55,7 @@ matches the images. Rolling back means deploying an earlier SHA.
   `/healthz`).
 - There is no separate migration step. The backend creates missing tables and upserts the catalog seed when it
   starts, under a Postgres advisory lock. This does not alter existing tables; schema changes to them would need
-  migrations (see [future-improvements.md](future-improvements.md)).
+  migrations (see [future-improvements.md](../decisions/future-improvements.md)).
 - Deploy workflows use a concurrency group, so two deploys to one environment never overlap.
 
 ## 5. Smoke test
@@ -70,7 +70,7 @@ covered by the backend's scenario tests in CI (`test_customer_a_partner_match_to
 ## 6. One-time setup
 
 The deploy role is created by the environment it deploys, so the first apply is done by an admin, and GitHub
-needs a few settings. The full ordered list is in [terraform.md](terraform.md#one-time-setup). The GitHub side:
+needs a few settings. The full ordered list is in [terraform.md](03-terraform.md#one-time-setup). The GitHub side:
 
 | Setting | Value | Used by |
 |---|---|---|
