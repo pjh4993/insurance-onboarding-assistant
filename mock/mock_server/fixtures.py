@@ -291,3 +291,45 @@ def rationale_for(rec: dict[str, str | None], customer_key: str | None) -> str:
     if korean:
         return f"{name}은(는) 말씀하신 필요에 맞는 보장을 제공합니다."
     return f"{name} matches the needs you described."
+
+
+# --- IntakeReply ----------------------------------------------------------------------------------------
+# The customer's first message: a canned reply in the message's language, and the product type its words
+# point to (first match wins), so a local demo sees the intake turn answer instead of a fixed fallback.
+
+_INTEREST_WORDS = (
+    ("TRAVEL_PROTECTION", ("여행", "출장", "해외", "trip", "travel", "flight", "tokyo", "도쿄")),
+    ("EXTENDED_WARRANTY", ("보증", "warranty", "tv", "티비", "가전", "appliance")),
+    (
+        "MOBILE_INSURANCE",
+        ("휴대폰", "핸드폰", "폰", "액정", "phone", "screen", "iphone", "galaxy", "갤럭시", "아이폰"),
+    ),
+    ("DEVICE_PROTECTION", ("노트북", "laptop", "tablet", "태블릿", "기기", "device")),
+)
+
+_INTAKE_REPLY = {
+    "ko": {
+        "MOBILE_INSURANCE": "휴대폰 파손이라면 휴대폰 보험으로 도와드릴 수 있어요. "
+        "보장 여부는 기기 정보를 보고 확인해 드릴게요.",
+        "TRAVEL_PROTECTION": "여행 보험을 찾고 계시군요. 일정과 목적지에 맞는 보장을 찾아 드릴게요.",
+        "EXTENDED_WARRANTY": "제조사 보증이 끝난 뒤의 고장은 연장 보증으로 대비할 수 있어요.",
+        "DEVICE_PROTECTION": "기기 파손은 기기 보험으로 대비할 수 있어요. 어떤 기기인지 확인해 볼게요.",
+        None: "저는 기기·여행·연장 보증 같은 보험을 찾고 가입하는 걸 도와드려요.",
+    },
+    "en": {
+        "MOBILE_INSURANCE": "A cracked or damaged phone is what mobile insurance is for. "
+        "I'll check your cover once I know the phone.",
+        "TRAVEL_PROTECTION": "Travel cover it is. I'll find cover that fits your dates and destination.",
+        "EXTENDED_WARRANTY": "Breakdowns after the maker's warranty ends are "
+        "what an extended warranty covers.",
+        "DEVICE_PROTECTION": "Device protection covers accidental damage. Let's look at your device.",
+        None: "I help you find and apply for device, travel and warranty insurance.",
+    },
+}
+
+
+def intake_reply(text: str) -> dict[str, Any]:
+    lower = text.casefold()
+    interest = next((p for p, words in _INTEREST_WORDS if any(w in lower for w in words)), None)
+    lang = "ko" if any("\uac00" <= ch <= "\ud7a3" for ch in text) else "en"
+    return {"reply": _INTAKE_REPLY[lang][interest] if text.strip() else "", "product_interest": interest}

@@ -164,10 +164,10 @@ def bundle_in_japanese(tmp_path):
 
     from onboarding_agent.config import BUNDLED, default_bundle, load_bundle
 
-    target = tmp_path / "1.1.0"
+    target = tmp_path / "1.4.0"
     shutil.copytree(Path(str(BUNDLED)) / default_bundle().version, target)
     config = json.loads((target / "config.json").read_text())
-    config["version"] = "1.2.0"
+    config["version"] = "1.4.0"
     config["languages"]["ja"] = {"name": "Japanese"}
     for entry in [*config["labels"].values(), *config["billing_periods"].values()]:
         entry["ja"] = entry["en"]

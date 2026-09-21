@@ -27,22 +27,34 @@ Nodes are split by who decides.
 
 | Type | What it does | Nodes |
 |---|---|---|
-| **Code** | Deterministic checks, calculations, external calls, writes | `greet`, `verify_identity`, `check_otp`, `check_document`, `fetch_purchases`, `check_eligibility`, `rank_products`, `quote_premium`, `open_application`, `submit_application`, `human_handoff` |
-| **LLM** | Extracts values from what people say, or writes text | `assess_needs`, `explain_recommendation`, `collect_parties`, `collect_answers`, `summarize_application` |
+| **Code** | Deterministic checks, calculations, external calls, writes | `greet`, `collect_identity`, `verify_identity`, `check_otp`, `check_document`, `fetch_purchases`, `check_eligibility`, `rank_products`, `quote_premium`, `open_application`, `submit_application`, `human_handoff` |
+| **LLM** | Extracts values from what people say, or writes text | `understand_intake`, `assess_needs`, `explain_recommendation`, `collect_parties`, `collect_answers`, `summarize_application` |
 | **Wait** | Pauses with `interrupt()` until a person answers | `ask_customer`, `await_decision`, `confirm_summary`, `await_agent` |
 
 A node that needs free-form input asks the question itself: it appends the message, sets `waiting_for`, and
 routes to `ask_customer`. `ask_customer` is one node reused for every "please tell me X" pause
-(`IDENTITY_INFO`, `OTP_CODE`, `NEEDS`, `PARTIES`, `ANSWERS`). It interrupts, records the answer, sets
-`last_input` to the kind it received, and routes back to the node that handles that kind. Decisions, the summary
+(`INTAKE`, `IDENTITY_INFO`, `OTP_CODE`, `NEEDS`, `PARTIES`, `ANSWERS`). It interrupts, records the answer, sets
+`last_input` to the kind it received, and routes back to the node that handles that kind.
+
+The conversation opens on the customer's own words: `greet` waits for `INTAKE`, the first thing they typed or
+picked on the landing screen, and `understand_intake` answers it (briefly, with no prices or promises of cover;
+an off-topic question is steered back), notes the product type it points to, and says what comes next. Identity
+and profiling then ask in **small forms**, one topic at a time. Each wait's prompt carries a `FormSpec` (topic,
+title, a one-line reason, a few fields, pre-filled where something is already known):
+`collect_identity` asks contact → ID document → consent, and `assess_needs` picks the next topic (coverage,
+person, device, trip) from the fields still missing, starting with the product the intake pointed to. A form
+answer (`{topic, fields}`) is merged as given without an LLM call; free text still goes through the LLM
+extraction, and the intake text is part of it. Decisions, the summary
 confirmation and agent resolutions have their own wait nodes because they carry structured data.
 
 ### What each node does
 
 | Node | Stage | Reads | Writes | External call |
 |---|---|---|---|---|
-| `greet` | 1 | Market | First message, `waiting_for = IDENTITY_INFO` | — |
-| `ask_customer` | all | The resumed input | For `IDENTITY_INFO`: `Party` contact fields, consent time, ID number (AES-encrypted and HMAC), optional date of birth. For `OTP_CODE`: a transient `otp_code` in state. Otherwise the text as a message | — |
+| `greet` | 1 | Market | First message, `waiting_for = INTAKE` | — |
+| `understand_intake` | 1 | The intake text, the market's catalog | A reply to it; `intake` (the text, kept encrypted for the needs extraction) and `product_interest` (the product type it points to, or none) | Bedrock (`IntakeReply`) |
+| `collect_identity` | 1 | Identity topics answered so far | The next identity form (`form_topic`, `waiting_for = IDENTITY_INFO`), or nothing once all are in | — |
+| `ask_customer` | all | The resumed input | For `INTAKE`: the text. For `IDENTITY_INFO`: the topic's fields into `Party` (contact fields, consent time, ID number AES-encrypted and HMAC), topic marked answered. For `OTP_CODE`: a transient `otp_code` in state. Otherwise the text as a message | — |
 | `verify_identity` | 1 | `Party` | With consent and a match: `VERIFIED`, `PARTNER_MATCH`, partner ref, date of birth. Otherwise sends an OTP | Partner match (only with consent). If no match: identity, send OTP |
 | `check_otp` | 1 | `otp_code`, `otp_request_id` | `Party.verification_*`; clears `otp_code` | Identity: verify OTP |
 | `check_document` | 1 | ID number from `Party` (decrypted) | `Party.verification_*` | Identity: verify document |
@@ -78,7 +90,9 @@ routing can be replayed from a checkpoint and tested without a database (`backen
 
 | After | Reads | Branches |
 |---|---|---|
-| `ask_customer` | `last_input` | `IDENTITY_INFO` → `verify_identity`; `OTP_CODE` → `check_otp`; `NEEDS` → `assess_needs`; `PARTIES` → `collect_parties`; `ANSWERS` → `collect_answers` |
+| `ask_customer` | `last_input` | `INTAKE` → `understand_intake`; `IDENTITY_INFO` → `collect_identity`; `OTP_CODE` → `check_otp`; `NEEDS` → `assess_needs`; `PARTIES` → `collect_parties`; `ANSWERS` → `collect_answers` |
+| `understand_intake` | — | `collect_identity` |
+| `collect_identity` | `form_topic` | a topic still pending → `ask_customer`; all answered → `verify_identity` |
 | `verify_identity` | `identity_result` | `MATCHED` → `fetch_purchases`; otherwise wait for the OTP |
 | `check_otp` | `identity_result` | `OTP_OK` → `fetch_purchases`; otherwise `check_document` |
 | `check_document` | `identity_result` | `DOC_OK` → `fetch_purchases`; otherwise `human_handoff` |
@@ -100,8 +114,9 @@ Identity routing uses **results, not counters**. The number of failed identity a
 shape decides what follows: `OTP_FAILED` always goes to the document check, `DOC_FAILED` always goes to an agent.
 That is how "two failures hand off" is enforced.
 
-The question loops are the exception. `needs_rounds` and `answers_rounds` count answers that still left
-fields missing, and `confirm_rejections` counts summaries the customer rejected. After **3** the node sets
+The question loops are the exception. `answers_rounds` counts answers that still left fields missing, and
+`needs_rounds` counts answers that filled none of the fields still missing (so answering the small forms one
+by one never trips it), and `confirm_rejections` counts summaries the customer rejected. After **3** the node sets
 `handoff_reason` (`NEEDS_INCOMPLETE`, `ANSWERS_INCOMPLETE` or `SUMMARY_REJECTED`) and the session goes to an
 agent instead of asking forever.
 
@@ -234,8 +249,8 @@ they still exist. A flat graph keeps them stable while the code is split. It als
 
 | Module (`onboarding_agent/flows/`) | Nodes | Declares |
 |---|---|---|
-| `conversation` | `greet`, `ask_customer` | built from the stages' `inputs` |
-| `identity` | `verify_identity`, `check_otp`, `check_document` | inputs `IDENTITY_INFO`, `OTP_CODE` (with recorders that store them); handoff `IDENTITY_FAILED` |
+| `conversation` | `greet`, `understand_intake`, `ask_customer` | input `INTAKE`; built from the stages' `inputs` |
+| `identity` | `collect_identity`, `verify_identity`, `check_otp`, `check_document` | inputs `IDENTITY_INFO`, `OTP_CODE` (with recorders that store them); handoff `IDENTITY_FAILED` |
 | `profiling` | `fetch_purchases`, `assess_needs` | input `NEEDS`; handoff `NEEDS_INCOMPLETE` |
 | `recommendation` | `check_eligibility`, `rank_products`, `quote_premium`, `explain_recommendation`, `await_decision` | handoff `NO_ELIGIBLE_PRODUCT` (back to profiling) |
 | `application` | `open_application`, `collect_parties`, `collect_answers`, `summarize_application`, `confirm_summary`, `submit_application` | inputs `PARTIES`, `ANSWERS`; handoffs `ANSWERS_INCOMPLETE`, `SUMMARY_REJECTED` |

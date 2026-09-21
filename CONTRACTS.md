@@ -105,7 +105,7 @@ All JSON. Money is integer minor units + ISO 4217 currency. Times are ISO 8601 U
 ### Types
 ```ts
 type Stage = "IDENTITY" | "PROFILING" | "RECOMMENDATION" | "APPLICATION" | "SUBMITTED" | "HANDOFF" | "DECLINED" | "WITHDRAWN";
-type WaitingFor = "IDENTITY_INFO" | "OTP_CODE" | "NEEDS" | "DECISION" | "PARTIES" | "ANSWERS" | "CONFIRM" | "AGENT" | null;
+type WaitingFor = "INTAKE" | "IDENTITY_INFO" | "OTP_CODE" | "NEEDS" | "DECISION" | "PARTIES" | "ANSWERS" | "CONFIRM" | "AGENT" | null;
 
 type Locale = string;  // a language code the agent's config bundle declares (today "ko" | "en"): fixed copy, LLM replies, the customer UI
 
@@ -116,7 +116,21 @@ type SessionSummary = {
   assigned_agent_id: string | null; last_activity_at: string;
 };
 type Message = { id: string; role: "customer" | "assistant" | "agent" | "system"; text: string; created_at: string };
-type Prompt = { waiting_for: WaitingFor; message: string; options?: RecommendationCard[]; summary?: string };
+type Prompt = { waiting_for: WaitingFor; message: string; options?: RecommendationCard[]; summary?: string; form?: FormSpec };
+// A small form for one topic, sent while waiting for IDENTITY_INFO or NEEDS; absent on every other prompt.
+type FormSpec = {
+  topic: string;               // "contact" | "id_document" | "consent" | "coverage" | "person" | "device" | "trip" | …
+  title: string; reason: string;   // localized heading, and one line on why it is asked now
+  fields: FormField[];         // usually 1–4
+  allow_text: boolean;         // the customer may answer in free text instead (NEEDS)
+};
+type FormField = {
+  name: string; label: string; // name = the key the answer comes back under
+  kind: "text" | "email" | "tel" | "date" | "number" | "select" | "multiselect" | "boolean";
+  options?: { value: string; label: string }[];
+  required: boolean; placeholder?: string;
+  value?: unknown;             // pre-filled when already known (partner data, the intake, an earlier answer)
+};
 type Quote = { quote_id: string; premium_minor: number; currency: string; billing_period: "MONTHLY" | "ONE_TIME" | "PER_TRIP";
                term_start_date: string; term_end_date: string; valid_until: string };
 type RecommendationCard = {
@@ -144,9 +158,10 @@ type InputBody = { type: Exclude<WaitingFor, null>; data: Record<string, unknown
 
 | type | data |
 |---|---|
-| `IDENTITY_INFO` | `{full_name, email, phone, id_document_type, id_document_number, third_party_consent: boolean}` |
+| `INTAKE` | `{text}` — the first thing the customer typed or picked on the landing screen (`""` for a plain start). The graph answers it, notes the product it points to, and carries the text into the needs extraction |
+| `IDENTITY_INFO` | `{topic, fields: {…}}` with the current form's fields (contact → id_document → consent), or the full shape `{full_name, email, phone, id_document_type, id_document_number, third_party_consent: boolean}` in one go |
 | `OTP_CODE` | `{code}` |
-| `NEEDS` | `{text}` — free text, the LLM extracts |
+| `NEEDS` | `{topic, fields: {…}}` — merged as given, no LLM call — and/or `{text}` — free text, the LLM extracts |
 | `DECISION` | `{decision: "ACCEPT" | "DECLINE" | "CHANGE", recommendation_id?, text?}` |
 | `PARTIES` | `{text}` |
 | `ANSWERS` | `{text}` |

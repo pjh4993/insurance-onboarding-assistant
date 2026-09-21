@@ -46,9 +46,15 @@ class OnboardingState(TypedDict, total=False):
     # progress
     stage: Literal["IDENTITY", "PROFILING", "RECOMMENDATION", "APPLICATION",
                    "SUBMITTED", "HANDOFF", "DECLINED", "WITHDRAWN"]
-    waiting_for: Literal["IDENTITY_INFO", "OTP_CODE", "NEEDS", "DECISION",
+    waiting_for: Literal["INTAKE", "IDENTITY_INFO", "OTP_CODE", "NEEDS", "DECISION",
                          "PARTIES", "ANSWERS", "CONFIRM", "AGENT"] | None
     last_input: ... | None                    # which input ask_customer just received
+    form_topic: str | None                    # the small form the pending IDENTITY_INFO / NEEDS wait asks
+
+    # intake: the customer's first message
+    intake: dict[str, str] | None             # {"text"}: a dict, so it is encrypted; feeds the needs extraction
+    product_interest: str | None              # a catalog product_type the intake points to
+    identity_topics: list[str]                # identity forms answered ("contact", "id_document", "consent")
 
     # entity references (values live in the domain DB)
     needs_assessment_id: str | None           # latest version
@@ -63,7 +69,7 @@ class OnboardingState(TypedDict, total=False):
     identity_result: Literal["MATCHED", "NOT_MATCHED", "OTP_OK", "OTP_FAILED",
                              "DOC_OK", "DOC_FAILED"] | None
     needs_complete: bool
-    needs_rounds: int                         # loop guard, max 3
+    needs_rounds: int                         # loop guard, max 3: answers that filled nothing still missing
     eligible_count: int
     decision: Literal["ACCEPT", "DECLINE", "CHANGE"] | None
     parties_complete: bool

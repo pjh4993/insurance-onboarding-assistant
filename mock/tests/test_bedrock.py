@@ -168,3 +168,23 @@ def test_bedrock_faults(client, kind, status, code):
     assert r.headers["x-amzn-errortype"].split(":")[0] == code
     assert r.json()["message"]
     assert client.post(f"/model/{MODEL}/converse", json=body).status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("message", "interest", "fragment"),
+    [
+        ("폰 액정이 깨졌는데 보험 되나요?", "MOBILE_INSURANCE", "휴대폰"),
+        ("Travel cover for Tokyo next month", "TRAVEL_PROTECTION", "Travel"),
+        ("what is the weather today", None, "I help you"),
+    ],
+)
+def test_intake_reply_reads_only_the_customer_message(client, message, interest, fragment):
+    # The system prompt names every product; only the customer's own words may decide the interest.
+    data = tool_input(
+        converse(
+            client, message, "IntakeReply", system="Products: TRAVEL_PROTECTION, MOBILE_INSURANCE, laptop"
+        ),
+        "IntakeReply",
+    )
+    assert data["product_interest"] == interest
+    assert fragment in data["reply"]

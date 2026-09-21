@@ -23,8 +23,9 @@ def line(s, pts):
 
 # ------------------------------------------------------------------ LangGraph graph
 def langgraph_graph():
-    s = Svg("lg1", 1010, 1776, "The onboarding LangGraph graph: nodes of the four stages and the human handoff, "
-                               "coloured by kind, with every conditional edge and its condition")
+    D = 140  # the intake turn and the identity form loop push everything from verify_identity down
+    s = Svg("lg1", 1010, 1776 + D, "The onboarding LangGraph graph: nodes of the four stages and the human handoff, "
+                                   "coloured by kind, with every conditional edge and its condition")
     SX, SW, SC, SR = 380, 240, 500, 620  # spine: the main path
     LX, LW, LR, LC = 84, 170, 254, 169  # ask_customer loops on the left
     RX, RW, RR, RC = 724, 156, 880, 802  # the OTP and document checks on the right
@@ -35,20 +36,34 @@ def langgraph_graph():
     def spine(y, name, kind, sub=None, h=None):
         s.node(SX, y, SW, name, kind, sub, h=h)
 
+    # ---- stage 1, top: intake turn, then identity asked in small forms (not shifted)
+    s.group(70, 58, 830, 346 + D, "1. Identity verification")
+    s.pill(SC - 50, 18, 100, 28, "start")
+    line(s, [(SC, 46), (SC, 88)])
+    spine(88, "greet", "code")
+    line(s, [(SC, 122), (SC, 142)])
+    spine(142, "ask_customer", "wait", "INTAKE", h=40)
+    line(s, [(SC, 182), (SC, 212)])
+    spine(212, "understand_intake", "llm")
+    line(s, [(SC, 246), (SC, 282)])
+    spine(282, "collect_identity", "code")
+    s.node(LX, 276, LW, "ask_customer", "wait", "IDENTITY_INFO", h=40)
+    line(s, [(SX, 292), (LR, 292)])
+    label(s, 317, 286, "form pending")
+    line(s, [(LR, 306), (SX, 306)])
+    line(s, [(SC, 316), (SC, 352)])
+    label(s, SC + 8, 338, "all answered", "start")
+
+    # everything below moves down by D
+    s.p.append(f'<g transform="translate(0,{D})">')
+
     # stage groups
-    s.group(70, 58, 830, 346, "1. Identity verification")
     s.group(70, 416, 570, 182, "2. Customer profiling")
     s.group(70, 606, 770, 346, "3. Policy recommendation")
     s.group(70, 964, 570, 466, "4. Policy application")
     s.group(620, 1494, 384, 270, "Human handoff (any stage)")
 
-    # ---- stage 1
-    s.pill(SC - 50, 18, 100, 28, "start")
-    line(s, [(SC, 46), (SC, 88)])
-    spine(88, "greet", "code")
-    line(s, [(SC, 122), (SC, 142)])
-    spine(142, "ask_customer", "wait", "IDENTITY_INFO", h=40)
-    line(s, [(SC, 182), (SC, 212)])
+    # ---- stage 1, verification
     spine(212, "verify_identity", "code")
     s.node(RX, 209, RW, "ask_customer", "wait", "OTP_CODE", h=40)
     line(s, [(SR, 229), (RX, 229)])
@@ -138,8 +153,7 @@ def langgraph_graph():
     s.node(780, 1530, 210, "human_handoff", "code")
     line(s, [(885, 1564), (885, 1598)])
     s.node(780, 1598, 210, "await_agent", "wait", h=56)
-    line(s, [(780, 1646), (FG, 1646), (FG, 105), (SX, 105)])
-    label(s, 200, 99, "CONTINUE after identity failure")
+    # CONTINUE resumes the identity forms, in the unshifted top: drawn after the group closes (below)
     line(s, [(780, 1634), (FF, 1634), (FF, 469), (SX, 469)])
     label(s, 200, 463, "VERIFIED after identity failure")
     line(s, [(780, 1622), (FA, 1622), (FA, 562), (SX, 562)])
@@ -154,6 +168,11 @@ def langgraph_graph():
     s.pill(860, 1712, 140, 28, "stop: WITHDRAWN")
 
     s.legend(84, 1516, LEGEND)
+    s.p.append("</g>")
+
+    # await_agent CONTINUE after an identity failure: back to the identity forms, up the right edge
+    line(s, [(990, 1640 + D), (1002, 1640 + D), (1002, 299), (SR, 299)])
+    label(s, 810, 293, "CONTINUE after identity failure")
     return s
 
 

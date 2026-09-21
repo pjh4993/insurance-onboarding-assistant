@@ -26,6 +26,7 @@ TOOL_NAMES = {
     "partiesextraction": "PartiesExtraction",
     "answersextraction": "AnswersExtraction",
     "applicationsummary": "ApplicationSummary",
+    "intakereply": "IntakeReply",
 }
 
 
@@ -38,6 +39,14 @@ def _strings(node: Any) -> list[str]:
     if isinstance(node, list):
         return [s for v in node for s in _strings(v)]
     return []
+
+
+def last_user_text(body: dict[str, Any]) -> str:
+    """The latest user message alone: the system prompt lists every product, so it must not be searched."""
+    for message in reversed(body.get("messages") or []):
+        if message.get("role") == "user":
+            return "\n".join(_strings(message.get("content", [])))
+    return ""
 
 
 def request_text(body: dict[str, Any]) -> str:
@@ -90,7 +99,12 @@ def converse_result(body: dict[str, Any], started: float) -> dict[str, Any]:
     text = request_text(body)
     tool = pick_tool(body)
     if tool:
-        payload = tool_input(tool, text)
+        canonical = TOOL_NAMES.get(tool.replace("_", "").casefold())
+        payload = (
+            fixtures.intake_reply(last_user_text(body))
+            if canonical == "IntakeReply"
+            else tool_input(tool, text)
+        )
         content = [
             {"toolUse": {"toolUseId": f"tooluse_{uuid.uuid4().hex[:22]}", "name": tool, "input": payload}}
         ]
