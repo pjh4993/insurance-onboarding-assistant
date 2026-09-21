@@ -9,3 +9,4 @@ node_modules/
 *.tfstate*
 .env
 .DS_Store
+conversation.md
