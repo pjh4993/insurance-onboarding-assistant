@@ -15,11 +15,36 @@ is off or failing.
 The frontend passes `traceparent` to the backend, so a relayed call and the API call it causes are one trace.
 Logs written inside a span carry its trace id (in the OTLP record, and as `trace=` in the stdout line).
 
-## 2. Keeping it small
+## 2. Log format
+
+Logs are structured. On stdout every line is one JSON object; over OTLP the same fields arrive as log attributes
+(in Loki, structured metadata), so they can be filtered and grouped without parsing the message.
+
+```json
+{"ts": "2026-09-21T13:33:54.304+00:00", "level": "INFO", "logger": "app.services.runtime", "msg": "turn finished",
+ "trace_id": "71957a97…", "span_id": "3d52439a…", "session_id": "b235ccb9-…", "stage": "IDENTITY",
+ "status": "ACTIVE", "waiting_for": "IDENTITY_INFO", "mode": "AUTO"}
+```
+
+| Field | Meaning |
+|---|---|
+| `ts`, `level`, `logger`, `msg` | Always present. `msg` is a fixed string (`turn finished`, `graph run failed`); the context goes in fields |
+| `trace_id`, `span_id` | When logged inside a request, the trace it belongs to |
+| `session_id`, `stage`, `status`, `waiting_for`, `mode`, `market` | Onboarding context, on the events below |
+| `http.request.method`, `url.path`, `http.response.status_code`, `client.address` | Access log lines (uvicorn), split out of the line |
+| `exception.type`, `exception.message`, `exception.stacktrace` | When an error is logged. The stack is not in `msg` |
+
+Backend events: `session created`, `turn finished` (once per graph run, with the stage it reached),
+`graph run failed`, `could not route the failure to human_handoff`, and the SSE broker's `could not publish event`
+and `LISTEN connection lost; reconnecting`. Frontend events: `backend relay failed` and `request failed` (Next's
+unhandled errors). In code, pass context with `extra=` (Python) or the `fields` argument (`lib/server/log.ts`),
+never by formatting it into the message.
+
+## 3. Keeping it small
 
 | Control | Where | Effect |
 |---|---|---|
-| `LOG_MAX_CHARS` (default 2000) | Both services | A log message is cut to this many characters from the head, and a traceback or stack to this many from the tail, where the error is. The cut is marked `…[+N chars]`. The same cap applies to span attribute values |
+| `LOG_MAX_CHARS` (default 2000) | Both services | The message and every string field are cut to this many characters from the head; `exception.stacktrace` is cut from the tail, where the error is. The cut is marked `…[+N chars]`. The same cap applies to span attribute values |
 | Quiet paths | Both services | `/healthz` and the SSE `/stream` endpoints produce no spans. A stream is one long connection, so its span would say nothing per event. Health-check access logs are dropped |
 | Sub-spans | Backend | The ASGI `receive`/`send` spans are not recorded |
 | Library loggers | Backend | `httpx`, `botocore`, `psycopg`, `langchain`, `langgraph` and similar log at WARNING only |
@@ -27,7 +52,7 @@ Logs written inside a span carry its trace id (in the OTLP record, and as `trace
 Traces are not sampled: after the quiet paths are removed, a demo's traffic is small. `OTEL_TRACES_SAMPLER` can
 change that without code.
 
-## 3. Turning it on
+## 4. Turning it on
 
 Terraform leaves export off until `otlp_endpoint` is set in the environment's `terraform.tfvars`.
 
@@ -48,7 +73,7 @@ Terraform leaves export off until `otlp_endpoint` is set in the environment's `t
 
 Locally, export stays off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set in the environment.
 
-## 4. CloudWatch in Grafana
+## 5. CloudWatch in Grafana
 
 The same stack can read CloudWatch metrics (ALB, ECS, RDS) and the log groups through the CloudWatch data source,
 using **Grafana Assume Role**. `infra/envs/develop/grafana.tf` creates a read-only role for it once

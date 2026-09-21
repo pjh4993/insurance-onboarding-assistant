@@ -105,6 +105,7 @@ class Runtime:
                 last_activity_at=now,
             )
             s.add(session)
+        log.info("session created", extra={"session_id": str(session_id), "market": market})
         await self._run(session, initial_state(session_id=str(session_id), party_id=str(party_id), market=market))
         return await self.get_session(str(session_id)), token
 
@@ -152,11 +153,11 @@ class Runtime:
             try:
                 await self._stream(sid, graph_input, config)
             except Exception as exc:  # retries are exhausted (or a bug): hand the session to an agent
-                log.warning("session %s: graph run failed: %s", sid, type(exc).__name__)
+                log.warning("graph run failed", extra={"session_id": sid, "error.type": type(exc).__name__})
                 try:
                     await self._recover(sid, config, exc)
                 except Exception:
-                    log.exception("session %s: could not route the failure to human_handoff", sid)
+                    log.exception("could not route the failure to human_handoff", extra={"session_id": sid})
             finally:
                 await self._sync_session(session)
 
@@ -212,6 +213,16 @@ class Runtime:
             else:
                 row.status = "ACTIVE"
             party = await s.get(Party, row.party_id)
+        log.info(
+            "turn finished",
+            extra={
+                "session_id": str(row.session_id),
+                "stage": row.last_stage,
+                "status": row.status,
+                "waiting_for": row.waiting_for,
+                "mode": row.mode,
+            },
+        )
         await self._publish_summary(row, party)
         prompt = await self.prompt(row, values)
         await self.broker.publish(

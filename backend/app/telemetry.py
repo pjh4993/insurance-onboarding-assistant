@@ -1,12 +1,21 @@
-"""Logging and OpenTelemetry setup. Logs always go to stdout (CloudWatch); traces and logs also go over
-OTLP when OTEL_EXPORTER_OTLP_ENDPOINT is set. Every record is capped at `log_max_chars`."""
+"""Structured logging and OpenTelemetry setup.
+
+Logs go to stdout as one JSON object per line (CloudWatch), and also over OTLP when
+OTEL_EXPORTER_OTLP_ENDPOINT is set, with the same fields as log attributes. Context goes in fields,
+not in the message: `log.warning("graph run failed", extra={"session_id": sid})`. Every string is
+capped at `log_max_chars`.
+"""
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
 import traceback
+import weakref
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import FastAPI
 from opentelemetry import trace
@@ -16,8 +25,20 @@ from app.config import Settings
 # Paths excluded from traces: health checks and long-lived SSE streams (one span per connection, not per event).
 EXCLUDED_URLS = "/healthz,/stream"
 NOISY_LOGGERS = ("httpx", "httpcore", "botocore", "urllib3", "psycopg", "langchain", "langgraph")
+# uvicorn.error propagates to "uvicorn"; uvicorn.access does not propagate at all.
+UVICORN_LOGGERS = ("uvicorn", "uvicorn.access")
+
+# Attributes every LogRecord has; anything else on a record came from `extra=` or a filter here.
+_RESERVED = frozenset(vars(logging.LogRecord("", 0, "", 0, "", None, None))) | {
+    "message",
+    "asctime",
+    "taskName",
+    "color_message",  # uvicorn's ANSI-colored copy of msg
+}
 
 _otel_ready = False
+# Records already capped: the stdout and OTLP handlers each run a CapLength on the same record.
+_capped: weakref.WeakSet[logging.LogRecord] = weakref.WeakSet()
 
 
 def truncate(text: str, limit: int, keep: str = "head") -> str:
@@ -28,26 +49,49 @@ def truncate(text: str, limit: int, keep: str = "head") -> str:
     return text[:limit] + marker if keep == "head" else marker + text[-limit:]
 
 
+def record_fields(record: logging.LogRecord) -> dict[str, Any]:
+    """The structured fields of a record: its `extra=` keys and those added by the filters below."""
+    return {k: v for k, v in vars(record).items() if k not in _RESERVED and not k.startswith("_")}
+
+
 class CapLength(logging.Filter):
-    """Render the message once, cap it, and fold any traceback in (its tail, where the error is)."""
+    """Render the message once and cap it; cap every string field; move a traceback into exception.* fields."""
 
     def __init__(self, max_chars: int) -> None:
         super().__init__()
         self.max_chars = max_chars
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if getattr(record, "capped", False):  # the stdout and OTLP handlers share one record
+        if record in _capped:
             return True
-        record.capped = True
-        message = truncate(record.getMessage(), self.max_chars)
+        _capped.add(record)
+        record.msg, record.args = truncate(record.getMessage(), self.max_chars), None
         if record.exc_info and record.exc_info[1] is not None:
-            tb = "".join(traceback.format_exception(*record.exc_info))
-            message = f"{message}\n{truncate(tb, self.max_chars, keep='tail')}"
+            exc = record.exc_info[1]
+            stack = "".join(traceback.format_exception(*record.exc_info))
+            setattr(record, "exception.type", type(exc).__name__)
+            setattr(record, "exception.message", truncate(str(exc), self.max_chars))
+            setattr(record, "exception.stacktrace", truncate(stack, self.max_chars, keep="tail"))
             record.exc_info = None
             record.exc_text = None
-        record.msg, record.args = message, None
-        span = trace.get_current_span().get_span_context()
-        record.trace_id = f"{span.trace_id:032x}" if span.is_valid else "-"
+        for key, value in record_fields(record).items():
+            if isinstance(value, str) and key != "exception.stacktrace":
+                setattr(record, key, truncate(value, self.max_chars))
+        return True
+
+
+class AccessFields(logging.Filter):
+    """Split uvicorn's access line into fields (it logs `client - "METHOD path HTTP/x" status` with args)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) == 5:
+            client, method, path, http_version, status = args
+            setattr(record, "client.address", str(client))
+            setattr(record, "http.request.method", method)
+            setattr(record, "url.path", path)
+            setattr(record, "network.protocol.version", http_version)
+            setattr(record, "http.response.status_code", int(status))
         return True
 
 
@@ -56,19 +100,40 @@ class DropHealthChecks(logging.Filter):
         return "/healthz" not in record.getMessage()
 
 
+class JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        entry: dict[str, Any] = {
+            "ts": datetime.fromtimestamp(record.created, UTC).isoformat(timespec="milliseconds"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        span = trace.get_current_span().get_span_context()
+        if span.is_valid:
+            entry["trace_id"] = f"{span.trace_id:032x}"
+            entry["span_id"] = f"{span.span_id:016x}"
+        entry.update(record_fields(record))
+        return json.dumps(entry, ensure_ascii=False, default=str)
+
+
 def setup_logging(settings: Settings) -> None:
-    cap = CapLength(settings.log_max_chars)
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s trace=%(trace_id)s %(message)s"))
-    handler.addFilter(cap)
+    handler.setFormatter(JsonFormatter())
+    handler.addFilter(CapLength(settings.log_max_chars))
     handler.set_name("app-stdout")
+
     root = logging.getLogger()
     root.handlers = [h for h in root.handlers if h.get_name() != "app-stdout"]
     root.addHandler(handler)
     root.setLevel(settings.log_level)
     for name in NOISY_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.access").addFilter(DropHealthChecks())
+
+    # uvicorn configures its own plain-text handlers and does not propagate; give them the JSON one.
+    for name in UVICORN_LOGGERS:
+        logging.getLogger(name).handlers = [handler]
+    access = logging.getLogger("uvicorn.access")
+    access.filters = [DropHealthChecks(), AccessFields()]
 
 
 def setup_otel(app: FastAPI, settings: Settings) -> None:
@@ -101,11 +166,10 @@ def setup_otel(app: FastAPI, settings: Settings) -> None:
         logger_provider = LoggerProvider(resource=resource)
         logger_provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter()))
         set_logger_provider(logger_provider)
+        # Record fields become log attributes; the handler adds trace and span ids itself.
         otlp = LoggingHandler(level=logging.INFO, logger_provider=logger_provider)
         otlp.addFilter(CapLength(settings.log_max_chars))
-        logging.getLogger().addHandler(otlp)
-        # uvicorn's loggers do not propagate to root: one access line per request, health checks already dropped.
-        for name in ("uvicorn.access", "uvicorn.error"):
+        for name in ("", *UVICORN_LOGGERS):
             logging.getLogger(name).addHandler(otlp)
 
         HTTPXClientInstrumentor().instrument()

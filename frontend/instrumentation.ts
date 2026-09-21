@@ -28,5 +28,5 @@ export async function register(): Promise<void> {
 
 export const onRequestError: Instrumentation.onRequestError = async (err, request) => {
   const { log } = await import("./lib/server/log");
-  log("error", `${request.method} ${request.path} failed`, err);
+  log("error", "request failed", { "http.request.method": request.method, "url.path": request.path }, err);
 };

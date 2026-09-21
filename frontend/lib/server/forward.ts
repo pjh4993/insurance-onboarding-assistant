@@ -41,7 +41,7 @@ export async function forward(
     });
   } catch (err) {
     if (req.signal.aborted) return new Response(null, { status: 499 });
-    log("error", `[proxy] ${method} ${path} failed`, err);
+    log("error", "backend relay failed", { "http.request.method": method, "url.path": path }, err);
     return jsonError(502, "Backend unavailable");
   }
 

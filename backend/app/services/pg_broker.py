@@ -78,7 +78,11 @@ class PostgresBroker:
                 await conn.execute("SELECT pg_notify(%s, %s)", (self._channel, encode(event)))
         except psycopg.Error:
             # Same contract as a dropped in-memory event: the reconnect refetch covers it.
-            log.warning("could not publish %s for session %s", event.type, event.session_id, exc_info=True)
+            log.warning(
+                "could not publish event",
+                extra={"session_id": event.session_id, "event.type": event.type},
+                exc_info=True,
+            )
 
     def stream(
         self, session_id: str | None, ping_seconds: float, initial: list[str] | None = None
@@ -105,7 +109,7 @@ class PostgresBroker:
                 raise
             except Exception:
                 self.listening.clear()
-                log.warning("LISTEN connection lost; reconnecting", exc_info=True)
+                log.warning("LISTEN connection lost; reconnecting", extra={"channel": self._channel}, exc_info=True)
                 await asyncio.sleep(self._retry_seconds)
 
     async def _dispatch(self, payload: str) -> None:
@@ -113,7 +117,7 @@ class PostgresBroker:
             msg: dict[str, Any] = json.loads(payload)
             session_id, event_type = msg["s"], msg["t"]
         except (ValueError, KeyError, TypeError):
-            log.warning("ignoring malformed notification")
+            log.warning("ignoring malformed notification", extra={"channel": self._channel})
             return
         if event_type == RESYNC:
             self._local.close_streams(session_id)
