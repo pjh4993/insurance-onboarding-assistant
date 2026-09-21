@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { NextIntlClientProvider, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { sessionLocale, type Locale } from "@/i18n/locales";
@@ -133,6 +134,14 @@ function CustomerError({ kind }: { kind: "expired" | "loadFailed" }) {
       <div className="notice">
         <h1>{t("errorTitle")}</h1>
         <p>{t(kind)}</p>
+        {kind === "expired" && (
+          <>
+            <p>{t("expiredHint")}</p>
+            <Link className="btn btn--primary" href="/">
+              {t("startNew")}
+            </Link>
+          </>
+        )}
       </div>
     </main>
   );

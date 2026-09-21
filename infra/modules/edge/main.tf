@@ -225,29 +225,28 @@ resource "aws_lb_listener_rule" "agent_cognito" {
   }
 }
 
-# With an agent host, the app host is for customers: send its agent paths to the agent host, same path.
-resource "aws_lb_listener_rule" "agent_paths_to_agent_host" {
+# With an agent host, the app host is for customers. Its agent API answers 404 here, so no agent data is
+# reachable without the login; /agent pages reach the frontend, which redirects them to the agent host (an ALB
+# redirect action would write ":443" into the URL).
+resource "aws_lb_listener_rule" "agent_api_off_app_host" {
   count = local.agent_enabled ? 1 : 0
 
   listener_arn = aws_lb_listener.https[0].arn
   priority     = 15
 
   action {
-    type = "redirect"
+    type = "fixed-response"
 
-    redirect {
-      host        = var.agent_domain_name
-      path        = "/#{path}"
-      query       = "#{query}"
-      protocol    = "HTTPS"
-      port        = "443"
-      status_code = "HTTP_302"
+    fixed_response {
+      content_type = "application/json"
+      message_body = "{\"error\":\"not_found\"}"
+      status_code  = "404"
     }
   }
 
   condition {
     path_pattern {
-      values = var.agent_path_patterns
+      values = ["/api/agent/*"]
     }
   }
 
@@ -256,6 +255,12 @@ resource "aws_lb_listener_rule" "agent_paths_to_agent_host" {
       values = [var.domain_name]
     }
   }
+}
+
+# Same rule and priority as the redirect it replaces.
+moved {
+  from = aws_lb_listener_rule.agent_paths_to_agent_host[0]
+  to   = aws_lb_listener_rule.agent_api_off_app_host[0]
 }
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agentConsoleHref, baseUrl, customerLink, isAgentHost } from "./hosts";
+import { agentHostRedirect, agentConsoleHref, baseUrl, customerLink, isAgentHost } from "./hosts";
 
 const AGENT = "https://dev.agent.onboardassist.click";
 const APP = "https://dev.app.onboardassist.click";
@@ -49,5 +49,23 @@ describe("links across hosts", () => {
     expect(customerLink(APP, AGENT, "/s/tok123")).toBe(`${APP}/s/tok123`);
     expect(customerLink(null, "http://localhost:13000", "/s/tok123")).toBe("http://localhost:13000/s/tok123");
     expect(customerLink(null, "http://localhost:13000/", "/s/tok123")).toBe("http://localhost:13000/s/tok123");
+  });
+});
+
+describe("agentHostRedirect", () => {
+  const agent = "https://dev.agent.example";
+
+  it("sends agent pages on the customer host to the agent host, without a port", () => {
+    expect(agentHostRedirect("/agent", "", "dev.app.example", agent)).toBe("https://dev.agent.example/");
+    expect(agentHostRedirect("/agent/sessions/1", "?tab=x", "dev.app.example", agent)).toBe(
+      "https://dev.agent.example/agent/sessions/1?tab=x",
+    );
+  });
+
+  it("leaves everything else alone", () => {
+    expect(agentHostRedirect("/agent", "", "dev.agent.example", agent)).toBeNull(); // already there
+    expect(agentHostRedirect("/agent", "", "localhost:13000", null)).toBeNull(); // no agent host: one origin
+    expect(agentHostRedirect("/agentx", "", "dev.app.example", agent)).toBeNull();
+    expect(agentHostRedirect("/chat", "", "dev.app.example", agent)).toBeNull();
   });
 });

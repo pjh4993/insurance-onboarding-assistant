@@ -28,3 +28,19 @@ export function agentConsoleHref(agentBase: string | null): string {
 export function customerLink(customerBase: string | null, currentOrigin: string, customerPath: string): string {
   return `${customerBase ?? currentOrigin.replace(/\/+$/, "")}${customerPath}`;
 }
+
+/**
+ * Where an agent path requested outside the agent host should go: the same page on the agent host, with no
+ * port in the URL (the ALB's own redirect action always writes one). /agent is the agent host's root there.
+ * Null when there is no agent host, the request is already on it, or the path is not an agent page.
+ */
+export function agentHostRedirect(
+  pathname: string,
+  search: string,
+  host: string | null | undefined,
+  agentBase: string | null,
+): string | null {
+  if (!agentBase || isAgentHost(host, agentBase)) return null;
+  if (pathname !== "/agent" && !pathname.startsWith("/agent/")) return null;
+  return `${agentBase}${pathname === "/agent" ? "/" : pathname}${search}`;
+}

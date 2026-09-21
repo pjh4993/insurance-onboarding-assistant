@@ -198,7 +198,9 @@
     "duration": "Usually takes under 5 minutes",
     "privacy": "What you share is used only for this application, and a human agent can step in at any time.",
     "errorTitle": "Something went wrong",
-    "expired": "This link has expired or is not valid. Please ask for a new link.",
+    "expired": "This session has ended, or the link is no longer valid.",
+    "expiredHint": "Start a new application here, or ask the agent who sent you the link for a new one.",
+    "startNew": "Start a new application",
     "loadFailed": "We could not load your session. Please refresh the page.",
     "localeFailed": "Could not change the language. Please try again."
   },

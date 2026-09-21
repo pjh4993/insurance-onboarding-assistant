@@ -114,8 +114,9 @@ Task egress is open (to reach the endpoints and NAT); ingress is what limits eac
 1. Each environment has three hosts: customers use the app host (develop `dev.app.`, prod `app.onboardassist.click`),
    agents the agent host (`dev.agent.` / `agent.`), and the docs have their own (`dev.docs.` / `docs.`). Every path
    on the agent host goes through an `authenticate-cognito` rule, and the frontend serves the console at its root;
-   the console's own API calls are covered by the same ALB session cookie (8 hours). On the app host, `/agent`,
-   `/agent/*` and `/api/agent/*` redirect to the agent host, so no agent page is reachable without the login.
+   the console's own API calls are covered by the same ALB session cookie (8 hours). On the app host, `/api/agent/*`
+   answers 404 at the ALB, so no agent data is reachable without the login, and the frontend redirects `/agent`
+   and `/agent/*` to the same page on the agent host (in `proxy.ts`, since an ALB redirect writes `:443` into the URL).
    Without an agent host (`agent_domain_name` empty) the console stays on the app host behind the same rule on
    those paths. Requests for the docs host (`dev.docs.` / `docs.`) go to the docs site through a plain forward
    rule on the host header, with no login: the design docs are public.
