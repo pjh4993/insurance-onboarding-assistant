@@ -2,8 +2,9 @@ locals {
   https_enabled = var.domain_name != ""
   docs_enabled  = local.https_enabled && var.docs_domain_name != ""
   agent_enabled = local.https_enabled && var.agent_domain_name != ""
-  # The operator host needs its own Cognito client (its callback names that host).
-  operator_enabled = local.https_enabled && var.operator_domain_name != "" && var.operator_client_id != ""
+  # The operator host needs its own Cognito client (its callback names that host). Gated on the host alone:
+  # the client's id is unknown until the client exists, and count/for_each must be known at plan time.
+  operator_enabled = local.https_enabled && var.operator_domain_name != ""
   hostnames = compact([
     var.domain_name,
     local.docs_enabled ? var.docs_domain_name : "",

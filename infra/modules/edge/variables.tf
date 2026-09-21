@@ -98,7 +98,7 @@ variable "operator_domain_name" {
 }
 
 variable "operator_client_id" {
-  description = "The Cognito app client the operator host logs in with."
+  description = "The Cognito app client the operator host logs in with; required when operator_domain_name is set."
   type        = string
   default     = ""
 }
