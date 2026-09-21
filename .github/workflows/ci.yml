@@ -33,6 +33,8 @@ jobs:
           --health-retries 20
     env:
       DATABASE_URL: postgresql+psycopg://onboarding:onboarding@localhost:5432/onboarding
+      # The DB-backed tests (scenarios, goldens, API) create and drop this database; without it they skip.
+      TEST_DATABASE_URL: postgresql+psycopg://onboarding:onboarding@localhost:5432/onboarding_test
       PARTNER_API_URL: http://localhost:8080/partner
       IDENTITY_API_URL: http://localhost:8080/identity
       CONTRACT_API_URL: http://localhost:8080/contract
