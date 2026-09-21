@@ -53,10 +53,9 @@ export function CustomerChat() {
   const stream = useEventStream(view ? customerApi.streamUrl : null, {
     onOpen: load, // resync anything missed while disconnected
     "session.updated": ({ session }) => setView((v) => v && { ...v, session }),
-    "message.appended": ({ message }) => {
-      setView((v) => v && { ...v, messages: appendMessage(v.messages, message) });
-      if (message.role !== "customer") setBusy(false);
-    },
+    // Replies arrive while the turn is still running; the backend accepts input only once it ends, which
+    // prompt.updated marks (it fires at the end of every turn, with a null prompt when nothing is asked).
+    "message.appended": ({ message }) => setView((v) => v && { ...v, messages: appendMessage(v.messages, message) }),
     "prompt.updated": ({ prompt }) => {
       setView((v) => v && { ...v, prompt });
       setBusy(false);

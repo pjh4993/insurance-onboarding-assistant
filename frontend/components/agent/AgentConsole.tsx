@@ -108,8 +108,8 @@ export function AgentConsole({ customerBaseUrl = null }: { customerBaseUrl?: str
     "message.appended": ({ session_id, message }) => {
       if (!mine(session_id)) return;
       setDetail((d) => d && { ...d, messages: appendMessage(d.messages, message) });
-      if (message.role === "assistant" || message.role === "system") setBusy(false);
     },
+    // The turn ends (and input is accepted again) with prompt.updated, not with the first reply.
     "prompt.updated": ({ session_id, prompt }) => {
       if (!mine(session_id)) return;
       setDetail((d) => d && { ...d, prompt });
