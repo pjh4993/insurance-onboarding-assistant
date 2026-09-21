@@ -7,15 +7,18 @@ import asyncio
 import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 from fastapi import FastAPI
 
+from app.api.operator import router as operator_router
 from app.api.routes import router
 from app.clients.external import ContractClient, IdentityClient, PartnerClient, make_http
 from app.config import Settings, get_settings
 from app.db.engine import init_db, make_engine, make_sessionmaker
 from app.db.uow import uow_factory
+from app.services.operator import OperatorConsole, seed_baseline
 from app.services.pg_broker import PostgresBroker
 from app.services.pubsub import Broker, InMemoryBroker
 from app.services.runtime import Runtime, entity_listener
@@ -29,7 +32,7 @@ from onboarding_agent import (
     build_graph,
     open_checkpointer,
 )
-from onboarding_agent.config import Bundle, ConfigError, load_bundle
+from onboarding_agent.config import Bundle, ConfigError, load_bundle, open_store
 from onboarding_core.util import Clock, utcnow
 
 
@@ -42,6 +45,7 @@ class Overrides:
     llm: StructuredLLM | None = None
     clock: Clock | None = None
     bundle: Bundle | None = None
+    ecs: Any = None  # stands in for the boto3 ECS client the operator console restarts the backend with
 
 
 log = logging.getLogger(__name__)
@@ -62,6 +66,10 @@ def bedrock_llm(settings: Settings, bundle: Bundle) -> BedrockStructuredLLM:
 
 async def agent_bundle(settings: Settings) -> Bundle:
     """Read and validate the config bundle once, at startup: a bad one stops the service here."""
+    if settings.agent_config_seed and settings.agent_config_uri:
+        seeded = await asyncio.to_thread(seed_baseline, open_store(settings.agent_config_uri))
+        if seeded:
+            log.info("agent config baseline seeded", extra={"agent_config.versions": ", ".join(seeded)})
     try:
         bundle = await asyncio.to_thread(
             load_bundle,
@@ -140,11 +148,13 @@ def create_app(settings: Settings | None = None, overrides: Overrides | None = N
             app.state.settings = settings
             app.state.broker = broker
             app.state.runtime = rt
+            app.state.operator = OperatorConsole(settings, bundle, ecs_client=overrides.ecs)
             app.state.engine = engine
             yield
 
     app = FastAPI(title="Onboarding Assistant API", version="0.1.0", lifespan=lifespan)
     app.include_router(router)
+    app.include_router(operator_router)
     setup_otel(app, settings)
     return app
 

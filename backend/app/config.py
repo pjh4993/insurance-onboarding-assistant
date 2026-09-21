@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     agent_config_version: str | None = None
     # Comma-separated model ids the bundle may name (what the IAM policy allows). Unset: not checked.
     llm_allowed_model_ids: str | None = None
+    # Local runs: publish the shipped baseline into AGENT_CONFIG_URI when it lacks it (AWS seeds with Terraform).
+    agent_config_seed: bool = False
+    # The operator console restarts the backend through ECS so it loads a newly published bundle. Unset: no restart.
+    backend_ecs_cluster: str | None = None
+    backend_ecs_service: str | None = None
 
     checkpoint_aes_key: str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
     session_hmac_key: str = "dev-session-hmac-key"
