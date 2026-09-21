@@ -1,0 +1,98 @@
+name: deploy-prod
+
+# Manual promotion of an image SHA that already passed develop. No rebuild:
+# the same immutable ECR tags are deployed. Required reviewers are configured
+# on the GitHub Environment "prod".
+on:
+  workflow_dispatch:
+    inputs:
+      image_sha:
+        description: "Commit SHA whose images (already in ECR) to deploy"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  IMAGE_TAG: ${{ inputs.image_sha }}
+  TF_ROOT: infra/envs/prod
+
+# Environment "prod" variables:
+#   AWS_DEPLOY_ROLE_ARN_PROD  terraform output deploy_role_arn (envs/prod)
+#   TF_STATE_BUCKET           state bucket from infra/bootstrap
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod # OIDC sub = repo:pjh4993/bolttech-onboarding-assistant:environment:prod
+    defaults:
+      run:
+        working-directory: ${{ env.TF_ROOT }}
+    steps:
+      - name: Validate SHA input
+        working-directory: .
+        run: |
+          [[ "${IMAGE_TAG}" =~ ^[0-9a-f]{40}$ ]] || { echo "image_sha must be a full 40-char commit SHA"; exit 1; }
+
+      # Infra code comes from the same commit as the images.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.image_sha }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check the images exist (no rebuild)
+        run: |
+          for svc in backend frontend; do
+            aws ecr describe-images --repository-name "onboarding/${svc}" \
+              --image-ids imageTag="${IMAGE_TAG}" --query 'imageDetails[0].imageDigest' --output text
+          done
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: terraform apply
+        run: >-
+          terraform apply -input=false -auto-approve
+          -var "image_tag=${IMAGE_TAG}"
+          -var "state_bucket_name=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: Read outputs
+        id: tf
+        run: |
+          {
+            echo "cluster=$(terraform output -raw ecs_cluster_name)"
+            echo "services=$(terraform output -raw ecs_service_names)"
+            echo "base_url=$(terraform output -raw base_url)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Wait for ECS services to be stable
+        run: |
+          aws ecs wait services-stable \
+            --cluster "${{ steps.tf.outputs.cluster }}" \
+            --services ${{ steps.tf.outputs.services }}
+
+      - name: Smoke test
+        run: |
+          url="${{ steps.tf.outputs.base_url }}/healthz"
+          for i in $(seq 1 30); do
+            if body=$(curl -fsS --max-time 10 "$url"); then
+              echo "$body"; echo "$body" | grep -q '"status"' && exit 0
+            fi
+            echo "attempt $i: not healthy yet"; sleep 10
+          done
+          echo "smoke test failed: $url"; exit 1

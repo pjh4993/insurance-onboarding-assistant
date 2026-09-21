@@ -1,0 +1,28 @@
+environment = "prod"
+
+# Full HA: NAT and interface endpoints in both AZs.
+single_nat_gateway     = false
+interface_endpoint_azs = ["ap-northeast-2a", "ap-northeast-2c"]
+
+enable_mocks  = false
+desired_count = 2
+
+db_instance_class      = "db.t4g.small"
+db_multi_az            = true
+db_deletion_protection = true
+
+# The real partner / identity / contract systems do not exist yet.
+# Placeholders on the reserved .invalid TLD until they do.
+partner_api_url  = "https://partner.invalid"
+identity_api_url = "https://identity.invalid"
+contract_api_url = "https://contract.invalid"
+
+# Empty until prod gets its own hostname (e.g. app.onboardassist.click with
+# route53_zone_name = "onboardassist.click"). Empty = HTTP-only ALB.
+domain_name = ""
+
+# develop owns the OIDC provider and ECR repositories; prod looks them up.
+create_shared_ci_resources = false
+github_oidc_subjects       = ["environment:prod"]
+
+state_bucket_name = "onboarding-tfstate-<ACCOUNT_ID>"

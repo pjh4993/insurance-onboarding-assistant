@@ -1,0 +1,123 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: onboarding
+          POSTGRES_PASSWORD: onboarding
+          POSTGRES_DB: onboarding
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U onboarding"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://onboarding:onboarding@localhost:5432/onboarding
+      PARTNER_API_URL: http://localhost:8080/partner
+      IDENTITY_API_URL: http://localhost:8080/identity
+      CONTRACT_API_URL: http://localhost:8080/contract
+      BEDROCK_ENDPOINT_URL: http://localhost:8080
+      BEDROCK_MODEL_ID: global.anthropic.claude-sonnet-4-6
+      AWS_REGION: ap-northeast-2
+      AWS_ACCESS_KEY_ID: mock
+      AWS_SECRET_ACCESS_KEY: mock
+      CHECKPOINT_AES_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
+      SESSION_HMAC_KEY: ci-session-hmac-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run pytest
+
+  mock:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # corepack honours package.json "packageManager" when present.
+      - run: corepack enable
+      - run: pnpm install
+      - run: pnpm lint
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm build
+
+  terraform:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        root: [envs/develop, envs/prod, bootstrap]
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.root }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+      - run: terraform fmt -recursive -check ../..
+        if: matrix.root == 'envs/develop'
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [backend, mock, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service }}
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}

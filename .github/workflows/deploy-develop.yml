@@ -1,0 +1,104 @@
+name: deploy-develop
+
+# Every push to main builds the three images once, tags them with the commit
+# SHA, and rolls develop forward. prod later promotes the same SHA.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # GitHub OIDC -> AWS
+  contents: read
+
+concurrency:
+  group: deploy-develop
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  IMAGE_TAG: ${{ github.sha }}
+  TF_ROOT: infra/envs/develop
+
+# Repository variables (Settings > Secrets and variables > Actions > Variables):
+#   AWS_DEPLOY_ROLE_ARN_DEVELOP  terraform output deploy_role_arn (envs/develop)
+#   TF_STATE_BUCKET              terraform output state_bucket_name (infra/bootstrap)
+jobs:
+  images:
+    # Skip until the one-time AWS setup has set the deploy role variable.
+    if: ${{ vars.AWS_DEPLOY_ROLE_ARN_DEVELOP != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [backend, mock, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN_DEVELOP }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/onboarding/${{ matrix.service }}:${{ env.IMAGE_TAG }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+  deploy:
+    needs: images
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.TF_ROOT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN_DEVELOP }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.7
+          terraform_wrapper: false # keep `terraform output -raw` clean
+
+      - name: terraform init
+        run: terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: terraform apply
+        run: >-
+          terraform apply -input=false -auto-approve
+          -var "image_tag=${IMAGE_TAG}"
+          -var "state_bucket_name=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: Read outputs
+        id: tf
+        run: |
+          {
+            echo "cluster=$(terraform output -raw ecs_cluster_name)"
+            echo "services=$(terraform output -raw ecs_service_names)"
+            echo "base_url=$(terraform output -raw base_url)"
+          } >> "$GITHUB_OUTPUT"
+
+      # The circuit breaker rolls a failed deployment back; this step then fails.
+      - name: Wait for ECS services to be stable
+        run: |
+          aws ecs wait services-stable \
+            --cluster "${{ steps.tf.outputs.cluster }}" \
+            --services ${{ steps.tf.outputs.services }}
+
+      - name: Smoke test (frontend /healthz -> backend /healthz)
+        run: |
+          url="${{ steps.tf.outputs.base_url }}/healthz"
+          for i in $(seq 1 30); do
+            if body=$(curl -fsS --max-time 10 "$url"); then
+              echo "$body"
+              echo "$body" | grep -q '"status"' && exit 0
+            fi
+            echo "attempt $i: not healthy yet"; sleep 10
+          done
+          echo "smoke test failed: $url"; exit 1
