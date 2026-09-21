@@ -10,7 +10,17 @@ the entry point the API service drives. Nodes reach the domain DB and external s
 in `onboarding_core.ports` (see [solution-architecture.md](01-solution-architecture.md#backend-packages)). How the
 code is split, and how to add to it, is in [§9](#9-code-by-domain).
 
+The graph is described from the outside in, the way the C4 model zooms into a system:
+
+| Level | Section | Shows |
+|---|---|---|
+| Stages | [§1](#1-the-four-stages) | The four stages, the order they run in, and how a session leaves them |
+| Inside a stage | [§3](#3-inside-each-stage) | Each stage's nodes and edges on their own, then the human handoff |
+| The whole graph | [§4](#4-the-whole-graph) | Every node and every conditional edge in one picture, as a reference |
+
 ## 1. The four stages
+
+![The four stages and their exits](assets/langgraph-stages.svg)
 
 | Stage | What the customer does | What the system does | New entities | Stage ends when |
 |---|---|---|---|---|
@@ -20,6 +30,15 @@ code is split, and how to add to it, is in [§9](#9-code-by-domain).
 | 4. Policy application | Says who is insured and who pays, answers product questions, confirms the summary | Pre-fills answers it already knows, asks for the rest, writes a summary, submits | `Application`, `ApplicationParty`, other `Party` rows | `Application.status = SUBMITTED` with a submission reference |
 
 Identity comes first. No profiling happens until identity is verified. See [assumptions.md](../decisions/assumptions.md).
+
+The stages run in order, with three ways out of the straight line:
+
+- **`CHANGE`**: after seeing the recommendations, the customer changes their answers and the session goes back
+  to profiling ([the loop back](#the-loop-back)).
+- **`DECLINE`**: the customer turns the recommendations down and the session ends as `DECLINED`.
+- **Human handoff**: every stage can get stuck (identity fails twice, answers stay incomplete, nothing fits) and
+  any node can run out of retries. The session then waits for a support agent, who resumes it or ends it as
+  `WITHDRAWN` ([human handoff](#human-handoff)).
 
 ## 2. Nodes by type
 
@@ -31,94 +50,86 @@ Nodes are split by who decides.
 | **LLM** | Extracts values from what people say, or writes text | `understand_intake`, `assess_needs`, `explain_recommendation`, `collect_parties`, `collect_answers`, `summarize_application` |
 | **Wait** | Pauses with `interrupt()` until a person answers | `ask_customer`, `await_decision`, `confirm_summary`, `await_agent` |
 
+The diagrams colour them the same way: blue is code, purple is LLM, orange is a wait node.
+
 A node that needs free-form input asks the question itself: it appends the message, sets `waiting_for`, and
 routes to `ask_customer`. `ask_customer` is one node reused for every "please tell me X" pause
 (`INTAKE`, `IDENTITY_INFO`, `OTP_CODE`, `NEEDS`, `PARTIES`, `ANSWERS`). It interrupts, records the answer, sets
-`last_input` to the kind it received, and routes back to the node that handles that kind.
+`last_input` to the kind it received, and routes back to the node that handles that kind. Decisions, the summary
+confirmation and agent resolutions have their own wait nodes because they carry structured data.
+
+Identity and profiling ask in **small forms**, one topic at a time. Each wait's prompt carries a `FormSpec`
+(topic, title, a one-line reason, a few fields, pre-filled where something is already known). A form answer
+(`{topic, fields}`) is merged as given without an LLM call; free text still goes through the LLM extraction.
+
+| Node | Reads | Writes | External call |
+|---|---|---|---|
+| `ask_customer` | The resumed input | For `INTAKE`: the text. For `IDENTITY_INFO`: the topic's fields into `Party` (contact fields, consent time, ID number AES-encrypted and HMAC), topic marked answered. For `OTP_CODE`: a transient `otp_code` in state. Otherwise the text as a message | — |
+
+The question loops do not ask forever. `answers_rounds` counts answers that still left fields missing,
+`needs_rounds` counts answers that filled none of the fields still missing (so answering the small forms one by
+one never trips it), and `confirm_rejections` counts summaries the customer rejected. After **3** the node sets
+`handoff_reason` (`NEEDS_INCOMPLETE`, `ANSWERS_INCOMPLETE` or `SUMMARY_REJECTED`) and the session goes to an
+agent.
+
+## 3. Inside each stage
+
+One diagram per stage. A dashed pill is a node drawn in another stage's diagram: where the session comes from,
+or where it goes next. Not drawn: every node routes to `human_handoff` when `last_error` is set (its retries ran
+out, see [§6](#6-retries-and-error-handling)).
+
+### Stage 1: Identity verification
+
+![Stage 1: identity verification](assets/langgraph-stage-identity.svg)
 
 The conversation opens on the customer's own words: `greet` waits for `INTAKE`, the first thing they typed or
 picked on the landing screen, and `understand_intake` answers it (briefly, with no prices or promises of cover;
-an off-topic question is steered back), notes the product type it points to, and says what comes next. Identity
-and profiling then ask in **small forms**, one topic at a time. Each wait's prompt carries a `FormSpec` (topic,
-title, a one-line reason, a few fields, pre-filled where something is already known):
-`collect_identity` asks contact → ID document → consent, and `assess_needs` picks the next topic (coverage,
-person, device, trip) from the fields still missing, starting with the product the intake pointed to. A form
-answer (`{topic, fields}`) is merged as given without an LLM call; free text still goes through the LLM
-extraction, and the intake text is part of it. Decisions, the summary
-confirmation and agent resolutions have their own wait nodes because they carry structured data.
+an off-topic question is steered back), notes the product type it points to, and says what comes next.
+`collect_identity` then asks contact → ID document → consent, one form each, before `verify_identity` runs.
 
-### What each node does
-
-| Node | Stage | Reads | Writes | External call |
-|---|---|---|---|---|
-| `greet` | 1 | Market | First message, `waiting_for = INTAKE` | — |
-| `understand_intake` | 1 | The intake text, the market's catalog | A reply to it; `intake` (the text, kept encrypted for the needs extraction) and `product_interest` (the product type it points to, or none) | Bedrock (`IntakeReply`) |
-| `collect_identity` | 1 | Identity topics answered so far | The next identity form (`form_topic`, `waiting_for = IDENTITY_INFO`), or nothing once all are in | — |
-| `ask_customer` | all | The resumed input | For `INTAKE`: the text. For `IDENTITY_INFO`: the topic's fields into `Party` (contact fields, consent time, ID number AES-encrypted and HMAC), topic marked answered. For `OTP_CODE`: a transient `otp_code` in state. Otherwise the text as a message | — |
-| `verify_identity` | 1 | `Party` | With consent and a match: `VERIFIED`, `PARTNER_MATCH`, partner ref, date of birth. Otherwise sends an OTP | Partner match (only with consent). If no match: identity, send OTP |
-| `check_otp` | 1 | `otp_code`, `otp_request_id` | `Party.verification_*`; clears `otp_code` | Identity: verify OTP |
-| `check_document` | 1 | ID number from `Party` (decrypted) | `Party.verification_*` | Identity: verify document |
-| `fetch_purchases` | 2 | `Party.partner_customer_ref`, consent | `InsurableObject` (`source = PARTNER`) | Partner: purchases. Does nothing without consent or match |
-| `assess_needs` | 2 | Customer's `NEEDS` messages, current assessment, partner devices | `NeedsAssessment`, and on completion a device or trip `InsurableObject` described by the customer | Bedrock (`NeedsExtraction`) |
-| `check_eligibility` | 3 | Catalog rules for the session's market, assessment, objects | One `Recommendation` per product, **including ineligible ones** with failed rules | — |
-| `rank_products` | 3 | `TargetMarket` weights | `Recommendation.rank`, `score` | — |
-| `quote_premium` | 3 | `Product.rating`, `term_rule`, object values | `Quote` per eligible recommendation. A rating error makes that product ineligible | — |
-| `explain_recommendation` | 3 | Ranked, priced recommendations; `TargetMarket.rationale` | `Recommendation.rationale` | Bedrock (`RecommendationRationale`) |
-| `await_decision` | 3 | `ACCEPT` / `DECLINE` / `CHANGE` | `Recommendation.status`, `Quote.status`, `decided_by` | — |
-| `open_application` | 4 | Accepted recommendation and quote | `Application` (`DRAFT`) with answers pre-filled from the object and the customer. Re-prices the quote if it expired | — |
-| `collect_parties` | 4 | Customer's `PARTIES` text | `ApplicationParty` rows, new `Party` rows for others | Bedrock (`PartiesExtraction`) |
-| `collect_answers` | 4 | Customer's `ANSWERS` text, `Product.required_application_fields` | `Application.answers`, `missing_fields`, status | Bedrock (`AnswersExtraction`), only when there is new text |
-| `summarize_application` | 4 | Complete application | `Application.summary` | Bedrock (`ApplicationSummary`) |
-| `confirm_summary` | 4 | `confirmed`, optional correction text | — | — |
-| `submit_application` | 4 | Complete application | `Application.submission_ref`, `SUBMITTED` | Contract admin, with `Idempotency-Key` |
-| `human_handoff` | any | `last_error`, `handoff_reason` | `stage = HANDOFF`, `waiting_for = AGENT`, where to resume, a message | — |
-| `await_agent` | any | Agent resolution | `Party.verification_method = AGENT` on `VERIFIED` after an identity handoff | — |
-
-`quote_premium` runs before `explain_recommendation` so the explanation can mention the price.
-
-## 3. Graph
-
-![The onboarding LangGraph graph](assets/langgraph-graph.svg)
-
-Blue is code, purple is LLM, orange is a wait node. Not drawn: every node routes to `human_handoff` when
-`last_error` is set, and `quote_premium` also hands off if rating errors leave no eligible product.
-
-### Conditional edges
-
-Every node has a conditional edge. Every routing function reads **only the state**, never the database, so
-routing can be replayed from a checkpoint and tested without a database (`backend/packages/agent/tests/test_routing.py`).
-
-| After | Reads | Branches |
-|---|---|---|
-| `ask_customer` | `last_input` | `INTAKE` → `understand_intake`; `IDENTITY_INFO` → `collect_identity`; `OTP_CODE` → `check_otp`; `NEEDS` → `assess_needs`; `PARTIES` → `collect_parties`; `ANSWERS` → `collect_answers` |
-| `understand_intake` | — | `collect_identity` |
-| `collect_identity` | `form_topic` | a topic still pending → `ask_customer`; all answered → `verify_identity` |
-| `verify_identity` | `identity_result` | `MATCHED` → `fetch_purchases`; otherwise wait for the OTP |
-| `check_otp` | `identity_result` | `OTP_OK` → `fetch_purchases`; otherwise `check_document` |
-| `check_document` | `identity_result` | `DOC_OK` → `fetch_purchases`; otherwise `human_handoff` |
-| `assess_needs` | `needs_complete`, `handoff_reason` | complete → `check_eligibility`; `NEEDS_INCOMPLETE` → `human_handoff`; otherwise ask again |
-| `check_eligibility`, `quote_premium` | `eligible_count` | 0 → `human_handoff`; ≥ 1 → next node |
-| `await_decision` | `decision` | `ACCEPT` → `open_application`; `CHANGE` → `assess_needs`; `DECLINE` → end |
-| `collect_parties` | `parties_complete` | true → `collect_answers`; false → ask again |
-| `collect_answers` | `answers_complete`, `handoff_reason` | complete → `summarize_application`; `ANSWERS_INCOMPLETE` or `NO_ELIGIBLE_PRODUCT` → `human_handoff`; otherwise ask again |
-| `confirm_summary` | `confirmed`, `correcting`, `handoff_reason` | true → `submit_application`; a rejection with a correction → `collect_parties` (then `collect_answers` with the same message); without one → `collect_answers`; `SUMMARY_REJECTED` → `human_handoff` |
-| `await_agent` | `handoff_resolution`, `handoff_reason`, `resume_node` | See [§5](#5-human-handoff) |
-| any node | `last_error` | set → `human_handoff` |
-
-`fetch_purchases` has no branch. Consent (`Party.third_party_consent_at`) is a precondition inside the node:
-without consent or without a partner match it does nothing and passes on. The customer then describes the
-device in their own words.
+| Node | Reads | Writes | External call |
+|---|---|---|---|
+| `greet` | Market | First message, `waiting_for = INTAKE` | — |
+| `understand_intake` | The intake text, the market's catalog | A reply to it; `intake` (the text, kept encrypted for the needs extraction) and `product_interest` (the product type it points to, or none) | Bedrock (`IntakeReply`) |
+| `collect_identity` | Identity topics answered so far | The next identity form (`form_topic`, `waiting_for = IDENTITY_INFO`), or nothing once all are in | — |
+| `verify_identity` | `Party` | With consent and a match: `VERIFIED`, `PARTNER_MATCH`, partner ref, date of birth. Otherwise sends an OTP | Partner match (only with consent). If no match: identity, send OTP |
+| `check_otp` | `otp_code`, `otp_request_id` | `Party.verification_*`; clears `otp_code` | Identity: verify OTP |
+| `check_document` | ID number from `Party` (decrypted) | `Party.verification_*` | Identity: verify document |
 
 Identity routing uses **results, not counters**. The number of failed identity attempts lives in
 `Party.verification_attempts` in the database. The state holds only the last result (`OTP_FAILED`), and the graph
 shape decides what follows: `OTP_FAILED` always goes to the document check, `DOC_FAILED` always goes to an agent.
 That is how "two failures hand off" is enforced.
 
-The question loops are the exception. `answers_rounds` counts answers that still left fields missing, and
-`needs_rounds` counts answers that filled none of the fields still missing (so answering the small forms one
-by one never trips it), and `confirm_rejections` counts summaries the customer rejected. After **3** the node sets
-`handoff_reason` (`NEEDS_INCOMPLETE`, `ANSWERS_INCOMPLETE` or `SUMMARY_REJECTED`) and the session goes to an
-agent instead of asking forever.
+### Stage 2: Customer profiling
+
+![Stage 2: customer profiling](assets/langgraph-stage-profiling.svg)
+
+| Node | Reads | Writes | External call |
+|---|---|---|---|
+| `fetch_purchases` | `Party.partner_customer_ref`, consent | `InsurableObject` (`source = PARTNER`) | Partner: purchases. Does nothing without consent or match |
+| `assess_needs` | Customer's `NEEDS` messages, current assessment, partner devices | `NeedsAssessment`, and on completion a device or trip `InsurableObject` described by the customer | Bedrock (`NeedsExtraction`) |
+
+`fetch_purchases` has no branch. Consent (`Party.third_party_consent_at`) is a precondition inside the node:
+without consent or without a partner match it does nothing and passes on. The customer then describes the
+device in their own words.
+
+`assess_needs` picks the next form topic (coverage, person, device, trip) from the fields still missing,
+starting with the product the intake pointed to. The intake text is part of what the LLM extracts from.
+
+### Stage 3: Policy recommendation
+
+![Stage 3: policy recommendation](assets/langgraph-stage-recommendation.svg)
+
+| Node | Reads | Writes | External call |
+|---|---|---|---|
+| `check_eligibility` | Catalog rules for the session's market, assessment, objects | One `Recommendation` per product, **including ineligible ones** with failed rules | — |
+| `rank_products` | `TargetMarket` weights | `Recommendation.rank`, `score` | — |
+| `quote_premium` | `Product.rating`, `term_rule`, object values | `Quote` per eligible recommendation. A rating error makes that product ineligible | — |
+| `explain_recommendation` | Ranked, priced recommendations; `TargetMarket.rationale` | `Recommendation.rationale` | Bedrock (`RecommendationRationale`) |
+| `await_decision` | `ACCEPT` / `DECLINE` / `CHANGE` | `Recommendation.status`, `Quote.status`, `decided_by` | — |
+
+`quote_premium` runs before `explain_recommendation` so the explanation can mention the price.
 
 Eligibility runs on assumptions when the customer has not said everything: a device is new, undamaged and
 bought (for a phone, activated) today. The assumptions are recorded in `assumed_fields` and never copied into
@@ -129,7 +140,7 @@ months ago), the session goes to an agent with `NO_ELIGIBLE_PRODUCT` instead of 
 "Today" is the market's calendar day (`Asia/Seoul` for KR, `America/New_York` for US), not the UTC date: a
 Korean customer who bought a TV at 08:00 in Seoul bought it today, though it is still yesterday in UTC.
 
-### The loop back
+#### The loop back
 
 When the customer chooses `CHANGE` after seeing recommendations, all recommendations and quotes of that run
 become `EXPIRED` and the flow returns to `assess_needs`. Because the current assessment is complete,
@@ -137,30 +148,26 @@ become `EXPIRED` and the flow returns to `assess_needs`. Because the current ass
 customer typed what changed together with `CHANGE`, that text is used as the next needs answer; otherwise
 the graph asks what changed. Old versions are kept so the agent can see what each recommendation was based on.
 
-## 4. Interrupt and resume
+### Stage 4: Policy application
 
-1. A wait node calls `interrupt({"waiting_for": ...})`. The node before it has already appended the question
-   to `messages`.
-2. The checkpointer saves the state and the graph run stops.
-3. The backend copies `stage`, `waiting_for` (from the interrupt payload) and the next node into the
-   `OnboardingSession` row and publishes SSE events (`session.updated`, `prompt.updated`, plus
-   `message.appended` and `entity.updated` while the graph ran). The frontend shows the input that matches
-   `waiting_for`. This is the "workflow visibility" the brief asks for.
-4. When input arrives (`POST .../input` with `{type, data}`), the API validates `data` for that `type`, rejects
-   it with `409` if `type` is not the current `waiting_for` or the session is still processing, and returns `202`.
-   The graph resumes the same thread in a background task with
-   `Command(resume=data, update={"actor": ..., "mode": ...})`.
-5. The paused node receives the value and the graph runs until the next wait node or the end.
+![Stage 4: policy application](assets/langgraph-stage-application.svg)
 
-The same mechanism covers three cases:
+| Node | Reads | Writes | External call |
+|---|---|---|---|
+| `open_application` | Accepted recommendation and quote | `Application` (`DRAFT`) with answers pre-filled from the object and the customer. Re-prices the quote if it expired | — |
+| `collect_parties` | Customer's `PARTIES` text | `ApplicationParty` rows, new `Party` rows for others | Bedrock (`PartiesExtraction`) |
+| `collect_answers` | Customer's `ANSWERS` text, `Product.required_application_fields` | `Application.answers`, `missing_fields`, status | Bedrock (`AnswersExtraction`), only when there is new text |
+| `summarize_application` | Complete application | `Application.summary` | Bedrock (`ApplicationSummary`) |
+| `confirm_summary` | `confirmed`, optional correction text | — | — |
+| `submit_application` | Complete application | `Application.submission_ref`, `SUBMITTED` | Contract admin, with `Idempotency-Key` |
 
-| Case | How |
-|---|---|
-| Multi-turn conversation | Every question is a wait; every answer is a resume |
-| Customer leaves and comes back | The graph stays paused in the checkpoint. The same link resumes from the last wait node |
-| Agent takes over | The agent resumes the same thread with `actor = AGENT` |
+"Not confirmed" is drawn going back to `collect_answers`. A rejection that comes with a correction goes to
+`collect_parties` first, then to `collect_answers` with the same message, so a correction can change who is
+insured as well as an answer.
 
-## 5. Human handoff
+### Human handoff
+
+![Human handoff](assets/langgraph-handoff.svg)
 
 The handoff is two nodes. `human_handoff` is a code node: it sets `stage = HANDOFF`, `waiting_for = AGENT`,
 `handoff_reason`, and where to resume (`resume_stage`, and `resume_node` for errors), and adds a message.
@@ -168,7 +175,12 @@ The handoff is two nodes. `human_handoff` is a code node: it sets `stage = HANDO
 resumes, so keeping the state changes in a separate node before the pause means they are saved once and are
 visible to the agent while the session waits.
 
-It is reached for five reasons:
+| Node | Reads | Writes | External call |
+|---|---|---|---|
+| `human_handoff` | `last_error`, `handoff_reason` | `stage = HANDOFF`, `waiting_for = AGENT`, where to resume, a message | — |
+| `await_agent` | Agent resolution | `Party.verification_method = AGENT` on `VERIFIED` after an identity handoff | — |
+
+It is reached for these reasons:
 
 | `handoff_reason` | Trigger | Example |
 |---|---|---|
@@ -192,6 +204,60 @@ session, sees the conversation, the current node, the entities and the error mes
 Taking over a session (`POST .../assign`) sets `assigned_agent_id` and `mode = ASSIST`. Assignment is recorded,
 not enforced: any signed-in agent can send input. Everything sent through the agent endpoints runs with
 `actor = AGENT` and is recorded as `captured_by` / `decided_by = AGENT` on the entities.
+
+## 4. The whole graph
+
+All of §3 in one picture, for looking up a path end to end.
+
+![The onboarding LangGraph graph](assets/langgraph-graph.svg)
+
+Not drawn: every node routes to `human_handoff` when `last_error` is set, and `quote_premium` also hands off if
+rating errors leave no eligible product.
+
+### Conditional edges
+
+Every node has a conditional edge. Every routing function reads **only the state**, never the database, so
+routing can be replayed from a checkpoint and tested without a database (`backend/packages/agent/tests/test_routing.py`).
+
+| After | Reads | Branches |
+|---|---|---|
+| `ask_customer` | `last_input` | `INTAKE` → `understand_intake`; `IDENTITY_INFO` → `collect_identity`; `OTP_CODE` → `check_otp`; `NEEDS` → `assess_needs`; `PARTIES` → `collect_parties`; `ANSWERS` → `collect_answers` |
+| `understand_intake` | — | `collect_identity` |
+| `collect_identity` | `form_topic` | a topic still pending → `ask_customer`; all answered → `verify_identity` |
+| `verify_identity` | `identity_result` | `MATCHED` → `fetch_purchases`; otherwise wait for the OTP |
+| `check_otp` | `identity_result` | `OTP_OK` → `fetch_purchases`; otherwise `check_document` |
+| `check_document` | `identity_result` | `DOC_OK` → `fetch_purchases`; otherwise `human_handoff` |
+| `assess_needs` | `needs_complete`, `handoff_reason` | complete → `check_eligibility`; `NEEDS_INCOMPLETE` → `human_handoff`; otherwise ask again |
+| `check_eligibility`, `quote_premium` | `eligible_count` | 0 → `human_handoff`; ≥ 1 → next node |
+| `await_decision` | `decision` | `ACCEPT` → `open_application`; `CHANGE` → `assess_needs`; `DECLINE` → end |
+| `collect_parties` | `parties_complete` | true → `collect_answers`; false → ask again |
+| `collect_answers` | `answers_complete`, `handoff_reason` | complete → `summarize_application`; `ANSWERS_INCOMPLETE` or `NO_ELIGIBLE_PRODUCT` → `human_handoff`; otherwise ask again |
+| `confirm_summary` | `confirmed`, `correcting`, `handoff_reason` | true → `submit_application`; a rejection with a correction → `collect_parties` (then `collect_answers` with the same message); without one → `collect_answers`; `SUMMARY_REJECTED` → `human_handoff` |
+| `await_agent` | `handoff_resolution`, `handoff_reason`, `resume_node` | See [human handoff](#human-handoff) |
+| any node | `last_error` | set → `human_handoff` |
+
+## 5. Interrupt and resume
+
+1. A wait node calls `interrupt({"waiting_for": ...})`. The node before it has already appended the question
+   to `messages`.
+2. The checkpointer saves the state and the graph run stops.
+3. The backend copies `stage`, `waiting_for` (from the interrupt payload) and the next node into the
+   `OnboardingSession` row and publishes SSE events (`session.updated`, `prompt.updated`, plus
+   `message.appended` and `entity.updated` while the graph ran). The frontend shows the input that matches
+   `waiting_for`. This is the "workflow visibility" the brief asks for.
+4. When input arrives (`POST .../input` with `{type, data}`), the API validates `data` for that `type`, rejects
+   it with `409` if `type` is not the current `waiting_for` or the session is still processing, and returns `202`.
+   The graph resumes the same thread in a background task with
+   `Command(resume=data, update={"actor": ..., "mode": ...})`.
+5. The paused node receives the value and the graph runs until the next wait node or the end.
+
+The same mechanism covers three cases:
+
+| Case | How |
+|---|---|
+| Multi-turn conversation | Every question is a wait; every answer is a resume |
+| Customer leaves and comes back | The graph stays paused in the checkpoint. The same link resumes from the last wait node |
+| Agent takes over | The agent resumes the same thread with `actor = AGENT` |
 
 ## 6. Retries and error handling
 

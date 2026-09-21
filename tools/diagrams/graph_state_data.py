@@ -21,6 +21,257 @@ def line(s, pts):
     s.seg(pts)
 
 
+# ------------------------------------------------------------------ LangGraph: the four stages (level 1)
+def langgraph_stages():
+    s = Svg("lg0", 1240, 370, "The four stages of the onboarding graph in order, the CHANGE loop back to profiling, "
+                              "the DECLINE exit, and the human handoff every stage can fall into and resume from")
+    X, W, Y, H = [110, 360, 610, 860], 190, 100, 84
+    C = [x + W / 2 for x in X]
+    stages = [
+        ("Identity verification", "intake, forms, then checks", "ends when verified"),
+        ("Customer profiling", "LLM reads, code finds gaps", "ends when nothing is missing"),
+        ("Policy recommendation", "code ranks and prices", "LLM explains, customer picks"),
+        ("Policy application", "parties, answers, summary", "ends when submitted"),
+    ]
+    for i, (x, (name, sub1, sub2)) in enumerate(zip(X, stages)):
+        s.box(x, Y, W, H, "", ())
+        s.p.pop()  # drop the empty title
+        s.text(x + W / 2, Y + 22, f"STAGE {i + 1}", 10.5, weight="700", op="0.5")
+        s.text(x + W / 2, Y + 42, name, 14, weight="650")
+        s.text(x + W / 2, Y + 60, sub1, 11.5, op="0.72")
+        s.text(x + W / 2, Y + 75, sub2, 11.5, op="0.72")
+    my = Y + H / 2
+    s.pill(10, my - 14, 70, 28, "start")
+    line(s, [(80, my), (X[0], my)])
+    for i, t in enumerate(["verified", "complete", "ACCEPT"]):
+        line(s, [(X[i] + W, my), (X[i + 1], my)])
+        label(s, (X[i] + W + X[i + 1]) / 2, my - 7, t)
+    line(s, [(X[3] + W, my), (1100, my)])
+    label(s, 1075, my - 7, "submit")
+    s.pill(1100, my - 14, 130, 28, "stop: SUBMITTED")
+    # CHANGE back to profiling, DECLINE out
+    line(s, [(C[2] - 40, Y), (C[2] - 40, 70), (C[1] + 60, 70), (C[1] + 60, Y)])
+    label(s, (C[1] + C[2]) / 2 + 10, 64, "CHANGE: redo needs")
+    line(s, [(C[2] + 50, Y), (C[2] + 50, 48)])
+    label(s, C[2] + 58, 80, "DECLINE", "start")
+    s.pill(C[2] - 15, 20, 130, 28, "stop: DECLINED")
+    # human handoff under every stage
+    HY = 290
+    s.box(X[0], HY, X[3] + W - X[0], 60, "Human handoff",
+          ("human_handoff, then await_agent: a support agent resolves and the session resumes, or ends. "
+           "Also reached from any node whose retries ran out",), color=ORANGE)
+    reasons = [("identity", "failed twice"), ("3 rounds,", "still missing"), ("no eligible", "product"),
+               ("3 rounds or", "3 rejections")]
+    for c, (r1, r2) in zip(C, reasons):
+        line(s, [(c - 30, Y + H), (c - 30, HY)])
+        label(s, c - 38, 232, r1, "end")
+        label(s, c - 38, 246, r2, "end")
+        s.seg([(c + 30, HY), (c + 30, Y + H)], dashed=True)
+        label(s, c + 38, 240, "resume", "start")
+    line(s, [(X[3] + W, HY + 30), (1100, HY + 30)])
+    label(s, 1075, HY + 23, "END")
+    s.pill(1100, HY + 16, 130, 28, "stop: WITHDRAWN")
+    return s
+
+
+# ------------------------------------------------------------------ LangGraph: inside each stage (level 2)
+SX, SW, SC, SR = 260, 200, 360, 460  # the stage's main path
+EX, EW = 580, 160  # exits on the right
+
+
+def exit_pill(s, x, y, w, t):
+    """A way out of the stage: a node drawn in another stage's diagram."""
+    s.pill(x, y, w, 28, t, dashed=True)
+
+
+def langgraph_stage_identity():
+    D = 140  # the intake turn and the identity form loop sit above verify_identity
+    s = Svg("lg2", 760, 530 + D, "Stage 1, identity verification: greet, answer the customer's intake, ask for "
+                                 "identity in small forms, then the partner match, the OTP and the document check, "
+                                 "each result routing to profiling or on")
+    RX, RW, RC = 560, 180, 650
+    s.pill(SC - 50, 16, 100, 28, "start")
+    line(s, [(SC, 44), (SC, 70)])
+    s.node(SX, 70, SW, "greet", "code")
+    line(s, [(SC, 104), (SC, 130)])
+    s.node(SX, 130, SW, "ask_customer", "wait", "INTAKE", h=40)
+    line(s, [(SC, 170), (SC, 200)])
+    s.node(SX, 200, SW, "understand_intake", "llm")
+    line(s, [(SC, 234), (SC, 270)])
+    s.node(SX, 270, SW, "collect_identity", "code")
+    s.node(20, 267, 160, "ask_customer", "wait", "IDENTITY_INFO", h=40)
+    line(s, [(SX, 280), (180, 280)])
+    label(s, 220, 273, "form pending")
+    line(s, [(180, 296), (SX, 296)])
+    line(s, [(SC, 304), (SC, 340)])
+    label(s, SC + 8, 326, "all answered", "start")
+    s.p.append(f'<g transform="translate(0,{D})">')  # everything below moves down by D
+    s.node(SX, 200, SW, "verify_identity", "code")
+    line(s, [(SR, 217), (RX, 217)])
+    label(s, 510, 210, "NOT_MATCHED")
+    s.node(RX, 197, RW, "ask_customer", "wait", "OTP_CODE", h=40)
+    line(s, [(RC, 237), (RC, 270)])
+    s.node(RX, 270, RW, "check_otp", "code")
+    line(s, [(RC, 304), (RC, 340)])
+    label(s, RC + 8, 326, "OTP_FAILED", "start")
+    s.node(RX, 340, RW, "check_document", "code")
+    line(s, [(RC, 374), (RC, 440)])
+    label(s, RC + 8, 410, "DOC_FAILED", "start")
+    exit_pill(s, 570, 440, 160, "→ human_handoff")
+    line(s, [(SC, 234), (SC, 440)])
+    label(s, SC - 8, 330, "MATCHED", "end")
+    line(s, [(RX, 287), (410, 287), (410, 440)])
+    label(s, 485, 281, "OTP_OK")
+    line(s, [(RX, 357), (440, 357), (440, 440)])
+    label(s, 500, 351, "DOC_OK")
+    exit_pill(s, 240, 440, 240, "→ stage 2: fetch_purchases")
+    s.legend(20, 500, LEGEND)
+    s.p.append("</g>")
+    return s
+
+
+def langgraph_stage_profiling():
+    s = Svg("lg3", 760, 350, "Stage 2, customer profiling: fetch partner purchases, then assess needs, asking again "
+                             "until nothing is missing or three rounds pass")
+    exit_pill(s, SC - 70, 16, 140, "from stage 1")
+    line(s, [(SC, 44), (SC, 70)])
+    s.node(SX, 70, SW, "fetch_purchases", "code")
+    line(s, [(SC, 104), (SC, 140)])
+    s.node(SX, 140, SW, "assess_needs", "llm", h=56)
+    s.node(10, 148, 150, "ask_customer", "wait", "NEEDS", h=40)
+    line(s, [(SX, 156), (160, 156)])
+    label(s, 210, 138, "no input yet,")
+    label(s, 210, 150, "or fields missing")
+    line(s, [(160, 182), (SX, 182)])
+    exit_pill(s, EX, 136, EW, "from stage 3: CHANGE")
+    line(s, [(EX, 150), (SR, 150)])
+    line(s, [(SR, 188), (660, 188), (660, 260)])
+    label(s, 560, 182, "3 rounds, still missing")
+    exit_pill(s, EX, 260, EW, "→ human_handoff")
+    line(s, [(SC, 196), (SC, 260)])
+    label(s, SC - 8, 232, "needs_complete", "end")
+    exit_pill(s, 230, 260, 260, "→ stage 3: check_eligibility")
+    s.legend(20, 320, LEGEND)
+    return s
+
+
+def langgraph_stage_recommendation():
+    s = Svg("lg4", 760, 490, "Stage 3, policy recommendation: eligibility, ranking, pricing and the explanation "
+                             "run in code and the LLM, then the customer accepts, declines or changes their needs")
+    exit_pill(s, SC - 70, 16, 140, "from stage 2")
+    line(s, [(SC, 44), (SC, 70)])
+    s.node(SX, 70, SW, "check_eligibility", "code")
+    line(s, [(SR, 87), (EX, 87)])
+    label(s, 520, 80, "eligible_count = 0")
+    exit_pill(s, EX, 73, EW, "→ human_handoff")
+    line(s, [(SC, 104), (SC, 140)])
+    label(s, SC + 8, 126, "eligible_count >= 1", "start")
+    s.node(SX, 140, SW, "rank_products", "code")
+    line(s, [(SC, 174), (SC, 200)])
+    s.node(SX, 200, SW, "quote_premium", "code")
+    line(s, [(SR, 217), (EX, 217)])
+    label(s, 520, 210, "none priced")
+    exit_pill(s, EX, 203, EW, "→ human_handoff")
+    line(s, [(SC, 234), (SC, 260)])
+    s.node(SX, 260, SW, "explain_recommendation", "llm")
+    line(s, [(SC, 294), (SC, 320)])
+    s.node(SX, 320, SW, "await_decision", "wait")
+    line(s, [(SR, 337), (EX, 337)])
+    label(s, 520, 330, "DECLINE")
+    s.pill(EX, 323, EW, 28, "stop: DECLINED")
+    line(s, [(SX, 337), (200, 337)])
+    label(s, 230, 330, "CHANGE")
+    exit_pill(s, 20, 323, 180, "→ stage 2: assess_needs")
+    line(s, [(SC, 354), (SC, 400)])
+    label(s, SC + 8, 382, "ACCEPT", "start")
+    exit_pill(s, 240, 400, 240, "→ stage 4: open_application")
+    s.legend(20, 460, LEGEND)
+    return s
+
+
+def langgraph_stage_application():
+    s = Svg("lg5", 760, 630, "Stage 4, policy application: open the application, collect the parties and the "
+                             "answers, summarize, confirm and submit")
+    exit_pill(s, SC - 90, 16, 180, "from stage 3: ACCEPT")
+    line(s, [(SC, 44), (SC, 70)])
+    s.node(SX, 70, SW, "open_application", "code")
+    line(s, [(SC, 104), (SC, 140)])
+    s.node(SX, 140, SW, "collect_parties", "llm", h=56)
+    s.node(10, 148, 150, "ask_customer", "wait", "PARTIES", h=40)
+    line(s, [(SX, 156), (160, 156)])
+    label(s, 210, 138, "no input yet,")
+    label(s, 210, 150, "or a name missing")
+    line(s, [(160, 182), (SX, 182)])
+    line(s, [(SC, 196), (SC, 240)])
+    label(s, SC + 8, 222, "parties_complete", "start")
+    s.node(SX, 240, SW, "collect_answers", "llm", h=56)
+    s.node(10, 248, 150, "ask_customer", "wait", "ANSWERS", h=40)
+    line(s, [(SX, 256), (160, 256)])
+    label(s, 210, 250, "fields missing")
+    line(s, [(160, 282), (SX, 282)])
+    line(s, [(SR, 268), (EX, 268)])
+    label(s, 520, 249, "3 rounds, or no")
+    label(s, 520, 261, "product fits")
+    exit_pill(s, EX, 254, EW, "→ human_handoff")
+    line(s, [(SC, 296), (SC, 340)])
+    label(s, SC + 8, 328, "answers_complete", "start")
+    s.node(SX, 340, SW, "summarize_application", "llm")
+    line(s, [(SC, 374), (SC, 400)])
+    s.node(SX, 400, SW, "confirm_summary", "wait")
+    line(s, [(SX, 417), (220, 417), (220, 316), (300, 316), (300, 296)])
+    label(s, 212, 370, "not confirmed", "end")
+    line(s, [(SR, 417), (EX, 417)])
+    label(s, 520, 410, "3 rejections")
+    exit_pill(s, EX, 403, EW, "→ human_handoff")
+    line(s, [(SC, 434), (SC, 470)])
+    label(s, SC + 8, 456, "confirmed", "start")
+    s.node(SX, 470, SW, "submit_application", "code")
+    line(s, [(SC, 504), (SC, 540)])
+    s.pill(SC - 80, 540, 160, 28, "stop: SUBMITTED")
+    s.legend(20, 600, LEGEND)
+    return s
+
+
+def langgraph_handoff():
+    s = Svg("lg6", 1070, 440, "Human handoff: each handoff reason leads to human_handoff and await_agent; the "
+                              "agent's resolution resumes the session at the node its reason names, or ends it")
+    reasons = ["IDENTITY_FAILED", "NEEDS_INCOMPLETE", "NO_ELIGIBLE_PRODUCT", "ANSWERS_INCOMPLETE",
+               "SUMMARY_REJECTED", "ERROR (retries ran out)"]
+    s.text(125, 36, "handoff_reason", 12, weight="700", op="0.6")
+    for i, r in enumerate(reasons):
+        cy = 85 + 50 * i
+        exit_pill(s, 20, cy - 14, 210, r)
+        s.seg([(230, cy), (260, cy)], arrow=False)
+    s.seg([(260, 85), (260, 335)], arrow=False)
+    line(s, [(260, 210), (290, 210)])
+    s.node(290, 193, 180, "human_handoff", "code")
+    line(s, [(470, 210), (520, 210)])
+    s.node(520, 193, 160, "await_agent", "wait")
+    s.text(600, 250, "agent sends VERIFIED,", 11, op="0.8")
+    s.text(600, 264, "CONTINUE or END", 11, op="0.8")
+    s.text(905, 36, "resumes at", 12, weight="700", op="0.6")
+    targets = [
+        ("collect_identity", "code", "IDENTITY_FAILED + CONTINUE"),
+        ("fetch_purchases", "code", "IDENTITY_FAILED + VERIFIED"),
+        ("assess_needs", "llm", "NEEDS_INCOMPLETE, NO_ELIGIBLE_PRODUCT"),
+        ("collect_answers", "llm", "ANSWERS_INCOMPLETE"),
+        ("summarize_application", "llm", "SUMMARY_REJECTED"),
+    ]
+    s.seg([(680, 210), (720, 210)], arrow=False)
+    s.seg([(720, 60), (720, 360)], arrow=False)
+    for i, (name, kind, sub) in enumerate(targets):
+        cy = 60 + 50 * i
+        line(s, [(720, cy), (760, cy)])
+        s.node(760, cy - 20, 290, name, kind, sub, h=40)
+    line(s, [(720, 310), (760, 310)])
+    s.box(760, 290, 290, 40, "resume_node", ("ERROR: re-runs the node that failed",), dashed=True, mono=True)
+    line(s, [(720, 360), (760, 360)])
+    label(s, 740, 353, "END")
+    s.pill(760, 346, 290, 28, "stop: WITHDRAWN (any reason)")
+    s.legend(20, 400, LEGEND)
+    return s
+
+
 # ------------------------------------------------------------------ LangGraph graph
 def langgraph_graph():
     D = 140  # the intake turn and the identity form loop push everything from verify_identity down
@@ -394,6 +645,12 @@ def data_model_er():
 
 
 if __name__ == "__main__":
+    langgraph_stages().save("docs/design/assets/langgraph-stages.svg")
+    langgraph_stage_identity().save("docs/design/assets/langgraph-stage-identity.svg")
+    langgraph_stage_profiling().save("docs/design/assets/langgraph-stage-profiling.svg")
+    langgraph_stage_recommendation().save("docs/design/assets/langgraph-stage-recommendation.svg")
+    langgraph_stage_application().save("docs/design/assets/langgraph-stage-application.svg")
+    langgraph_handoff().save("docs/design/assets/langgraph-handoff.svg")
     langgraph_graph().save("docs/design/assets/langgraph-graph.svg")
     state_checkpoint_encryption().save("docs/design/assets/state-checkpoint-encryption.svg")
     data_model_er().save("docs/design/assets/data-model-er.svg")
