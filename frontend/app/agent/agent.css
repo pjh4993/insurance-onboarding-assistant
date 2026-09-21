@@ -1,0 +1,357 @@
+.agent-shell {
+  height: 100dvh;
+}
+.console {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 380px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "bar bar bar"
+    "list chat artifacts";
+}
+.console__bar {
+  grid-area: bar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.console__who {
+  font-size: 13px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.console__nav {
+  display: none;
+  gap: 4px;
+}
+.console__nav button {
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.console__nav button.is-on {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.console__nav button:disabled {
+  opacity: 0.4;
+}
+.col {
+  min-height: 0;
+  overflow: hidden;
+}
+.col--list {
+  grid-area: list;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+.col--chat {
+  grid-area: chat;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+}
+.col--artifacts {
+  grid-area: artifacts;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+/* session list */
+.session-list ul {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.section-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  margin: 4px 2px 6px;
+}
+.section-label--warning {
+  color: var(--warning);
+}
+.session {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+.session:hover {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+}
+.session--handoff {
+  border-color: #f1d3a6;
+  background: var(--warning-soft);
+}
+.session--selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.session__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.session__name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session__ago {
+  flex: none;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.session__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* new session */
+.new-session {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.segmented button {
+  border: none;
+  background: var(--surface);
+  padding: 7px 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.segmented button.is-on {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+}
+.link-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+}
+.link-box code {
+  display: block;
+  padding: 6px 8px;
+}
+
+/* conversation */
+.conversation {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.conversation__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.conversation__header h2 {
+  font-size: 17px;
+  margin-bottom: 6px;
+}
+.conversation__assign {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.conversation__messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 18px;
+}
+.conversation__input {
+  padding: 12px 18px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  max-height: 60%;
+  overflow-y: auto;
+}
+
+/* artifacts */
+.artifacts {
+  padding: 12px 16px 24px;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+.tabs button {
+  border: none;
+  background: none;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink-3);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+}
+.tabs button[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tab__h {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+  margin-top: 10px;
+}
+.tab__h5 {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.facts {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13.5px;
+}
+.facts__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.facts dt {
+  color: var(--ink-3);
+}
+.facts dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.identity {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+}
+.card-plain {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+.missing {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 13px;
+  color: var(--warning);
+  font-weight: 600;
+}
+.summary {
+  font-size: 13.5px;
+  white-space: pre-wrap;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+.parties {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+/* medium: artifacts drop below? keep three columns but narrower */
+@media (max-width: 1200px) {
+  .console {
+    grid-template-columns: 260px minmax(0, 1fr) 320px;
+  }
+}
+/* narrow: one panel at a time, switched from the bar */
+@media (max-width: 900px) {
+  .console {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "bar"
+      "main";
+  }
+  .console__nav {
+    display: flex;
+  }
+  .console__who {
+    display: none;
+  }
+  .col {
+    grid-area: main;
+    display: none;
+    border: none;
+  }
+  .console--list .col--list,
+  .console--chat .col--chat,
+  .console--artifacts .col--artifacts {
+    display: flex;
+    flex-direction: column;
+  }
+  .console--artifacts .col--artifacts {
+    display: block;
+  }
+}
