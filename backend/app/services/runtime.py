@@ -9,7 +9,7 @@ import logging
 import math
 import secrets
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -82,6 +82,8 @@ class Runtime:
         sessionmaker: async_sessionmaker[AsyncSession],
         broker: Broker,
         settings: Settings,
+        languages: Mapping[str, str],
+        default_language: str,
         clock: Clock = utcnow,
     ) -> None:
         self.agent = agent
@@ -89,6 +91,8 @@ class Runtime:
         self.broker = broker
         self.settings = settings
         self.clock = clock
+        self.languages = dict(languages)  # the languages the agent's config bundle is written in
+        self.default_language = default_language
         self._locks: dict[str, asyncio.Lock] = {}
         self._tasks: dict[str, asyncio.Task] = {}
 
@@ -114,6 +118,15 @@ class Runtime:
     def client_ip_hash(self, client_ip: str) -> str:
         return hmac_hex(self.settings.session_hmac_key, client_ip)
 
+    def session_locale(self, market: str, locale: str | None = None) -> str:
+        """The locale a session gets: the one asked for, which the agent must speak, or else the market's."""
+        if locale is not None:
+            if locale not in self.languages:
+                raise InputError(422, f"locale {locale!r} is not one the agent speaks: {', '.join(self.languages)}")
+            return locale
+        market_default = default_locale(market)
+        return market_default if market_default in self.languages else self.default_language
+
     async def create_session(
         self,
         market: str,
@@ -125,7 +138,7 @@ class Runtime:
         """Create a session and run the graph's first turn. A SELF_SERVE start is checked against the
         rate limits in the same transaction as the insert, and raises RateLimited when over one."""
         now = self.clock()
-        locale = locale or default_locale(market)
+        locale = self.session_locale(market, locale)
         token = secrets.token_urlsafe(32)
         session_id, party_id = uuid.uuid4(), uuid.uuid4()
         async with self.sessionmaker() as s, s.begin():
@@ -243,6 +256,7 @@ class Runtime:
     async def set_locale(self, session_id: str, locale: str) -> OnboardingSession | None:
         """Only the session row changes here. The graph picks the new language up on its next resume, so a
         node that is running finishes in the old one and messages already sent are left as they were."""
+        self.session_locale("", locale)
         async with self.sessionmaker() as s, s.begin():
             session = await s.get(OnboardingSession, uuid.UUID(session_id))
             if session is None:

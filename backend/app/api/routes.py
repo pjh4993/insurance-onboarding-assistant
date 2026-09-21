@@ -65,7 +65,10 @@ async def _accept_input(rt: Runtime, session: OnboardingSession, body: InputBody
 
 
 async def _set_locale(rt: Runtime, session: OnboardingSession, locale: str) -> dict[str, Any]:
-    updated = await rt.set_locale(str(session.session_id), locale)
+    try:
+        updated = await rt.set_locale(str(session.session_id), locale)
+    except InputError as exc:
+        raise HTTPException(exc.status, exc.detail) from exc
     view = await rt.session_view(updated)
     return view["session"]
 
@@ -88,9 +91,21 @@ def _link(session: OnboardingSession, token: str) -> dict[str, Any]:
     return {"session_id": str(session.session_id), "token": token, "customer_path": f"/s/{token}"}
 
 
+@router.get("/api/languages")
+async def languages(rt: RuntimeDep) -> dict[str, Any]:
+    """The languages a session can be in: the ones the agent's config bundle is written in."""
+    return {
+        "languages": [{"code": code, "name": name} for code, name in rt.languages.items()],
+        "default": rt.default_language,
+    }
+
+
 @router.post("/api/sessions", status_code=201)
 async def create_session(body: CreateSessionBody, rt: RuntimeDep) -> dict[str, Any]:
-    session, token = await rt.create_session(body.market, body.locale)
+    try:
+        session, token = await rt.create_session(body.market, body.locale)
+    except InputError as exc:
+        raise HTTPException(exc.status, exc.detail) from exc
     return _link(session, token)
 
 
@@ -105,6 +120,8 @@ async def create_public_session(
         session, token = await rt.create_session(
             body.market, body.locale, origin=SELF_SERVE, client_ip_hash=rt.client_ip_hash(client_ip)
         )
+    except InputError as exc:
+        raise HTTPException(exc.status, exc.detail) from exc
     except RateLimited as exc:
         return JSONResponse(
             {"detail": "rate_limited", "retry_after": exc.retry_after},

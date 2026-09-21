@@ -116,7 +116,15 @@ def create_app(settings: Settings | None = None, overrides: Overrides | None = N
                 on_entity=entity_listener(broker),
             )
             agent = AgentRunner(build_graph(deps, checkpointer), retry_max_attempts=settings.retry_max_attempts)
-            rt = Runtime(agent=agent, sessionmaker=sessionmaker, broker=broker, settings=settings, clock=clock)
+            rt = Runtime(
+                agent=agent,
+                sessionmaker=sessionmaker,
+                broker=broker,
+                settings=settings,
+                languages=bundle.languages,
+                default_language=bundle.default_language,
+                clock=clock,
+            )
             app.state.settings = settings
             app.state.broker = broker
             app.state.runtime = rt

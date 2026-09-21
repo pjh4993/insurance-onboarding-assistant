@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 InputType = Literal["IDENTITY_INFO", "OTP_CODE", "NEEDS", "DECISION", "PARTIES", "ANSWERS", "CONFIRM", "AGENT"]
 
 
-Locale = Literal["ko", "en"]
+# A language code (ko, en, pt-BR). Which ones a session may use is up to the agent config bundle, checked by
+# the runtime; the column holds 5 characters.
+Locale = Annotated[str, Field(pattern=r"^[a-z]{2,3}(-[A-Z]{2})?$", max_length=5)]
 
 
 class CreateSessionBody(BaseModel):

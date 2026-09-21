@@ -125,6 +125,53 @@ def test_session_locale_defaults_to_market_and_switches_the_next_reply(client):
     assert r.status_code == 200 and r.json()["locale"] == "ko"
 
 
+def test_languages_come_from_the_agent_config(client):
+    assert client.get("/api/languages").json() == {
+        "languages": [{"code": "ko", "name": "Korean"}, {"code": "en", "name": "English"}],
+        "default": "en",
+    }
+    assert client.post("/api/sessions", json={"market": "KR", "locale": "ja"}).status_code == 422
+    assert client.post("/api/sessions", json={"market": "KR", "locale": "not a code"}).status_code == 422
+
+
+def bundle_in_japanese(tmp_path):
+    """The baseline bundle plus Japanese: a new language is a new (minor) version of the bundle."""
+    import json
+    import shutil
+    from pathlib import Path
+
+    from onboarding_agent.config import BUNDLED, load_bundle
+
+    target = tmp_path / "1.1.0"
+    shutil.copytree(Path(str(BUNDLED)) / "1.0.0", target)
+    config = json.loads((target / "config.json").read_text())
+    config["version"] = "1.1.0"
+    config["languages"]["ja"] = {"name": "Japanese"}
+    for entry in [*config["labels"].values(), *config["billing_periods"].values()]:
+        entry["ja"] = entry["en"]
+    (target / "config.json").write_text(json.dumps(config, ensure_ascii=False))
+    for path in config["flows"].values():
+        flow = json.loads((target / path).read_text())
+        for key, entry in flow["copy"].items():
+            entry["ja"] = "こんにちは！保険の加入をお手伝いします。" if key == "greeting" else entry["en"]
+        (target / path).write_text(json.dumps(flow, ensure_ascii=False))
+    return load_bundle(str(tmp_path))
+
+
+def test_a_language_added_to_the_bundle_can_be_used(settings, external, llm, tmp_path):
+    bundle = bundle_in_japanese(tmp_path)
+    app = create_app(
+        settings, Overrides(transport=external.transport(), llm=llm, clock=lambda: FIXED_NOW, bundle=bundle)
+    )
+    with TestClient(app) as client:
+        assert [lang["code"] for lang in client.get("/api/languages").json()["languages"]] == ["ko", "en", "ja"]
+        r = client.post("/api/sessions", json={"market": "KR", "locale": "ja"})
+        assert r.status_code == 201, r.text
+        view = client.get("/api/customer/session", headers={"X-Session-Token": r.json()["token"]}).json()
+        assert view["session"]["locale"] == "ja"
+        assert view["messages"][0]["text"] == "こんにちは！保険の加入をお手伝いします。"
+
+
 def test_session_locale_can_be_chosen_at_creation(client):
     r = client.post("/api/sessions", json={"market": "US", "locale": "ko"})
     assert r.status_code == 201, r.text

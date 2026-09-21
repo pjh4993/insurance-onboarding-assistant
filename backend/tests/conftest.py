@@ -100,7 +100,16 @@ async def runtime(settings, external, llm, clock):
             on_entity=entity_listener(broker),
         )
         agent = AgentRunner(build_graph(deps, saver), retry_max_attempts=settings.retry_max_attempts)
-        rt = Runtime(agent=agent, sessionmaker=sm, broker=broker, settings=settings, clock=clock)
+        bundle = deps.bundle
+        rt = Runtime(
+            agent=agent,
+            sessionmaker=sm,
+            broker=broker,
+            settings=settings,
+            languages=bundle.languages,
+            default_language=bundle.default_language,
+            clock=clock,
+        )
         rt.saver = saver
         yield rt
         await asyncio.gather(*(t for t in rt._tasks.values() if not t.done()), return_exceptions=True)
