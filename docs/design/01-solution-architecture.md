@@ -51,9 +51,10 @@ The brief requires two services that are deployed separately. We keep that split
 
 | Container | Technology | Responsibility |
 |---|---|---|
-| Frontend | Next.js 16 (App Router, TypeScript, pnpm), standalone Node server | Two apps in one service: the customer app (`/s/*`) and the agent console (`/agent`). `proxy.ts` (Next.js 16's middleware) turns the `/s/{token}` link into a session cookie. Route handlers under `/api/*` relay every call, including SSE, to the backend; the browser never calls the backend directly. `/healthz` proxies to the backend's health check, `/api/healthz` checks only the frontend, and `/api/agent/me` returns the signed-in agent's ID |
+| Frontend | Next.js 16 (App Router, TypeScript, pnpm), standalone Node server | Three apps in one service: the customer app (`/s/*`), the agent console (`/agent`) and the operator console (`/operator`, served at `/` on the operator host). `proxy.ts` (Next.js 16's middleware) turns the `/s/{token}` link into a session cookie and sends each console to its own host. Route handlers under `/api/*` relay every call, including SSE, to the backend; the browser never calls the backend directly. `/healthz` proxies to the backend's health check, `/api/healthz` checks only the frontend, and `/api/agent/me` returns the signed-in agent's ID |
 | Backend | FastAPI + LangGraph, Python 3.13, uv | HTTP API, the onboarding graph, eligibility, ranking and pricing, persistence, calls to external systems. Creates its tables and seeds the catalog at startup |
 | PostgreSQL | PostgreSQL 16 (RDS in AWS) | Three schemas: `checkpoint` (graph state), `domain` (customer and transaction entities), `catalog` (products, rules) |
+| Config bundle | S3, one bucket per environment (locally a Docker volume) | What the agent says and which models it uses, as immutable versions. The backend reads one version at startup and, for the operator console, publishes new ones (create-only). See [langgraph-design.md](02-langgraph-design.md#10-models-prompts-and-copy-the-config-bundle) |
 | Mock | FastAPI | One app for partner, identity, contract admin and Bedrock Converse, plus fault injection (`/_mock/faults`). Local and develop only |
 
 ### Backend packages
@@ -77,8 +78,8 @@ Why the three schemas share one instance: they differ in lifetime and access, bu
 three databases for this scope. Checkpoints are only useful while a session is alive (30-day inactivity limit),
 domain entities live as long as the customer relationship, and the catalog is read-only for the graph.
 
-Why the customer app and the agent console share one service: the brief asks for exactly two services. The
-two apps have separate layouts, routes and auth rules, so they behave as separate apps to users while the
+Why the customer app and the two consoles share one service: the brief asks for exactly two services. The
+three apps have separate layouts, routes, hosts and auth rules, so they behave as separate apps to users while the
 deployment stays at two units.
 
 ### Frontend-to-backend communication
@@ -93,6 +94,9 @@ deployment stays at two units.
   develop for now) `AGENT_DEV_AUTH=true` makes every agent `agent-demo`. The customer's session token is read from
   the httpOnly cookie and passed as `X-Session-Token`. The backend checks the token against its stored HMAC and
   trusts `X-Agent-Id` because only the frontend can reach it. See [networking.md](../infra/02-networking.md#5-authentication).
+- Operator identity works the same way, as `X-Operator-Id`. In AWS the frontend verifies the operator's Cognito
+  login (the operator app client, `operators` group) before sending it; locally `OPERATOR_DEV_AUTH=true` makes
+  every operator `operator-demo`. The operator API answers 404 on the app and agent hosts.
 - Sending input returns `202 Accepted`. The graph runs in the background and the result arrives over SSE.
 
 The API contract is in [`CONTRACTS.md`](../../CONTRACTS.md) §3. Main endpoints:
@@ -104,6 +108,9 @@ The API contract is in [`CONTRACTS.md`](../../CONTRACTS.md) §3. Main endpoints:
 | Customer app | `GET /api/customer/session`, `POST .../input`, `GET .../stream` | Read the session, send input, stream updates |
 | Agent console | `GET /api/agent/sessions`, `GET /api/agent/sessions/{id}`, `POST .../assign`, `POST .../input`, `GET /api/agent/sessions/{id}/stream`, `GET /api/agent/stream` | Session list, session detail with entities, take over, answer as agent, stream one session or all |
 | Agent console | `GET /api/agent/me` (frontend only) | Who the signed-in agent is, for "Assign to me" |
+| Operator console | `GET /api/operator/config`, `GET /api/operator/config/versions`, `GET .../versions/{version}` | The live version, the published versions, one version's files |
+| Operator console | `POST /api/operator/config/validate`, `POST /api/operator/config/versions`, `POST /api/operator/restart` | Check a draft, publish it as the next patch or minor, restart the backend to load it |
+| Operator console | `GET /api/operator/graph` | The agent loop's nodes and edges, read from the flow code |
 | Deploy smoke test | `GET /healthz` | Frontend relays to the backend's `/healthz` |
 
 ## 3. Inside the backend

@@ -76,16 +76,17 @@ def legend(s, x, y, items):
 
 # ------------------------------------------------------------------ README overview
 def overview():
-    s = Svg("sa1", 1040, 450, "Overview: customers and support agents use the Next.js frontend, which relays "
+    s = Svg("sa1", 1040, 450, "Overview: customers, support agents and operators use the Next.js frontend, which relays "
                               "to the FastAPI and LangGraph backend; the backend uses PostgreSQL and four "
                               "external systems that are mocked locally.")
     title(s, "Two services, one database, four external systems")
 
-    person(s, 20, 90, 140, 56, "Customer", "/s/{token}")
-    person(s, 20, 226, 140, 56, "Support agent", "/agent")
+    person(s, 20, 70, 140, 56, "Customer", "/s/{token}")
+    person(s, 20, 150, 140, 56, "Support agent", "/agent")
+    person(s, 20, 230, 140, 56, "Operator", "/operator")
 
     s.group(185, 56, 240, 250, "Frontend service: Next.js")
-    mbox(s, 205, 90, 200, 56, ["Customer app"], ["+ agent console"], color=GREEN)
+    mbox(s, 205, 80, 200, 76, ["Customer app"], ["+ agent console", "+ operator console"], color=GREEN)
     mbox(s, 205, 220, 200, 56, ["/api/* relay"], ["(incl. SSE)"], color=GREEN)
 
     s.group(450, 160, 270, 146, "Backend service: FastAPI + LangGraph")
@@ -99,9 +100,10 @@ def overview():
     for name, y in ext:
         s.box(770, y, 230, 54, name, dashed=True)
 
-    s.arrow(162, 118, 203, 118)
-    s.arrow(162, 246, 203, 140)
-    s.arrow(305, 148, 305, 218)
+    s.arrow(162, 98, 203, 104)
+    s.arrow(162, 178, 203, 124)
+    s.arrow(162, 258, 203, 144)
+    s.arrow(305, 158, 305, 218)
     s.arrow(407, 248, 468, 248)
     s.arrow(585, 285, 585, 334)
     for i, (_, y) in enumerate(ext):
@@ -113,13 +115,14 @@ def overview():
 
 # ------------------------------------------------------------------ 1. System context
 def context():
-    s = Svg("sa2", 1010, 470, "System context: customers and support agents use the onboarding assistant, "
+    s = Svg("sa2", 1010, 470, "System context: customers, support agents and operators use the onboarding assistant, "
                               "which calls the partner system, the identity provider, the contract admin "
                               "system and Amazon Bedrock.")
     title(s, "Who uses the system and what it talks to")
 
-    person(s, 20, 110, 180, 62, "Customer", "(no account, session link)")
-    person(s, 20, 300, 180, 62, "Support agent", "(staff account)")
+    person(s, 20, 80, 180, 62, "Customer", "(no account, session link)")
+    person(s, 20, 205, 180, 62, "Support agent", "(staff account)")
+    person(s, 20, 330, 180, 62, "Operator", "(staff, operators group)")
 
     s.group(360, 44, 210, 382, "Onboarding assistant")
     s.box(380, 70, 170, 336, "Frontend + Backend", color=GREEN)
@@ -135,8 +138,9 @@ def context():
         n = lab.count("\n") + 1
         s.arrow(552, cy, 798, cy, lab, ly=cy - 8 - (n - 1) * 14)
 
-    s.arrow(202, 141, 378, 141, "onboards through chat", ly=133)
-    s.arrow(202, 331, 378, 331, "watches sessions,\ntakes over", ly=309)
+    s.arrow(202, 111, 378, 111, "onboards through chat", ly=103)
+    s.arrow(202, 236, 378, 236, "watches sessions,\ntakes over", ly=214)
+    s.arrow(202, 361, 378, 361, "maintains prompts,\nmodels and copy", ly=339)
 
     legend(s, 20, 442, [(GREEN, "Built in this repo"), ("dashed", "External system")])
     s.save("docs/design/assets/solution-architecture-context.svg")
@@ -144,17 +148,19 @@ def context():
 
 # ------------------------------------------------------------------ 2. Containers
 def containers():
-    s = Svg("sa3", 1000, 736, "Containers: the browser reaches the customer app and agent console in the "
+    s = Svg("sa3", 1000, 736, "Containers: the browser reaches the customer app, agent console and operator console in the "
                               "Next.js frontend, whose route handlers relay to the FastAPI backend; the backend "
                               "runs the onboarding graph and domain code over three PostgreSQL schemas and "
-                              "calls the mock service.")
+                              "calls the mock service; it reads the agent config bundle at startup and publishes "
+                              "new versions of it for the operator console.")
     title(s, "What is deployed and how the parts talk")
 
     person(s, 380, 50, 160, 40, "Browser", None)
 
     s.group(120, 110, 600, 200, "Frontend service (Next.js)")
-    s.box(160, 145, 200, 56, "Customer app", ("/s/*",), color=GREEN)
-    s.box(480, 145, 200, 56, "Agent console", ("/agent/*",), color=GREEN)
+    s.box(140, 145, 170, 56, "Customer app", ("/s/*",), color=GREEN)
+    s.box(335, 145, 170, 56, "Agent console", ("/agent/*",), color=GREEN)
+    s.box(530, 145, 170, 56, "Operator console", ("/operator, operator host",), color=GREEN)
     s.box(340, 236, 240, 56, "Route handlers", ("/api/* (relay + SSE)",), color=GREEN)
 
     s.box(770, 130, 210, 86, "Mock service", ("/partner /identity /contract", "/model/{id}/converse"),
@@ -172,10 +178,12 @@ def containers():
     cylinder(s, 480, 584, 200, 52, "checkpoint schema")
     cylinder(s, 720, 584, 200, 52, "catalog schema")
 
-    s.arrow(435, 92, 285, 143)
-    s.arrow(485, 92, 555, 143)
-    s.arrow(300, 203, 400, 234)
-    s.arrow(540, 203, 520, 234)
+    s.arrow(430, 92, 225, 143)
+    s.arrow(460, 92, 420, 143)
+    s.arrow(490, 92, 615, 143)
+    s.arrow(225, 203, 390, 234)
+    s.arrow(420, 203, 460, 234)
+    s.arrow(615, 203, 530, 234)
     s.arrow(400, 294, 200, 420, "HTTP, internal only", anchor="end", lx=300, ly=350)
     s.arrow(282, 450, 398, 450)
     s.arrow(602, 450, 718, 450)
@@ -186,6 +194,10 @@ def containers():
     s.arrow(460, 480, 385, 582)
     s.arrow(200, 480, 300, 582)
     s.arrow(820, 480, 820, 582)
+    cylinder(s, 20, 584, 160, 56, "Config bundle", ("S3 (local: a volume)",))
+    s.arrow(100, 480, 100, 582)
+    s.text(108, 530, "read at startup,", 11.5, anchor="start", op="0.75")
+    s.text(108, 544, "publish versions", 11.5, anchor="start", op="0.75")
 
     legend(s, 40, 704, [(GREEN, "Built in this repo"), ("dashed", "Mock of the external systems")])
     s.save("docs/design/assets/solution-architecture-containers.svg")
