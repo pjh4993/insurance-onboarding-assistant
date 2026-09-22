@@ -203,25 +203,6 @@ def containers():
     s.save("docs/design/assets/solution-architecture-containers.svg")
 
 
-# ------------------------------------------------------------------ Backend packages
-def packages():
-    s = Svg("sa4", 950, 222, "Backend packages: the app API service depends on onboarding-agent and "
-                             "onboarding-core, and onboarding-agent depends on onboarding-core.")
-    title(s, "Three packages in one uv workspace; an arrow means depends on")
-
-    s.box(30, 66, 250, 86, "app/ (API service)", ("FastAPI, sessions, SSE,", "SQLAlchemy + HTTP adapters"),
-          mono=True)
-    s.box(350, 66, 250, 86, "onboarding-agent", ("graph, nodes, routing,", "LLM, checkpointer, runner"),
-          mono=True)
-    s.box(670, 66, 250, 86, "onboarding-core", ("entities, eligibility, pricing,", "catalog seed, ports"),
-          mono=True)
-
-    s.arrow(282, 109, 348, 109)
-    s.arrow(602, 109, 668, 109)
-    s.seg([(155, 154), (155, 200), (795, 200), (795, 156)])
-    s.save("docs/design/assets/solution-architecture-packages.svg")
-
-
 # ------------------------------------------------------------------ 3. Inside the backend
 def backend():
     s = Svg("sa5", 1080, 470, "Inside the backend: the HTTP API hands input to the runtime and checkpointer, "
@@ -264,5 +245,4 @@ if __name__ == "__main__":
     overview()
     context()
     containers()
-    packages()
     backend()

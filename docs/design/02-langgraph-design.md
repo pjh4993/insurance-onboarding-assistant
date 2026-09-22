@@ -7,7 +7,7 @@ What the graph stores and how routing reads it is in [state-management.md](03-st
 the `onboarding-agent` package (`backend/packages/agent/src/onboarding_agent/`): one module per domain under
 `flows/` holds its nodes and their edge functions, `build.py` assembles them into the graph, and `runner.py` is
 the entry point the API service drives. Nodes reach the domain DB and external systems only through the ports
-in `onboarding_core.ports` (see [solution-architecture.md](01-solution-architecture.md#backend-packages)). How the
+in `onboarding_core.ports`. How the
 code is split, and how to add to it, is in [§9](#9-code-by-domain).
 
 The graph is described from the outside in, the way the C4 model zooms into a system:

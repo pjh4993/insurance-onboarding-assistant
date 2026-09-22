@@ -57,23 +57,6 @@ The brief requires two services that are deployed separately. We keep that split
 | Config bundle | S3, one bucket per environment (locally a Docker volume) | What the agent says and which models it uses, as immutable versions. The backend reads one version at startup and, for the operator console, publishes new ones (create-only). See [langgraph-design.md](02-langgraph-design.md#10-models-prompts-and-copy-the-config-bundle) |
 | Mock | FastAPI | One app for partner, identity, contract admin and Bedrock Converse, plus fault injection (`/_mock/faults`). Local and develop only |
 
-### Backend packages
-
-The backend is one deployable service built from three Python packages in a uv workspace (`backend/`). The
-agent and the domain are libraries; the API service depends on them, never the other way round.
-
-![Backend packages](assets/solution-architecture-packages.svg)
-
-| Package | Path | Owns | Must not import |
-|---|---|---|---|
-| `onboarding-core` | `backend/packages/core` | Domain entities as plain dataclasses, the profiling, eligibility, pricing and application rules, the product lines (device, travel), the catalog seed, and the **ports** (`onboarding_core.ports`): the `UnitOfWork` with one repository per domain, the partner/identity/contract gateways | SQLAlchemy, LangGraph, FastAPI, `app` |
-| `onboarding-agent` | `backend/packages/agent` | The LangGraph graph (one module per domain under `flows/`), copy, LLM access, the encrypted checkpointer, and `AgentRunner` (start, resume, snapshot, route a failed run to handoff) | SQLAlchemy, FastAPI, `app` |
-| API service | `backend/app` | HTTP API and SSE, session tokens and the `OnboardingSession` mirror, and the **adapters**: the SQLAlchemy mapping of the core entities (`app/db/models.py`) and unit of work (`app/db/uow.py`), the HTTP clients. `app/main.py` is the composition root that plugs the adapters into the agent | — |
-
-The agent reads and writes the domain DB only through `UnitOfWork`. Core entities are mapped onto the tables
-imperatively, so a node changes an entity's fields and the unit of work persists them when its block exits.
-`tests/test_boundaries.py` fails the build if a package imports across its boundary.
-
 Why the three schemas share one instance: they differ in lifetime and access, but not enough to justify
 three databases for this scope. Checkpoints are only useful while a session is alive (30-day inactivity limit),
 domain entities live as long as the customer relationship, and the catalog is read-only for the graph.
