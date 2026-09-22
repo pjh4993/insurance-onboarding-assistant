@@ -1,21 +1,59 @@
 # Observability
 
-The backend and the frontend send traces and logs to Grafana Cloud over OTLP. Logs also go to stdout, which ECS
-ships to CloudWatch Logs (`/ecs/onboarding-<env>-{backend,frontend,mock}`), so they stay readable when OTLP export
-is off or failing.
+This page goes from the outside in, the way the C4 model zooms into a system: first where the system is watched
+from, then what each deployed part sends, then the traces and logs inside the application.
 
-## 1. What is sent
-
-| | Backend (FastAPI) | Frontend (Next.js server) |
+| Level | Section | Answers |
 |---|---|---|
-| Traces | One span per request, httpx calls to partner, identity and contract admin, botocore calls to Bedrock | One span per route and render, and each `fetch` to the backend |
-| Logs | Every record at `LOG_LEVEL` (default INFO) and above from the app; library loggers at WARNING | `lib/server/log.ts` and Next's unhandled request errors (`onRequestError`) |
-| Setup | `backend/app/telemetry.py` | `frontend/instrumentation.ts` |
+| Watch points | [§1](#1-where-the-system-is-watched) | Is it up, is it fast, is it healthy, and is each session moving? |
+| Parts | [§2](#2-what-each-part-sends) | Which container, load balancer or database reports what, and where it lands |
+| Inside the application | [§3](#3-traces-and-logs-in-the-application) | How one request becomes a trace, and what a log line carries |
+
+How to keep the volume down, turn export on and read CloudWatch from Grafana is in [§4](#4-keeping-it-small)
+to [§6](#6-cloudwatch-in-grafana).
+
+## 1. Where the system is watched
+
+![Where the system is watched](assets/observability-overview.svg)
+
+| # | Watch point | Question | Where to look |
+|---|---|---|---|
+| 1 | **Probes from outside** | Does each host answer, and does it load fast enough? | GitHub Actions: `deploy-develop`'s smoke test (`/healthz` through the frontend to the backend) after every deploy, and `e2e-dev` (read-only smoke checks and the page-load SLA) after every successful develop deploy and daily at 09:00 KST |
+| 2 | **Platform** | Are the tasks, the load balancer and the database healthy? | CloudWatch: Container Insights for ECS, ALB and RDS metrics, and every container's stdout in `/ecs/onboarding-<env>-{backend,frontend,mock}` (kept 30 days). The ALB drops a frontend task that fails `/api/healthz` |
+| 3 | **Application** | What did one request do, and why did it fail? | Grafana Cloud: traces (Tempo) and structured logs (Loki) from the backend and the frontend over OTLP. The same stack reads CloudWatch ([§6](#6-cloudwatch-in-grafana)) |
+| 4 | **Workflow** | Where is each onboarding session, and which ones need a person? | The agent console: every session's stage, status, what it waits for, its current node and the conversation, updated over SSE. Sessions in `HANDOFF` go to the top of the list. See [langgraph-design.md](02-langgraph-design.md#human-handoff) |
+
+The first three are for whoever runs the system. The fourth is for support agents, and is also where a stuck
+session shows first: a node that runs out of retries hands the session to an agent with its error, so the
+agent sees the failed node before anyone opens a trace.
+
+No alarms or dashboards are defined in code yet: the signals are there, but nothing pages anyone.
+
+## 2. What each part sends
+
+| Part | Traces | Logs | Metrics | Health |
+|---|---|---|---|---|
+| ALB | — | — | CloudWatch (`AWS/ApplicationELB`) | Target health: frontend `/api/healthz`, docs `/` |
+| Frontend (Next.js) | OTLP: one span per route and render, and each `fetch` to the backend | OTLP and stdout: `lib/server/log.ts` and Next's unhandled request errors (`onRequestError`) | Container Insights | `/api/healthz` (the frontend alone); `/healthz` relays to the backend |
+| Backend (FastAPI) | OTLP: one span per request, httpx calls to partner, identity and contract admin, botocore calls to Bedrock | OTLP and stdout: every record at `LOG_LEVEL` (default INFO) and above from the app; library loggers at WARNING | Container Insights | `/healthz` |
+| Mock | — | stdout | Container Insights | — |
+| PostgreSQL (RDS) | — | — | CloudWatch (`AWS/RDS`) | — |
+
+Telemetry is set up in `backend/app/telemetry.py` and `frontend/instrumentation.ts`. Each service names itself
+with `OTEL_SERVICE_NAME` (`onboarding-backend`, `onboarding-frontend`) and tags everything with
+`deployment.environment`, so one Grafana stack can hold develop and prod apart.
+
+Logs go both ways on purpose: stdout reaches CloudWatch even when OTLP export is off or failing.
+
+## 3. Traces and logs in the application
 
 The frontend passes `traceparent` to the backend, so a relayed call and the API call it causes are one trace.
 Logs written inside a span carry its trace and span ids (in the OTLP record, and as `trace_id`/`span_id` in the stdout JSON).
 
-## 2. Log format
+To follow one request, open its trace. To follow one onboarding session across requests and graph runs, filter
+the logs by `session_id`.
+
+### Log format
 
 Logs are structured. On stdout every line is one JSON object; over OTLP the same fields arrive as log attributes
 (in Loki, structured metadata), so they can be filtered and grouped without parsing the message.
@@ -40,7 +78,7 @@ and `LISTEN connection lost; reconnecting`. Frontend events: `backend relay fail
 unhandled errors). In code, pass context with `extra=` (Python) or the `fields` argument (`lib/server/log.ts`),
 never by formatting it into the message.
 
-## 3. Keeping it small
+## 4. Keeping it small
 
 | Control | Where | Effect |
 |---|---|---|
@@ -52,7 +90,7 @@ never by formatting it into the message.
 Traces are not sampled: after the quiet paths are removed, a demo's traffic is small. `OTEL_TRACES_SAMPLER` can
 change that without code.
 
-## 4. Turning it on
+## 5. Turning it on
 
 Terraform leaves export off until `otlp_endpoint` is set in the environment's `terraform.tfvars`.
 
@@ -73,7 +111,7 @@ Terraform leaves export off until `otlp_endpoint` is set in the environment's `t
 
 Locally, export stays off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set in the environment.
 
-## 5. CloudWatch in Grafana
+## 6. CloudWatch in Grafana
 
 The same stack can read CloudWatch metrics (ALB, ECS, RDS) and the log groups through the CloudWatch data source,
 using **Grafana Assume Role**. `infra/envs/develop/grafana.tf` creates a read-only role for it once
