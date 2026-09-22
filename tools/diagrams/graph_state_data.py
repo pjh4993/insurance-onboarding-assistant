@@ -427,6 +427,123 @@ def langgraph_graph():
     return s
 
 
+# ------------------------------------------------------------------ state: where session data lives (level 1)
+def state_stores():
+    s = Svg("st0", 1100, 420, "Where a session's data lives: the screens talk to the session runtime; the runtime "
+                              "resumes the graph and copies a summary into the OnboardingSession row; the graph "
+                              "saves its state to the encrypted checkpoint after every node, writes entities to the "
+                              "domain DB, reads the catalog and calls the identity system")
+    UI, API, G, IDS = (30, 30, 250, 64), (30, 170, 250, 76), (420, 170, 300, 76), (860, 170, 210, 76)
+    s.box(*UI, "Customer and agent screens", ("send inputs; read the session and SSE",))
+    s.box(*API, "Session runtime (API)", ("one turn per input, under a lock", "mirrors progress after each turn"))
+    s.box(*G, "Onboarding graph", ("one thread per session", "nodes read the state and return updates"), color=BLUE)
+    s.box(*IDS, "Identity system", ("holds the OTP request", "(external)"), dashed=True)
+    SY, SH = 320, 70
+    stores = [(30, 250, "OnboardingSession row", ("domain schema", "stage, waiting_for, status")),
+              (320, 230, "Checkpoint", ("checkpoint schema", "OnboardingState, AES-encrypted")),
+              (590, 230, "Domain DB", ("domain schema", "entity values: Party, Quote, ...")),
+              (860, 210, "Catalog", ("catalog schema", "products and rules, read-only"))]
+    for x, w, t, sub in stores:
+        s.box(x, SY, w, SH, t, sub, color=ORANGE if t == "Checkpoint" else None)
+    s.arrow(155, 96, 155, 168, "inputs  /  SSE events", two=True, anchor="start", lx=165, ly=136)
+    s.arrow(282, 208, 418, 208, "resume(input)")
+    s.arrow(155, 248, 155, 318, "summary after\neach turn", anchor="start", lx=165, ly=278)
+    s.arrow(470, 248, 435, 318, "saved after\nevery node", anchor="end", lx=445, ly=278)
+    s.arrow(630, 248, 690, 318, "entities,\nthrough ports", anchor="start", lx=668, ly=278)
+    s.arrow(710, 248, 930, 318, "reads", dashed=True, anchor="start", lx=830, ly=278)
+    s.arrow(722, 208, 858, 208, "checks, OTP")
+    return s
+
+
+# ------------------------------------------------------------------ state: inside the graph state (level 2)
+def state_groups():
+    s = Svg("st2", 940, 548, "OnboardingState is composed of one TypedDict per domain. Each lists its entity "
+                             "references (ids into the domain DB), routing signals, loop guards and transient "
+                             "inputs; the conversation part also holds the session context and progress")
+    s.group(10, 10, 920, 528, "OnboardingState: one TypedDict per domain that writes the fields")
+    X, W, Y0, GAP = (30, 330, 630), 280, 44, 16
+    cols = [
+        [("ConversationState", [
+            ("context  (set by the API)", ["session_id", "party_id  → Party", "market, locale", "actor, mode"]),
+            ("progress", ["stage", "waiting_for", "last_input", "form_topic"]),
+            ("conversation  (appended)", ["messages"]),
+            ("intake", ["intake  {text}", "product_interest"]),
+        ])],
+        [("IdentityState", [
+            ("ids", ["otp_request_id  → identity system"]),
+            ("signals", ["identity_result", "identity_topics"]),
+            ("transient", ["otp_code  {code}"]),
+        ]), ("ProfilingState", [
+            ("ids", ["needs_assessment_id  → NeedsAssessment", "insurable_object_ids  → InsurableObject"]),
+            ("signals", ["needs_complete"]),
+            ("guards", ["needs_rounds"]),
+            ("transient", ["needs_input  {topic, fields, text}"]),
+        ]), ("RecommendationState", [
+            ("ids", ["recommendation_ids  → Recommendation", "quote_ids  → Quote"]),
+            ("signals", ["eligible_count", "decision"]),
+        ])],
+        [("ApplicationState", [
+            ("ids", ["application_id  → Application"]),
+            ("signals", ["parties_complete", "answers_complete", "confirmed", "correcting"]),
+            ("guards", ["answers_rounds", "confirm_rejections"]),
+        ]), ("HandoffState", [
+            ("signals", ["handoff_reason", "handoff_resolution"]),
+            ("recovery", ["resume_node", "resume_stage", "last_error"]),
+        ])],
+    ]
+    for x, boxes in zip(X, cols):
+        y = Y0
+        for title, groups in boxes:
+            y += s.ebox(x, y, W, title, groups) + GAP
+    return s
+
+
+# ------------------------------------------------------------------ state: one turn (level 3)
+def state_turn():
+    s = Svg("st3", 1170, 624, "One turn: the screen posts an input; the runtime marks the session as processing and "
+                              "resumes the graph; each node reads and writes entities and returns an update that is "
+                              "merged and checkpointed; edges read routing signals until the graph waits again; the "
+                              "runtime then copies the new stage and wait into the session row and publishes SSE events")
+    lanes = [(100, "Screen", None), (330, "Session runtime", None), (580, "Graph", BLUE),
+             (850, "Checkpoint", ORANGE), (1070, "Domain DB", None)]
+    TOP, BOT = 20, 614
+    for cx, name, color in lanes:
+        s.box(cx - 85, TOP, 170, 40, name, (), color=color)
+        s.p.append(f'<line x1="{cx}" y1="{TOP + 40}" x2="{cx}" y2="{BOT}" stroke="currentColor" '
+                   f'stroke-opacity="0.25" stroke-dasharray="4 4"/>')
+    SC, RT, GR, CP, DB = (x for x, _, _ in lanes)
+    s.group(GR - 170, 258, DB + 70 - (GR - 170), 222, "per node, until the graph waits for a person")
+
+    def msg(n, x1, x2, y, t, dashed=False):
+        # The number sits where the message starts, and the label runs from it along the arrow.
+        s.arrow(x1, y, x2, y, dashed=dashed)
+        d = 1 if x2 > x1 else -1
+        s._num(x1 + d * 16, y - 14, n)
+        s.text(x1 + d * 32, y - 9, t, 11.5, anchor="start" if d > 0 else "end", op="0.8")
+
+    def note(n, y, lines):
+        w, h = 252, 18 + 15 * len(lines)
+        x = GR + 14
+        s.p.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="6" fill="currentColor" '
+                   f'fill-opacity="0.06" stroke="currentColor" stroke-opacity="0.45" stroke-width="1.3"/>')
+        s._num(x + 16, y + 16, n)
+        for i, t in enumerate(lines):
+            s.text(x + 32, y + 20 + i * 15, t, 11.5, anchor="start", op="0.85")
+
+    msg(1, SC, RT, 96, "input (must match waiting_for)")
+    msg(2, RT, DB, 136, "session row: waiting_for = null (processing)")
+    msg(3, RT, GR, 176, "resume + actor, mode, locale")
+    note(4, 194, ["ask_customer returns the input:", "last_input, otp_code / needs_input"])
+    msg(5, GR, DB, 316, "read and write entities (deterministic ids, upsert)")
+    msg(6, GR, CP, 356, "update merged, then saved (gzip, AES)")
+    msg(7, GR, SC, 396, "new messages, streamed as SSE message.appended", dashed=True)
+    note(8, 414, ["edge reads routing signals only:", "next node, or an interrupt (waiting_for)"])
+    msg(9, RT, CP, 520, "snapshot: stage, waiting_for, next node")
+    msg(10, RT, DB, 560, "session row: last_stage, waiting_for, current_node, status")
+    msg(11, RT, SC, 600, "SSE session.updated, prompt.updated")
+    return s
+
+
 # ------------------------------------------------------------------ checkpoint encryption
 def state_checkpoint_encryption():
     s = Svg("st1", 960, 116, "Checkpoint encryption: the state is serialized with JsonPlusSerializer (msgpack), "
@@ -652,5 +769,8 @@ if __name__ == "__main__":
     langgraph_stage_application().save("docs/design/assets/langgraph-stage-application.svg")
     langgraph_handoff().save("docs/design/assets/langgraph-handoff.svg")
     langgraph_graph().save("docs/design/assets/langgraph-graph.svg")
+    state_stores().save("docs/design/assets/state-stores.svg")
+    state_groups().save("docs/design/assets/state-groups.svg")
+    state_turn().save("docs/design/assets/state-turn.svg")
     state_checkpoint_encryption().save("docs/design/assets/state-checkpoint-encryption.svg")
     data_model_er().save("docs/design/assets/data-model-er.svg")
