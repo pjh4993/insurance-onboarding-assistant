@@ -1,7 +1,7 @@
 // Drives the customer app (/s/{token}) the way a person would, answering whatever the chat asks next.
 import { expect, type Locator, type Page } from "@playwright/test";
 import { t, type Locale } from "./i18n";
-import { OTP, type Seed } from "./seeds";
+import { OTP, otpFor, type Seed } from "./seeds";
 
 type Step = "identity" | "otp" | "needs" | "parties" | "answers" | "decision" | "confirm" | "closed" | "waitAgent";
 
@@ -177,7 +177,7 @@ export class CustomerApp {
           await this.fillIdentity(seed, { consent });
           break;
         case "otp":
-          await this.enterOtp();
+          await this.enterOtp(otpFor(seed));
           break;
         case "needs":
           await this.say("needs", seed.needs_text);

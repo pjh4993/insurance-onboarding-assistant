@@ -31,11 +31,14 @@ returns that customer's fixed answers.
 | | Market | Identity path | Needs | Expected outcome |
 |---|---|---|---|---|
 | **A** 김하늘 | KR | Partner match | New Galaxy phone, worried about breakage | `SUBMITTED`: `KR-MOB-SWAP` at ₩9,990/month |
-| **B** 이서준 | KR | No partner record → OTP `000000` | Trip to Japan, 3–7 October | `SUBMITTED`: `KR-TRV-OVERSEAS` at ₩6,750 for 5 days |
-| **C** Jane Doe | US | OTP fails → passport check passes | $1,299 laptop, accident cover | `SUBMITTED`: `US-DEV-LAPTOP-2Y` at $130 one-time |
-| **D** John Roe | US | OTP fails → document fails | "I need phone insurance." | `HANDOFF` after identity; after the agent verifies, `HANDOFF` again after 3 needs rounds |
+| **B** 이서준 | KR | No partner record → any OTP but `000000` passes | Trip to Japan, 3–7 October | `SUBMITTED`: `KR-TRV-OVERSEAS` at ₩6,750 for 5 days |
+| **C** Jane Doe | US | OTP `000000` fails → passport check passes | $1,299 laptop, accident cover | `SUBMITTED`: `US-DEV-LAPTOP-2Y` at $130 one-time |
+| **D** John Roe | US | OTP `000000` fails → document fails | "I need phone insurance." | `HANDOFF` after identity; after the agent verifies, `HANDOFF` again after 3 needs rounds |
 
 Submission references look like `SUB-2026-000001` and count up per mock run.
+
+No SMS is sent. The identity mock accepts every OTP code, for any phone number, except `000000`: type `000000` to
+take the OTP failure path.
 
 ### A: partner match with purchase pre-fill
 
@@ -55,7 +58,8 @@ Submission references look like `SUB-2026-000001` and count up per mock run.
 
 ### B: OTP and a customer-described trip
 
-1. No partner record, so the identity system sends an OTP. Enter `000000`. `check_otp` returns `OTP_OK`.
+1. No partner record, so the identity system sends an OTP. Enter any code but `000000`, e.g. `123456`.
+   `check_otp` returns `OTP_OK`.
 2. Needs: 40, office worker, travel insurance for Japan, leaving 3 October and back 7 October. `assess_needs`
    creates a `TRIP` object from the text.
 3. `KR-TRV-OVERSEAS` is priced per day: 5 days × ₩1,350 = ₩6,750 for the trip.
@@ -67,7 +71,7 @@ checks), but the mock always answers "all self", so the demo does not show it.
 
 ### C: OTP fails, document succeeds
 
-1. No partner record. Any OTP code fails (`OTP_FAILED`).
+1. No partner record. Enter `000000`, the code the mock turns down (`OTP_FAILED`).
 2. The graph moves to `check_document` with the passport number C gave at the start. It passes (`DOC_OK`,
    `verification_method = DOCUMENT`). One failed attempt is recorded.
 3. Needs: "I'm 36, a nurse in Seattle. I just bought a $1,299 laptop and want accident cover." The US laptop
@@ -77,7 +81,7 @@ checks), but the mock always answers "all self", so the demo does not show it.
 
 ### D: two failures, then an agent
 
-1. OTP fails, then the driver's licence check fails (`DOC_FAILED`). That is two failures.
+1. Enter `000000`: the OTP fails, then the driver's licence check fails (`DOC_FAILED`). That is two failures.
 2. `human_handoff` sets `stage = HANDOFF`, `waiting_for = AGENT` and `handoff_reason = IDENTITY_FAILED`;
    `await_agent` pauses. The session status becomes `HANDOFF` and it jumps to the top of the agent's session list.
 3. In the agent console, open the session and take it over (**Assign to me**). The session is now `ASSIST` and assigned

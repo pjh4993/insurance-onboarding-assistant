@@ -96,6 +96,9 @@ class OtpVerifyBody(BaseModel):
     code: str
 
 
+REJECTED_OTP_CODE = "000000"  # the one code the identity mock turns down
+
+
 class DocumentBody(BaseModel):
     document_type: str | None = None
     document_number: str
@@ -122,11 +125,11 @@ async def otp_verify(otp_request_id: str, body: OtpVerifyBody) -> Any:
         raise HTTPException(status_code=404, detail="unknown otp_request_id")
     if datetime.now(UTC) >= request.expires_at:
         return {"verified": False, "reason": "EXPIRED"}
-    customer = seed.by_phone(request.phone)
-    valid_code = ((customer or {}).get("otp") or {}).get("valid_code")
-    if valid_code is not None and secrets.compare_digest(body.code.strip(), valid_code):
-        return {"verified": True}
-    return {"verified": False, "reason": "MISMATCH"}
+    # No SMS is sent, so every code is accepted, for any phone, except REJECTED_OTP_CODE: entering it is how a
+    # demo takes the OTP failure path (seed customers C and D).
+    if secrets.compare_digest(body.code.strip(), REJECTED_OTP_CODE):
+        return {"verified": False, "reason": "MISMATCH"}
+    return {"verified": True}
 
 
 @identity.post("/documents/verify")

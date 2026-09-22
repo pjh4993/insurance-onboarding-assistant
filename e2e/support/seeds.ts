@@ -12,11 +12,14 @@ export type Seed = {
   id_document_type: string;
   id_document_number: string;
   needs_text: string;
+  otp: { valid_code: string | null } | null; // null: the partner match verifies, no OTP is asked
 };
 
 const SEEDS = Object.fromEntries((data.customers as Seed[]).map((c) => [c.key, c])) as Record<SeedKey, Seed>;
 
 export const seed = (key: SeedKey): Seed => SEEDS[key];
 
-/** Any OTP works for B; the mock fails every code for C and D. */
-export const OTP = "000000";
+/** The identity mock accepts every OTP code but one, so a seed whose OTP should fail (C, D) types that one. */
+export const OTP = "123456";
+export const REJECTED_OTP = "000000";
+export const otpFor = (s: Seed): string => (s.otp?.valid_code ? OTP : REJECTED_OTP);

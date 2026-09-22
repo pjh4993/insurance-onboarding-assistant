@@ -80,21 +80,13 @@ def _otp(client, phone):
     return body["otp_request_id"]
 
 
-def test_otp_b_succeeds_with_000000(client):
-    otp_id = _otp(client, "+821033334444")
-    assert client.post(f"/identity/v1/otp/{otp_id}/verify", json={"code": "123456"}).json() == {
-        "verified": False,
-        "reason": "MISMATCH",
-    }
-    assert client.post(f"/identity/v1/otp/{otp_id}/verify", json={"code": "000000"}).json() == {
-        "verified": True
-    }
-
-
-@pytest.mark.parametrize("phone", ["+12065550101", "+12065550102", "+821099999999"])
-def test_otp_c_d_unknown_always_fail(client, phone):
+@pytest.mark.parametrize("phone", ["+821033334444", "+12065550101", "+12065550102", "+821099999999"])
+def test_otp_accepts_any_code_but_000000(client, phone):
     otp_id = _otp(client, phone)
-    for code in ("000000", "123456"):
+    for code in ("123456", "999999", " 424242 "):
+        r = client.post(f"/identity/v1/otp/{otp_id}/verify", json={"code": code})
+        assert r.json() == {"verified": True}
+    for code in ("000000", " 000000 "):
         r = client.post(f"/identity/v1/otp/{otp_id}/verify", json={"code": code})
         assert r.json() == {"verified": False, "reason": "MISMATCH"}
 
@@ -102,7 +94,7 @@ def test_otp_c_d_unknown_always_fail(client, phone):
 def test_otp_expired(client, monkeypatch):
     monkeypatch.setenv("MOCK_OTP_TTL_SECONDS", "0")
     otp_id = _otp(client, "+821033334444")
-    r = client.post(f"/identity/v1/otp/{otp_id}/verify", json={"code": "000000"})
+    r = client.post(f"/identity/v1/otp/{otp_id}/verify", json={"code": "123456"})
     assert r.json() == {"verified": False, "reason": "EXPIRED"}
 
 

@@ -16,7 +16,7 @@ gap. The seed customers and what the mock does for each are in `docs/guides/demo
 
 - [ ] Identity form: empty and malformed fields (email, phone) are rejected before sending; the consent box is
       optional.
-- [ ] Wrong OTP, then the document check (seed C); two failures hand off (seed D) and the page says an agent is
+- [ ] Wrong OTP (`000000`, the one code the mock turns down), then the document check (seed C); two failures hand off (seed D) and the page says an agent is
       coming.
 - [ ] Answer faster than the assistant: type and send the moment a reply appears. Input must stay disabled until
       the turn ends, with no "still processing" error.
