@@ -28,7 +28,9 @@ export async function sample(browser: Browser, url: string): Promise<Sample> {
       const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
       const fcp = performance.getEntriesByName("first-contentful-paint")[0];
       return {
-        ttfb: nav.responseStart,
+        // From the request, not the navigation: DNS, TCP and TLS to Seoul take a CI runner in the US several round trips
+        // before the server sees anything, and a server slowdown is what the budget is for.
+        ttfb: nav.responseStart - nav.requestStart,
         fcp: fcp ? fcp.startTime : Number.NaN,
         lcp: w.__lcp,
         cls: w.__cls,

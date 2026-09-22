@@ -84,7 +84,9 @@ Playwright drives the real UI; labels come from `frontend/messages/*.json`, so c
 | Agent login redirect | whole load, ending on Cognito's page, ≤ 2.0 s | | |
 
 Measured from Seoul on 2026-09-22 the landing was at TTFB 176 ms and LCP 308 ms, the docs at LCP 0.8 s and CLS
-0.07. The budgets leave room for CI runners outside Korea, so a miss means a real slowdown.
+0.07. The budgets leave room for CI runners outside Korea, so a miss means a real slowdown. TTFB is the server's
+time, from the request to the first byte: DNS, TCP and TLS are left out, since from a US runner they alone take
+several round trips. The docs load their web fonts with `display=optional`, so a late font never reflows the page.
 
 **Exploratory QA** is not scripted: the `frontend-qa` skill (`.claude/skills/frontend-qa/SKILL.md`) has Claude Code
 walk the app with [agent-browser](https://github.com/vercel-labs/agent-browser) through

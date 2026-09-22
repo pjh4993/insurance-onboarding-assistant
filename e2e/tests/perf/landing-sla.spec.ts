@@ -1,6 +1,7 @@
 // Page-load SLA for develop: p75 over cold loads, desktop Chrome. The budgets are several times what develop
 // measured from Seoul (2026-09-22: landing LCP p75 0.3 s), so a run from a US CI runner still passes and a
-// real slowdown does not.
+// real slowdown does not. TTFB is the server's time (request sent to first byte), so it leaves out connection
+// setup, several round trips from a US runner.
 import { expect, test } from "@playwright/test";
 import { DEV } from "../../support/hosts";
 import { p75, sample, type Metric, type Sample } from "../../support/perf";

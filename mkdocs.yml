@@ -37,9 +37,9 @@ hooks:
 theme:
   name: material
   language: en
-  font:
-    text: Source Sans 3
-    code: IBM Plex Mono
+  # Not the theme's font loading: it swaps the web font in after first paint, and the reflow shifts the page
+  # (CLS 0.07 from Seoul, 0.19 on a Linux CI runner). extra_css loads the same fonts with display=optional.
+  font: false
   icon:
     repo: fontawesome/brands/github
   features:
@@ -67,6 +67,8 @@ theme:
 
 # Paths are site URLs: the hook publishes docs/ at the site root, so docs/assets/ is served at assets/.
 extra_css:
+  # display=optional: a font that is not ready at first paint is used from the next page on, never swapped in.
+  - https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=IBM+Plex+Mono:ital,wght@0,400;0,700;1,400;1,700&display=optional
   - assets/huggingface.css
   - assets/svg-zoom.css
   - assets/diagrams.css
