@@ -569,6 +569,121 @@ def state_checkpoint_encryption():
     return s
 
 
+# ------------------------------------------------------------------ data model: groups (level 1)
+def data_model_groups():
+    s = Svg("dm1", 1040, 420, "The four entity groups: customer and transaction entities in the domain schema, "
+                              "reference data in the catalog schema, and the policy in the contract admin system")
+
+    def group_box(x, y, w, h, name, entities, notes, dashed=False):
+        s.box(x, y, w, h, "", (), dashed=dashed)
+        s.p.pop()  # drop the empty title
+        s.text(x + w / 2, y + 26, name, 14, weight="650")
+        for i, e in enumerate(entities):
+            s.p.append(f'<text x="{x + w / 2}" y="{y + 48 + i * 16}" font-size="12" text-anchor="middle" '
+                       f'fill="currentColor" {MONOF}>{esc(e)}</text>')
+        for i, n in enumerate(notes):
+            s.text(x + w / 2, y + h - 30 + i * 15, n, 11.5, op="0.72")
+
+    s.group(20, 20, 650, 250, "domain schema")
+    s.group(720, 20, 300, 250, "catalog schema")
+    group_box(40, 56, 260, 190, "Customer", ["Party", "NeedsAssessment", "InsurableObject"],
+              ["changed by the workflow", "lives as long as the customer"])
+    group_box(390, 56, 260, 190, "Transaction",
+              ["OnboardingSession", "Recommendation", "Quote", "Application", "ApplicationParty"],
+              ["changed by the workflow", "one onboarding each"])
+    group_box(740, 56, 260, 190, "Reference", ["Product", "EligibilityRule", "TargetMarket"],
+              ["seeded at backend startup", "while a product is on sale"])
+    group_box(390, 310, 260, 90, "Result", ["Policy"], ["contract admin system, no table"], dashed=True)
+    s.arrow(388, 151, 302, 151)
+    label(s, 345, 132, "for one customer,")
+    label(s, 345, 144, "on their needs")
+    s.arrow(652, 151, 738, 151)
+    label(s, 695, 132, "recommends,")
+    label(s, 695, 144, "prices")
+    s.arrow(520, 248, 520, 308)
+    label(s, 528, 282, "a submitted application becomes one", "start")
+    return s
+
+
+# ------------------------------------------------------------------ data model: entities (level 2)
+def data_model_entities():
+    s = Svg("dm2", 1010, 640, "Every entity and how they relate, without fields: reference entities on the left, "
+                              "transaction entities in the middle, customer entities on the right")
+    W, H = 200, 36
+
+    def ent(x, y, name, dashed=False):
+        s.box(x, y, W, H, name, (), mono=True, dashed=dashed)
+
+    s.group(10, 40, 220, 350, "Reference (catalog)")
+    s.group(330, 20, 320, 590, "Transaction")
+    s.group(740, 20, 250, 300, "Customer")
+
+    # reference
+    ent(20, 80, "EligibilityRule")
+    ent(20, 200, "Product")
+    ent(20, 320, "TargetMarket")
+    s.seg([(120, 116), (120, 200)], arrow=False)
+    label(s, 128, 150, "requires", "start")
+    label(s, 128, 164, "n : 1", "start")
+    s.seg([(120, 236), (120, 320)], arrow=False)
+    label(s, 128, 270, "fits", "start")
+    label(s, 128, 284, "1 : n", "start")
+
+    # transaction
+    ent(380, 60, "OnboardingSession")
+    ent(380, 180, "Recommendation")
+    ent(380, 300, "Quote")
+    ent(380, 420, "Application")
+    ent(380, 540, "ApplicationParty")
+    s.seg([(440, 96), (440, 180)], arrow=False)
+    label(s, 448, 134, "produced", "start")
+    label(s, 448, 148, "1 : n", "start")
+    s.seg([(480, 216), (480, 300)], arrow=False)
+    label(s, 488, 254, "priced as", "start")
+    label(s, 488, 268, "1 : n", "start")
+    s.seg([(480, 336), (480, 420)], arrow=False)
+    label(s, 488, 374, "accepted price", "start")
+    label(s, 488, 388, "1 : 0..1", "start")
+    s.seg([(480, 456), (480, 540)], arrow=False)
+    label(s, 488, 494, "roles", "start")
+    label(s, 488, 508, "1 : 1..n", "start")
+    s.seg([(580, 212), (620, 212), (620, 432), (580, 432)], arrow=False)
+    label(s, 628, 322, "accepted into", "start")
+    label(s, 628, 336, "1 : 0..1", "start")
+    s.seg([(380, 72), (350, 72), (350, 448), (380, 448)], arrow=False)
+    label(s, 342, 330, "produced", "end")
+    label(s, 342, 344, "1 : n", "end")
+    s.seg([(220, 194), (380, 194)], arrow=False)
+    label(s, 290, 186, "recommends  1 : n")
+
+    # customer
+    CW = 170
+    s.box(770, 60, CW, H, "Party", (), mono=True)
+    s.box(770, 170, CW, H, "NeedsAssessment", (), mono=True)
+    s.box(770, 250, CW, H, "InsurableObject", (), mono=True)
+    s.seg([(820, 96), (820, 170)], arrow=False)
+    label(s, 812, 130, "versions", "end")
+    label(s, 812, 144, "1 : n", "end")
+    s.seg([(940, 88), (958, 88), (958, 268), (940, 268)], arrow=False)
+    label(s, 950, 232, "owns  1 : n", "end")
+    s.seg([(770, 78), (580, 78)], arrow=False)
+    label(s, 675, 70, "customer  1 : n")
+    s.seg([(770, 188), (580, 188)], arrow=False)
+    label(s, 690, 180, "based on  1 : n")
+    s.seg([(770, 268), (700, 268), (700, 202), (580, 202)], arrow=False)
+    label(s, 712, 234, "covers", "start")
+    label(s, 712, 248, "0..1 : n", "start")
+    s.seg([(940, 70), (982, 70), (982, 558), (580, 558)], arrow=False)
+    label(s, 790, 550, "plays  1 : n")
+
+    # result
+    s.box(770, 420, 170, H, "Policy", (), mono=True, dashed=True)
+    s.seg([(580, 444), (770, 444)], dashed=True)
+    label(s, 700, 436, "becomes (outside)")
+    s.text(855, 474, "contract admin system", 11, op="0.6")
+    return s
+
+
 # ------------------------------------------------------------------ ER diagram
 ENTITIES = {
     "OnboardingSession": [("uuid", "session_id", "PK"), ("string", "thread_id", ""), ("uuid", "party_id", "FK"),
@@ -773,4 +888,6 @@ if __name__ == "__main__":
     state_groups().save("docs/design/assets/state-groups.svg")
     state_turn().save("docs/design/assets/state-turn.svg")
     state_checkpoint_encryption().save("docs/design/assets/state-checkpoint-encryption.svg")
+    data_model_groups().save("docs/design/assets/data-model-groups.svg")
+    data_model_entities().save("docs/design/assets/data-model-entities.svg")
     data_model_er().save("docs/design/assets/data-model-er.svg")

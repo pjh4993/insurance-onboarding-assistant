@@ -4,16 +4,18 @@ Domain entities in the `domain` and `catalog` schemas. Names follow ACORD where 
 `InsurableObject`, `Quote`, `Policy`) and IDD for suitability (`NeedsAssessment`, `TargetMarket`). Graph state is
 separate and described in [state-management.md](03-state-management.md).
 
-This page matches `backend/app/db/models.py`, which maps the entity dataclasses of `onboarding-core`
-(`backend/packages/core`) onto these tables. The backend runs its Alembic migrations
-(`backend/app/db/migrations/`) to head at startup and then upserts the catalog seed. Both steps are idempotent
-and run under a Postgres advisory lock, so several starting replicas do not race. `0001` is the schema as
-`create_all` built it before migrations existed; a database from that time has the tables but no
-`alembic_version`, so it is stamped at `0001` instead of running it. A test checks that the models and the
-migrated schema do not drift. New migrations come from `uv run alembic revision --autogenerate -m "..."` in
-`backend/`.
+The model is described from the outside in, the way the C4 model zooms into a system:
+
+| Level | Section | Shows |
+|---|---|---|
+| Groups | [§1](#1-entity-groups) | The four groups of entities, which schema holds each, and how they depend on each other |
+| Entities | [§2](#2-entities-and-relationships) | Every entity and relationship, without fields |
+| Rules and lifecycle | [§3](#3-key-rules) and [§4](#4-state-transitions) | What each entity guarantees, and how their statuses move through one onboarding |
+| Reference | [§5](#5-product-catalog-seed) and [§6](#6-full-schema) | The product catalog seed, and every table with its fields |
 
 ## 1. Entity groups
+
+![Entity groups](assets/data-model-groups.svg)
 
 Entities are grouped by lifetime and by who changes them.
 
@@ -24,11 +26,28 @@ Entities are grouped by lifetime and by who changes them.
 | Transaction | `OnboardingSession`, `Recommendation`, `Quote`, `Application`, `ApplicationParty` | The workflow | Each onboarding. Outlives the conversation checkpoint | Yes (`answers`) |
 | Result | `Policy` | Contract admin system | The contract term | Out of scope, no table |
 
-## 2. Relationships
+A transaction ties one customer to the reference data: an onboarding session recommends products from the
+catalog for that customer's needs and objects, prices them, and ends in an application. The policy the
+application becomes lives in the contract admin system, outside this system.
 
-![Entity-relationship diagram](assets/data-model-er.svg)
+## 2. Entities and relationships
 
-Enum columns are stored as short strings; the allowed values are enforced by the code, not by the database.
+![Entities and relationships](assets/data-model-entities.svg)
+
+| From | Relationship | To | Why |
+|---|---|---|---|
+| `Party` | 1 : n `versions` | `NeedsAssessment` | A `CHANGE` writes a new version; old versions stay so an agent can see what each recommendation was based on |
+| `Party` | 1 : n `owns` | `InsurableObject` | One customer can have several devices or trips, from the partner or described by them |
+| `Party` | 1 : n `customer` | `OnboardingSession` | A customer can onboard more than once |
+| `OnboardingSession` | 1 : n `produced` | `Recommendation`, `Application` | One row per product per run; one application per accepted recommendation |
+| `NeedsAssessment` | 1 : n `based on` | `Recommendation` | Recommendations point at the version they were computed from |
+| `Product` | 1 : n `recommends` | `Recommendation` | Every product of the market gets a row, eligible or not |
+| `Recommendation` | 1 : n `priced as` | `Quote` | A re-price after expiry adds a quote |
+| `Recommendation`, `Quote` | 1 : 0..1 `accepted into` | `Application` | Only the accepted one becomes an application |
+| `Application` | 1 : 1..n `roles` | `ApplicationParty` ← `Party` | The policyholder, insured and payer, each a `Party` |
+| `Product` | 1 : n | `EligibilityRule`, `TargetMarket` | Rules exclude; target markets only add to the rank score |
+
+The fields of each table are in [§6](#6-full-schema).
 
 ## 3. Key rules
 
@@ -88,3 +107,18 @@ Notes on the rules as implemented:
 A session only evaluates the products whose `jurisdictions` include its market. All products except
 `KR-EW-HOME` also have a residence rule, plus product-specific rules (device category, days since purchase or
 activation, condition, trip length, and so on).
+
+## 6. Full schema
+
+![Entity-relationship diagram](assets/data-model-er.svg)
+
+Enum columns are stored as short strings; the allowed values are enforced by the code, not by the database.
+
+This page matches `backend/app/db/models.py`, which maps the entity dataclasses of `onboarding-core`
+(`backend/packages/core`) onto these tables. The backend runs its Alembic migrations
+(`backend/app/db/migrations/`) to head at startup and then upserts the catalog seed. Both steps are idempotent
+and run under a Postgres advisory lock, so several starting replicas do not race. `0001` is the schema as
+`create_all` built it before migrations existed; a database from that time has the tables but no
+`alembic_version`, so it is stamped at `0001` instead of running it. A test checks that the models and the
+migrated schema do not drift. New migrations come from `uv run alembic revision --autogenerate -m "..."` in
+`backend/`.
