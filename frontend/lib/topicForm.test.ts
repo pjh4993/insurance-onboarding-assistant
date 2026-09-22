@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTopicAnswer, initialFormState, validateForm } from "./topicForm";
+import { answerSummary, buildTopicAnswer, firstOpenField, initialFormState, validateField, validateForm } from "./topicForm";
 import type { FormSpec } from "./types";
 
 const form: FormSpec = {
@@ -119,5 +119,36 @@ describe("buildTopicAnswer", () => {
     const { fields } = buildTopicAnswer(form, state);
     expect(fields.purpose).toBe("BUSINESS");
     expect(fields.travellers).toBe(1.5);
+  });
+});
+
+describe("stepped form helpers", () => {
+  const yesNo = { yes: "Yes", no: "No" };
+  const field = (name: string) => form.fields.find((f) => f.name === name)!;
+
+  it("checks one field at a time", () => {
+    expect(validateField(field("destination"), " ")).toBe("required");
+    expect(validateField(field("email"), "")).toBeNull();
+    expect(validateField(field("travellers"), "two")).toBe("number");
+    expect(validateField(field("travellers"), "2")).toBeNull();
+  });
+
+  it("opens at the first field that still needs an answer", () => {
+    const state = initialFormState(form);
+    expect(firstOpenField(form, state)).toBe(0);
+    state.destination = "Tokyo";
+    expect(firstOpenField(form, state)).toBe(1); // optional email is empty: ask it, skippable
+    state.email = "a@b.co";
+    state.purpose = "LEISURE";
+    expect(firstOpenField(form, state)).toBe(form.fields.length - 1); // only the checkbox left
+  });
+
+  it("summarises answers with option labels and masks document numbers", () => {
+    expect(answerSummary(field("purpose"), "BUSINESS", yesNo)).toBe("Business");
+    expect(answerSummary(field("activities"), ["SKI", "DIVE"], yesNo)).toBe("Skiing, Diving");
+    expect(answerSummary(field("pre_existing"), true, yesNo)).toBe("Yes");
+    expect(answerSummary(field("email"), "", yesNo)).toBe("");
+    const doc = { name: "id_document_number", label: "Number", kind: "text" as const, required: true };
+    expect(answerSummary(doc, "900101-1234567", yesNo)).toBe("••••••••4567");
   });
 });

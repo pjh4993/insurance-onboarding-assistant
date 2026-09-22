@@ -12,5 +12,5 @@ test("anyone can start a session from the public landing page", async ({ page })
   await app.productCard("KR", "travel").click();
 
   await expect(page).toHaveURL(/\/chat$/);
-  await expect(page.getByRole("button", { name: t("en", "identity.submit") })).toBeVisible();
+  await expect(app.identityForm()).toBeVisible();
 });

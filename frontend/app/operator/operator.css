@@ -1,25 +1,29 @@
 /* Operator console: an artifact browser in the manner of Weights & Biases — dark top bar, version list on the
    left, the version in the middle with tabs, the agent loop on the right. */
 .op-shell {
+  /* The shared tokens (globals.css), named for the operator console; the top bar stays dark in both themes. */
   --op-bar: #1a1c1f;
   --op-bar-ink: #e8e9eb;
   --op-bar-dim: #9a9ea6;
-  --op-gold: #ffcc33;
-  --op-gold-soft: #fff6d6;
-  --op-bg: #f5f6f7;
-  --op-panel: #ffffff;
-  --op-line: #e2e4e8;
-  --op-ink: #1a1d24;
-  --op-ink-2: #5a606b;
-  --op-ink-3: #8b909a;
-  --op-live: #16a36a;
-  --op-live-soft: #dff5ea;
-  --op-add: #e6f6ec;
-  --op-add-ink: #1b6b3f;
-  --op-del: #fdecec;
-  --op-del-ink: #a32121;
-  --op-hl: #ffb300;
-  --op-hl-soft: #fff1c9;
+  --op-bar-raised: #2a2d32;
+  --op-bar-line: #3a3e45;
+  --op-gold: var(--mark);
+  --op-gold-soft: var(--mark-soft);
+  --op-bg: var(--bg-subtle);
+  --op-panel: var(--bg);
+  --op-line: var(--line);
+  --op-line-soft: var(--bg-muted);
+  --op-ink: var(--ink);
+  --op-ink-2: var(--ink-2);
+  --op-ink-3: var(--ink-3);
+  --op-live: var(--success);
+  --op-live-soft: var(--success-soft);
+  --op-add: var(--success-soft);
+  --op-add-ink: var(--success-ink);
+  --op-del: var(--danger-soft);
+  --op-del-ink: var(--danger-ink);
+  --op-hl: var(--mark);
+  --op-hl-soft: var(--mark-soft);
   height: 100dvh;
   display: grid;
   grid-template-rows: 48px minmax(0, 1fr);
@@ -86,7 +90,7 @@
   gap: 6px;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #2a2d32;
+  background: var(--op-bar-raised);
   color: var(--op-bar-ink);
   font-family: var(--mono);
   font-size: 12px;
@@ -170,7 +174,7 @@
   color: inherit;
 }
 .op-version:hover {
-  background: #f7f8f9;
+  background: var(--bg-subtle);
 }
 .op-version--on {
   background: var(--op-gold-soft);
@@ -197,20 +201,20 @@
   font-size: 11px;
   font-weight: 600;
   line-height: 18px;
-  background: #eef0f3;
+  background: var(--bg-muted);
   color: var(--op-ink-2);
 }
 .op-alias--latest {
   background: var(--op-gold);
-  color: #3a2c00;
+  color: var(--on-mark);
 }
 .op-alias--live {
   background: var(--op-live-soft);
   color: var(--op-live);
 }
 .op-alias--next {
-  background: #fff1c9;
-  color: #7a5600;
+  background: var(--mark-soft);
+  color: var(--mark-ink);
 }
 
 /* main */
@@ -288,17 +292,17 @@
 }
 .op-btn--primary {
   background: var(--op-gold);
-  border-color: #e6b400;
-  color: #2b2100;
+  border-color: var(--mark);
+  color: var(--on-mark);
 }
 .op-btn--dark {
-  background: #2a2d32;
-  border-color: #3a3e45;
+  background: var(--op-bar-raised);
+  border-color: var(--op-bar-line);
   color: var(--op-bar-ink);
 }
 .op-btn--danger {
-  background: #fff;
-  border-color: #e7b3b3;
+  background: var(--bg);
+  border-color: var(--danger-line);
   color: var(--op-del-ink);
 }
 
@@ -353,7 +357,7 @@
 }
 .op-table td {
   padding: 6px 14px;
-  border-bottom: 1px solid #f0f1f3;
+  border-bottom: 1px solid var(--op-line-soft);
   vertical-align: top;
 }
 .op-table tr[data-hot]:hover td {
@@ -378,7 +382,7 @@
 }
 .op-chip {
   border: 1px solid var(--op-line);
-  background: #fafbfc;
+  background: var(--bg-subtle);
   border-radius: 999px;
   padding: 2px 10px;
   font-size: 12px;
@@ -457,7 +461,7 @@ button.op-chip {
 .op-code__gap {
   padding: 2px 12px;
   color: var(--op-ink-3);
-  background: #f4f5f7;
+  background: var(--bg-muted);
   font-size: 12px;
 }
 .op-diffstat {
@@ -482,7 +486,7 @@ button.op-chip {
   font-family: var(--mono);
   font-size: 12.5px;
   line-height: 1.55;
-  background: #fcfcfd;
+  background: var(--bg-subtle);
   color: var(--op-ink);
 }
 .op-filetabs {
@@ -504,7 +508,7 @@ button.op-chip {
   white-space: nowrap;
 }
 .op-filetab--on {
-  background: #fcfcfd;
+  background: var(--bg-subtle);
   border-color: var(--op-line);
   margin-bottom: -1px;
   font-weight: 600;
@@ -555,11 +559,11 @@ button.op-chip {
   margin-bottom: 16px;
   font-size: 13px;
   background: var(--op-gold-soft);
-  border: 1px solid #f1d98a;
+  border: 1px solid var(--mark-line);
 }
 .op-banner--error {
   background: var(--op-del);
-  border-color: #efc2c2;
+  border-color: var(--danger-line);
   color: var(--op-del-ink);
 }
 
@@ -579,7 +583,7 @@ button.op-chip {
   min-height: 30px;
 }
 .op-loop__caption--idle {
-  background: #f4f5f7;
+  background: var(--bg-muted);
   color: var(--op-ink-3);
 }
 .op-loop__toggle {
@@ -633,7 +637,7 @@ button.op-chip {
   font-size: 12px;
 }
 .op-editor-nav a:hover {
-  background: #eceef1;
+  background: var(--bg-muted);
   color: var(--op-ink);
 }
 .op-editor-main {
@@ -662,7 +666,7 @@ button.op-chip {
   background: var(--op-panel);
   border: 1px solid var(--op-line);
   border-radius: 8px;
-  box-shadow: 0 -6px 16px rgb(16 24 40 / 0.08);
+  box-shadow: var(--float-shadow);
   overflow: hidden;
 }
 .op-publishbar .op-problems,
@@ -727,7 +731,7 @@ button.op-chip {
   font: inherit;
   font-size: 13.5px;
   line-height: 1.5;
-  background: #fff;
+  background: var(--bg);
 }
 .op-field__hint {
   font-size: 11.5px;
@@ -742,8 +746,8 @@ button.op-chip {
   display: grid;
   gap: 6px;
   padding: 10px;
-  border: 1px solid #ebe6fb;
-  background: #faf8ff;
+  border: 1px solid var(--violet-soft);
+  background: var(--violet-soft);
   border-radius: 8px;
 }
 .op-node__head {
@@ -757,7 +761,7 @@ button.op-chip {
   grid-template-columns: 170px minmax(0, 1fr);
   gap: 8px;
   padding-top: 10px;
-  border-top: 1px solid #f0f1f3;
+  border-top: 1px solid var(--op-line-soft);
 }
 .op-copy__key {
   padding-top: 8px;

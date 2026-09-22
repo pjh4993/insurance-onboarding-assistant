@@ -77,6 +77,7 @@ export function InputPanel({
           type={w}
           onSubmit={safeSubmit}
           disabled={disabled}
+          stepped={actor === "customer"}
           textPlaceholder={
             actor === "agent" ? t("input.agentPlaceholder", { kind: t("waiting.NEEDS") }) : t("input.placeholder.NEEDS")
           }

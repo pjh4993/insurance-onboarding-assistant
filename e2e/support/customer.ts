@@ -45,7 +45,9 @@ export class CustomerApp {
     const p = this.page;
     const composer = (kind: string) => p.getByPlaceholder(this.m(`input.placeholder.${kind}`));
     return {
-      identity: p.getByRole("button", { name: this.m("identity.submit") }),
+      // The customer chat asks identity one field at a time (a stepped topic form); NEEDS forms come with a
+      // free-text composer, which the flows below answer instead.
+      identity: p.locator('.stepper[data-type="IDENTITY_INFO"] .btn--cta'),
       otp: p.getByLabel(this.m("otp.label")), // its button stays disabled until a code is typed
       needs: composer("NEEDS"),
       parties: composer("PARTIES"),
@@ -82,6 +84,11 @@ export class CustomerApp {
     return this.controls().needs;
   }
 
+  /** The stepped identity form (contact, ID document, consent). */
+  identityForm() {
+    return this.page.locator('.stepper[data-type="IDENTITY_INFO"]');
+  }
+
   private assistantReplies() {
     return this.page.locator(".msg--assistant .msg__bubble:not(.typing)");
   }
@@ -95,15 +102,47 @@ export class CustomerApp {
       .toBe(true);
   }
 
+  /**
+   * Answers the identity topic forms (contact, ID document, consent) one question at a time, until the chat
+   * asks for something else. Inputs carry the field's name; choice buttons carry the option's value.
+   */
   async fillIdentity(seed: Seed, { consent }: { consent: boolean }) {
-    const p = this.page;
-    await p.getByLabel(this.m("identity.fullName")).fill(seed.full_name);
-    await p.getByLabel(this.m("identity.email")).fill(seed.email);
-    await p.getByLabel(this.m("identity.phone")).fill(seed.phone);
-    await p.getByLabel(this.m("identity.idType")).selectOption(seed.id_document_type);
-    await p.getByLabel(this.m("identity.idNumber")).fill(seed.id_document_number);
-    if (consent) await p.getByRole("checkbox").check();
-    await this.andWaitForReply(() => this.controls().identity.click());
+    const values: Record<string, string | boolean> = {
+      full_name: seed.full_name,
+      email: seed.email,
+      phone: seed.phone,
+      id_document_type: seed.id_document_type,
+      id_document_number: seed.id_document_number,
+      third_party_consent: consent,
+    };
+    const form = this.identityForm();
+    // Each turn waits for the chat to settle, so a form that is about to be replaced is never answered.
+    for (let i = 0; i < 12 && (await this.currentStep()) === "identity"; i++) {
+      const field = form.locator(".stepper__field");
+      // The last question of a topic sends the form, and the assistant answers it.
+      const sends = async () => {
+        const dots = form.locator(".stepper__progress span");
+        return (await dots.count()) === (await form.locator(".stepper__progress .done").count()) + 1;
+      };
+      const act = async (run: () => Promise<void>) => {
+        if (!(await sends())) return run();
+        // Wait for the assistant's reply and for this form to go (the next topic's form, or another step).
+        const sent = await form.elementHandle();
+        await this.andWaitForReply(run);
+        await expect.poll(() => sent!.evaluate((n) => n.isConnected)).toBe(false);
+      };
+      const choices = field.locator(".choice");
+      if (await choices.count()) {
+        const name = await field.getAttribute("data-field");
+        await act(() => field.locator(`.choice[data-value="${values[name ?? ""]}"]`).click());
+        continue;
+      }
+      const box = field.locator("input").first();
+      const name = (await box.getAttribute("name")) ?? "";
+      if ((await box.getAttribute("type")) === "checkbox") await box.setChecked(values[name] === true);
+      else await box.fill(String(values[name] ?? ""));
+      await act(() => this.controls().identity.click());
+    }
   }
 
   async enterOtp(code = OTP) {

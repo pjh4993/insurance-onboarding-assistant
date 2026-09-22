@@ -70,8 +70,8 @@ export function AgentLoop({ outline, nodeModels, highlight, caption }: Props) {
       <svg width={WIDTH} height={layout.height} role="img" aria-label="Agent loop">
         {layout.bands.map((band, i) => (
           <g key={band.domain}>
-            <rect x={0} y={band.top} width={WIDTH} height={band.bottom - band.top} fill={i % 2 ? "#fafbfc" : "#ffffff"} />
-            <text x={PILL_X} y={band.top + 16} fontSize={10.5} fontWeight={700} fill="#8b909a" letterSpacing="0.06em">
+            <rect x={0} y={band.top} width={WIDTH} height={band.bottom - band.top} style={{ fill: i % 2 ? "var(--bg-subtle)" : "var(--bg)" }} />
+            <text x={PILL_X} y={band.top + 16} fontSize={10.5} fontWeight={700} style={{ fill: "var(--ink-3)" }} letterSpacing="0.06em">
               {band.domain.toUpperCase()}
             </text>
           </g>
@@ -89,7 +89,7 @@ export function AgentLoop({ outline, nodeModels, highlight, caption }: Props) {
               key={`${e.source}->${e.target}`}
               d={`M ${ARC_X} ${y1} C ${ARC_X + bulge} ${y1}, ${ARC_X + bulge} ${y2}, ${ARC_X + 4} ${y2}`}
               fill="none"
-              stroke={hot ? "#ffb300" : e.kind === "resume" ? "#b59be0" : "#c9ccd2"}
+              style={{ stroke: hot ? "var(--mark)" : e.kind === "resume" ? "var(--violet-ink)" : "var(--line-strong)" }}
               strokeWidth={hot ? 2 : 1.2}
               strokeDasharray={back ? "4 3" : undefined}
               opacity={anyLit && !hot ? 0.35 : 1}
@@ -99,7 +99,7 @@ export function AgentLoop({ outline, nodeModels, highlight, caption }: Props) {
         })}
         <defs>
           <marker id="op-arrow" viewBox="0 0 6 6" refX="5" refY="3" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M 6 0 L 0 3 L 6 6 z" fill="#9ea3ab" />
+            <path d="M 6 0 L 0 3 L 6 6 z" style={{ fill: "var(--ink-4)" }} />
           </marker>
         </defs>
         {outline.nodes.map((node) => {
@@ -115,14 +115,22 @@ export function AgentLoop({ outline, nodeModels, highlight, caption }: Props) {
                 width={PILL_W}
                 height={20}
                 rx={10}
-                fill={on ? "#fff1c9" : node.kind === "llm" ? "#f3efff" : node.kind === "wait" ? "#eef6ff" : "#f4f5f7"}
-                stroke={on ? "#ffb300" : "#d9dce1"}
+                style={{
+                  fill: on
+                    ? "var(--mark-soft)"
+                    : node.kind === "llm"
+                      ? "var(--violet-soft)"
+                      : node.kind === "wait"
+                        ? "var(--primary-soft)"
+                        : "var(--bg-muted)",
+                  stroke: on ? "var(--mark)" : "var(--line-strong)",
+                }}
                 strokeWidth={on ? 1.8 : 1}
               />
-              <text x={PILL_X + 10} y={cy + 4} fontSize={11.5} fontFamily="var(--mono)" fill="#1a1d24">
+              <text x={PILL_X + 10} y={cy + 4} fontSize={11.5} fontFamily="var(--mono)" style={{ fill: "var(--ink)" }}>
                 {node.id}
               </text>
-              <text x={PILL_X + PILL_W - 8} y={cy + 4} fontSize={9.5} textAnchor="end" fill="#6b7280">
+              <text x={PILL_X + PILL_W - 8} y={cy + 4} fontSize={9.5} textAnchor="end" style={{ fill: "var(--ink-3)" }}>
                 {node.kind === "llm" ? `LLM${model ? ` · ${model}` : ""}` : node.kind === "wait" ? "wait" : ""}
                 {layout.ends.has(node.id) ? " ⏹" : ""}
               </text>

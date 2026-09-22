@@ -1,32 +1,119 @@
+/*
+ * Design tokens: Toss's flow on a Hugging Face docs shell. A white canvas split by 1px hairlines rather than
+ * shadows; Toss's grey scale for text; one blue for everything you can act on (buttons, links, focus,
+ * selection) and HF yellow only to mark where you are (the current step, a notice). Dark mode follows the
+ * system setting with HF's near-black shell. Spacing sits on a 4px grid.
+ */
 :root {
-  /* One palette for every page, taken from the customer landing page: cool gray canvas, white cards, ink
-     primary actions, blue only for links, focus and selection. */
-  --bg: #f3f4f6;
-  --surface: #ffffff;
-  --surface-2: #f7f8fa;
+  --bg: #ffffff;
+  --bg-subtle: #f9fafb;
+  --bg-muted: #f2f4f6;
+  --line: #ebedf0;
+  --line-strong: #d1d6db;
   --ink: #191f28;
   --ink-2: #4e5968;
   --ink-3: #8b95a1;
-  --line: #e5e8eb;
-  --line-2: #d1d6db;
-  --accent: #3182f6;
-  --accent-ink: #ffffff;
-  --accent-soft: #e8f1ff;
-  --success: #1f7a4d;
-  --success-soft: #e3f4ea;
-  --warning: #a55a00;
-  --warning-soft: #fff1dc;
-  --danger: #b42323;
-  --danger-soft: #fde8e8;
-  --muted-soft: #efefeb;
-  --radius: 16px;
-  --radius-sm: 10px;
-  --radius-card: 20px;
-  --shadow: 0 6px 24px rgb(25 31 40 / 0.06);
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR",
+  --ink-4: #b0b8c1;
+  --primary: #3182f6;
+  --primary-press: #1b64da;
+  --primary-soft: #e8f3ff;
+  --on-color: #ffffff;
+  --mark: #ffd21e;
+  --mark-soft: #fff8d6;
+  --mark-line: #f5dd7a;
+  --on-mark: #191f28;
+  --mark-ink: #7a5a00;
+  --violet-ink: #6b3fd4;
+  --violet-soft: #f3ecff;
+  --success: #03b26c;
+  --success-ink: #027a4a;
+  --success-soft: #e5f8ef;
+  --success-line: #b7e8d0;
+  --warning: #fe9800;
+  --warning-ink: #a85b00;
+  --warning-soft: #fff3e0;
+  --warning-line: #f6d5a3;
+  --danger: #f04452;
+  --danger-ink: #c81f2d;
+  --danger-soft: #feeced;
+  --danger-line: #f6c2c6;
+  --code-bg: #f6f7f9;
+  --float-shadow: 0 -4px 16px rgb(25 31 40 / 0.06);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-14: 56px;
+  --gutter: 20px;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+
+  --font: "Pretendard Variable", Pretendard, -apple-system, system-ui, "Apple SD Gothic Neo", "Noto Sans KR",
     sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --mono: var(--font-plex-mono, "IBM Plex Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Older names, kept so page styles read the same tokens. */
+  --surface: var(--bg);
+  --surface-2: var(--bg-subtle);
+  --muted-soft: var(--bg-muted);
+  --line-2: var(--line-strong);
+  --accent: var(--primary);
+  --accent-ink: var(--on-color);
+  --accent-soft: var(--primary-soft);
+  --radius: var(--radius-xl);
+  --radius-card: var(--radius-xl);
+  --shadow: none;
   color-scheme: light;
+}
+@media (min-width: 768px) {
+  :root {
+    --gutter: 24px;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f0f;
+    --bg-subtle: #161616;
+    --bg-muted: #1f1f1f;
+    --line: #262626;
+    --line-strong: #3a3a3a;
+    --ink: #eceef1;
+    --ink-2: #b0b8c1;
+    --ink-3: #8b95a1;
+    --ink-4: #5f6772;
+    --primary: #4c95ff;
+    --primary-press: #6aa8ff;
+    --primary-soft: #142640;
+    --mark-soft: #2e2608;
+    --mark-line: #5c4a0c;
+    --mark-ink: #ffe27a;
+    --violet-ink: #b69cff;
+    --violet-soft: #231a33;
+    --success: #1fb97a;
+    --success-ink: #4fd69b;
+    --success-soft: #0e2a1e;
+    --success-line: #1d4a36;
+    --warning: #f59a1b;
+    --warning-ink: #ffb54d;
+    --warning-soft: #2e2208;
+    --warning-line: #5a4312;
+    --danger: #f04452;
+    --danger-ink: #ff7a85;
+    --danger-soft: #331418;
+    --danger-line: #5e242b;
+    --code-bg: #161b22;
+    --float-shadow: 0 -4px 16px rgb(0 0 0 / 0.4);
+    color-scheme: dark;
+  }
 }
 
 * {
@@ -40,7 +127,7 @@ body {
 body {
   background: var(--bg);
   color: var(--ink);
-  font: 15px/1.5 var(--font);
+  font: 15px/1.6 var(--font);
   -webkit-font-smoothing: antialiased;
 }
 h1,
@@ -103,7 +190,7 @@ textarea {
   height: 32px;
   border-radius: 8px;
   background: var(--ink);
-  color: #fff;
+  color: var(--bg);
   font-size: 14px;
 }
 .brand strong {
@@ -117,7 +204,7 @@ textarea {
 }
 .conn {
   font-size: 12px;
-  color: var(--warning);
+  color: var(--warning-ink);
   background: var(--warning-soft);
   padding: 2px 8px;
   border-radius: 99px;
@@ -129,9 +216,9 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 36px;
+  min-height: 40px;
   padding: 0 16px;
-  border-radius: 99px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: var(--surface);
   font-weight: 600;
@@ -146,11 +233,18 @@ textarea {
   cursor: not-allowed;
 }
 .btn--primary {
-  background: var(--ink);
-  color: #fff;
+  background: var(--primary);
+  color: var(--on-color);
 }
 .btn--primary:hover:not(:disabled) {
-  background: #333d4b;
+  background: var(--primary-press);
+}
+/* The one action on a step: full width and tall, as on a phone's bottom bar. */
+.btn--cta {
+  width: 100%;
+  min-height: 56px;
+  border-radius: var(--radius-lg);
+  font-size: 17px;
 }
 .btn--ghost {
   border-color: var(--line-2);
@@ -162,16 +256,16 @@ textarea {
 }
 .btn--success {
   background: var(--success);
-  color: #fff;
+  color: var(--on-color);
 }
 .btn--danger {
   background: var(--danger);
-  color: #fff;
+  color: var(--on-color);
 }
 .btn--ghost.btn--danger {
   background: transparent;
-  color: var(--danger);
-  border-color: #efc4c4;
+  color: var(--danger-ink);
+  border-color: var(--danger-line);
 }
 .btn--link {
   background: none;
@@ -203,15 +297,15 @@ textarea {
 }
 .badge--success {
   background: var(--success-soft);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .badge--warning {
   background: var(--warning-soft);
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 .badge--danger {
   background: var(--danger-soft);
-  color: var(--danger);
+  color: var(--danger-ink);
 }
 .badge--muted {
   background: transparent;
@@ -259,7 +353,7 @@ textarea {
 .msg--mine .msg__bubble {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-color);
   border-bottom-right-radius: 4px;
 }
 .msg:not(.msg--mine) .msg__bubble {
@@ -267,13 +361,13 @@ textarea {
 }
 .msg--agent .msg__bubble {
   background: var(--success-soft);
-  border-color: #bfe3cd;
+  border-color: var(--success-line);
   color: var(--ink);
 }
 .msg--agent.msg--mine .msg__bubble {
   background: var(--success);
   border-color: var(--success);
-  color: #fff;
+  color: var(--on-color);
 }
 .msg--system {
   align-self: center;
@@ -325,7 +419,7 @@ textarea {
   color: var(--ink);
 }
 .input-panel__error {
-  color: var(--danger);
+  color: var(--danger-ink);
   background: var(--danger-soft);
   padding: 6px 10px;
   border-radius: var(--radius-sm);
@@ -465,12 +559,12 @@ textarea {
   color: var(--ink);
 }
 .field__req {
-  color: var(--danger);
+  color: var(--danger-ink);
 }
 .field__error {
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--danger);
+  color: var(--danger-ink);
 }
 .field--invalid input:not([type="checkbox"]),
 .field--invalid select {
@@ -517,6 +611,162 @@ textarea {
 }
 .chip:focus-within {
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* ---- stepped topic form (customer chat): one question at a time */
+.stepper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.stepper__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.stepper__progress {
+  display: flex;
+  gap: 6px;
+}
+.stepper__progress span {
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+.stepper__progress .done {
+  background: var(--ink-4);
+}
+.stepper__progress .now {
+  background: var(--mark);
+}
+.stepper__topic {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.stepper__reason {
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.stepper__answered {
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+.stepper__answered > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+}
+.stepper__answered dt {
+  color: var(--ink-3);
+  flex: none;
+}
+.stepper__answered dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  text-align: right;
+}
+.stepper__answered dd > span {
+  overflow-wrap: anywhere;
+}
+.link-btn {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.link-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.stepper__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.stepper__question {
+  font-size: 22px;
+  line-height: 1.4;
+  font-weight: 700;
+  color: var(--ink);
+  text-wrap: balance;
+}
+.stepper__optional {
+  margin-left: var(--space-2);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+  vertical-align: middle;
+}
+.stepper .field input,
+.stepper .field select {
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: 17px;
+}
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.choice {
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.choice:hover {
+  border-color: var(--ink-4);
+}
+.choice--on {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
+}
+.check--card {
+  align-items: center;
+  padding: var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.check--card input {
+  margin: 0;
+  width: 20px;
+  height: 20px;
+}
+.check--on {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .choice,
+  .btn {
+    transition: none;
+  }
 }
 
 /* ---- recommendation cards */
@@ -687,13 +937,13 @@ textarea {
   flex-direction: column;
   gap: 8px;
   background: var(--warning-soft);
-  border: 1px solid #f1d3a6;
+  border: 1px solid var(--warning-line);
   border-radius: var(--radius);
   padding: 12px;
 }
 .handoff__title {
   font-weight: 600;
-  color: var(--warning);
+  color: var(--warning-ink);
   font-size: 13.5px;
 }
 .handoff textarea {
@@ -733,7 +983,7 @@ textarea {
 }
 .stages__step--done::before,
 .stages__step--current::before {
-  background: var(--accent);
+  background: var(--ink-4);
 }
 .stages__dot {
   display: grid;
@@ -748,14 +998,15 @@ textarea {
   z-index: 1;
 }
 .stages__step--done .stages__dot {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--ink-2);
+  border-color: var(--ink-2);
+  color: var(--bg);
 }
 .stages__step--current .stages__dot {
-  border-color: var(--accent);
-  color: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-soft);
+  background: var(--mark);
+  border-color: var(--mark);
+  color: var(--on-mark);
+  box-shadow: 0 0 0 4px var(--mark-soft);
 }
 .stages__step--current {
   color: var(--ink);
@@ -800,8 +1051,9 @@ textarea {
 .notice {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   padding: 28px;
+  width: 100%;
   max-width: 460px;
   display: flex;
   flex-direction: column;
@@ -824,11 +1076,11 @@ textarea {
 }
 .banner--success {
   background: var(--success-soft);
-  color: var(--success);
+  color: var(--success-ink);
 }
 .banner--warning {
   background: var(--warning-soft);
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 .banner--muted {
   background: var(--muted-soft);
@@ -880,7 +1132,7 @@ textarea {
 }
 .locale-switch button.is-on {
   background: var(--ink);
-  color: #fff;
+  color: var(--bg);
   font-weight: 600;
 }
 .locale-switch button:disabled {

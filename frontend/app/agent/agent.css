@@ -42,7 +42,7 @@
 }
 .console__nav button.is-on {
   background: var(--ink);
-  color: #fff;
+  color: var(--bg);
   border-color: var(--ink);
 }
 .console__nav button:disabled {
@@ -92,7 +92,7 @@
   margin: 4px 2px 6px;
 }
 .section-label--warning {
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 .session {
   width: 100%;
@@ -112,12 +112,12 @@
   background: var(--surface-2);
 }
 .session--handoff {
-  border-color: #f1d3a6;
+  border-color: var(--warning-line);
   background: var(--warning-soft);
 }
 .session--selected {
   border-color: var(--ink);
-  box-shadow: 0 0 0 3px rgb(25 31 40 / 0.08);
+  box-shadow: 0 0 0 3px var(--bg-muted);
 }
 .session__top {
   display: flex;
@@ -175,7 +175,7 @@
 }
 .segmented button.is-on {
   background: var(--ink);
-  color: #fff;
+  color: var(--bg);
   font-weight: 600;
 }
 .link-box {
@@ -308,7 +308,7 @@
   flex-wrap: wrap;
   align-items: center;
   font-size: 13px;
-  color: var(--warning);
+  color: var(--warning-ink);
   font-weight: 600;
 }
 .summary {

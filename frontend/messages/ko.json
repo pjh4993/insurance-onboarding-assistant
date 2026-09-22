@@ -141,7 +141,15 @@
     "submit": "본인 확인하기"
   },
   "topicForm": {
-    "submit": "다음",
+    "submit": "확인",
+    "next": "다음",
+    "skip": "건너뛰기",
+    "skipped": "건너뜀",
+    "edit": "수정",
+    "optional": "선택",
+    "yes": "예",
+    "no": "아니요",
+    "progress": "{title} · {step}/{total}",
     "choose": "선택해 주세요",
     "required": "필수 항목이에요",
     "invalidNumber": "숫자를 입력해 주세요",

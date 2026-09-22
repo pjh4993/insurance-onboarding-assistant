@@ -34,18 +34,45 @@ function isEmpty(f: FormField, v: FieldState | undefined): boolean {
   return typeof v !== "string" || v.trim() === "";
 }
 
+/** One field's error, or null when its value can be sent. */
+export function validateField(f: FormField, v: FieldState | undefined): FieldError | null {
+  if (isEmpty(f, v)) return f.required ? "required" : null;
+  if (f.kind === "number" && !Number.isFinite(Number(String(v).trim()))) return "number";
+  return null;
+}
+
 /** Errors by field name; empty when the form can be sent. */
 export function validateForm(form: FormSpec, state: FormState): Record<string, FieldError> {
   const errors: Record<string, FieldError> = {};
   for (const f of form.fields) {
-    const v = state[f.name];
-    if (isEmpty(f, v)) {
-      if (f.required) errors[f.name] = "required";
-    } else if (f.kind === "number" && !Number.isFinite(Number(String(v).trim()))) {
-      errors[f.name] = "number";
-    }
+    const error = validateField(f, state[f.name]);
+    if (error) errors[f.name] = error;
   }
   return errors;
+}
+
+/** The first field still to answer in a stepped form: the first invalid one, else the first empty one. */
+export function firstOpenField(form: FormSpec, state: FormState): number {
+  const invalid = form.fields.findIndex((f) => validateField(f, state[f.name]));
+  if (invalid >= 0) return invalid;
+  const empty = form.fields.findIndex((f) => f.kind !== "boolean" && isEmpty(f, state[f.name]));
+  return empty >= 0 ? empty : form.fields.length - 1;
+}
+
+/**
+ * How an answered field reads in the stepped form's list above the current question: option labels for
+ * choices, "" for an empty optional field and a masked document number (only its last 4 characters show),
+ * since the list stays on screen while the customer answers the rest.
+ */
+export function answerSummary(f: FormField, v: FieldState | undefined, yesNo: { yes: string; no: string }): string {
+  if (f.kind === "boolean") return v === true ? yesNo.yes : yesNo.no;
+  if (isEmpty(f, v)) return "";
+  const label = (value: string) => f.options?.find((o) => o.value === value)?.label ?? value;
+  if (Array.isArray(v)) return v.map(label).join(", ");
+  const text = String(v).trim();
+  if (f.kind === "select") return label(text);
+  if (f.name.endsWith("_number") && text.length > 4) return `${"•".repeat(Math.min(text.length - 4, 8))}${text.slice(-4)}`;
+  return text;
 }
 
 /**

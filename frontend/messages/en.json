@@ -141,7 +141,15 @@
     "submit": "Verify my identity"
   },
   "topicForm": {
-    "submit": "Continue",
+    "submit": "Confirm",
+    "next": "Next",
+    "skip": "Skip",
+    "skipped": "Skipped",
+    "edit": "Edit",
+    "optional": "Optional",
+    "yes": "Yes",
+    "no": "No",
+    "progress": "{title} · {step} of {total}",
     "choose": "Choose…",
     "required": "Required",
     "invalidNumber": "Enter a number",
